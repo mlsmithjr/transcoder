@@ -14,20 +14,24 @@ nVida CUDA-enabled graphics card or Intel accelerated video.
 
 ### Requirements
 
-* latest *ffmpeg* 
+* latest *ffmpeg* (3.4.3-2 or higher)
 * latest nVidia CUDA drivers (_optional_)
 * Python 3 (3.6 or higher)
 * Python PlexAPI package (optional).  Install with `pip3 install plexapi`
 
 ### Configuration
-Since there are more people who will run this script in synchronous mode, the *CONCURRENT_JOBS* value defaults to 1.
+Since there are people who will run this script in synchronous mode, the *CONCURRENT_JOBS* value should be set to 1.
 There really is no good reason to increase this number if you are not using hardware transcoding as the CPU will be
 fully engaged already.
 
-> To run concurrent jobs you must edit *transcode.py*, look for CONCURRENT_JOBS, and 
-> change its value from 1 to 2 (or whatever your system can handle). You must also supply the
+> To change the concurrent jobs default you must edit *transcode.py*, look for CONCURRENT_JOBS, and 
+> change its value from 2 to whatever your system can handle, or 1 to disable. You must also supply the
 > appropriate options for your transcode profiles to use the supported hardware, otherwise you'll
-> completely bog down your system (see the transcode.yml "hevc" samples)
+> completely bog down your system (see the transcode.yml "hevc" samples). If you transcode with a profile not
+> setup for hardware support, or the rules matcher selects a profile without the setup, that file will
+> transcode using CPU time. Therefore, when using concurrent hardware transcoding using rules it is best that all your rules map
+> to only profiles with hardware support.  You can always run non-concurrent CPU-based transcodes from
+> the command line, selecting sequential-only and bypassing profile rules.
 
 Included with the source is a starting config file called *transcode.yml*.
 This is a YAML-formatted file and contains definitions for some transcoding profiles and matching rules.
@@ -52,6 +56,14 @@ your transcoding in a _cron_ job.
 
 ### Running
 
+Note that if using a list file as input, when the process is done that file will contain only those
+video files that failed to transcode, or it will be removed if all files were processed. So if you need to keep
+this file make a copy first.
+
+The default behavior is to remove the original video file after transcoding and replace it with the new version.
+If you want to keep the source *be sure to use the -k* parameter.  The transcoded file will be placed in the same
+folder as the source with the same name and a .tmp extension.
+
 To get help:
 ```
    # python3 transcode.py -h
@@ -73,4 +85,9 @@ To transcode everything in a master file, using a forced profile for all:
 ```
     # python3 transcode.py -p hevc_hd_preserve --from-file /tmp/queue.txt
     
+```
+
+If configured for concurrency but want o transcode a bunch of files sequentially only:
+```
+    # python3 transcode.py -s *.mp4
 ```
