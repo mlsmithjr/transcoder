@@ -8,31 +8,21 @@ import subprocess
 from queue import Queue
 from threading import Thread
 
-##
-## Customizable options here
-##
-FFMPEG='/usr/bin/ffmpeg'
-DEFAULT_QUEUEFILE = '/volume1/config/sonarr/transcode_queue.txt'
-CONCURRENT_JOBS = 2  # eg. a 4g nVidia GTX 960 can support 2 concurrent encodes.
-PLEX_SERVER = None  # '192.168.2.63:32400'  # set to None to disable
-DEFAULT_CONFIG=os.path.expanduser('~/.transcode.yml')
+DEFAULT_CONFIG = os.path.expanduser('~/.transcode.yml')
 
-##
-## End customizations
-##
-
-valid_predicates = ['vcodec','res_height','res_width','runtime','source_size']
+valid_predicates = ['vcodec', 'res_height', 'res_width', 'runtime', 'source_size']
 video_re = re.compile('^.*Duration: (\d+):(\d+):.* Stream #0:0.*: Video: (\w+).*, (\d+)x(\d+).*$', re.DOTALL)
 thread_queue = Queue(10)
 complete = set()
-queue_path = DEFAULT_QUEUEFILE
+queue_path = None
 profiles = dict()
 matching_rules = dict()
+config = dict()
+concurrent_jobs = 2
 keep_source = False
 
 
 def match_profile(path, vcodec, width, height, runtime, filesize_mb) -> (str, str):
-
     for description, body in matching_rules.items():
         if 'rules' not in body:
             # no rules section, match by default
@@ -45,7 +35,7 @@ def match_profile(path, vcodec, width, height, runtime, filesize_mb) -> (str, st
                 break
             if pred == 'res_height' and len(value) > 1:
                 if value.isnumeric():
-                    value = '==' + value # make python-friendly
+                    value = '==' + value  # make python-friendly
                 if not eval(f'{height}{value}'):
                     break
             if pred == 'res_width' and len(value) > 1:
@@ -68,6 +58,7 @@ def match_profile(path, vcodec, width, height, runtime, filesize_mb) -> (str, st
             return body['profile'], description
     return None, None
 
+
 def loadq(queuepath) -> list:
     if not os.path.exists(queuepath):
         print(f'Queue file {queuepath} not found')
@@ -85,22 +76,22 @@ def fetch_details(_path) -> (str, int, int):
             print(f'>>>> regex match on video stream data failed: ffmpeg -i {_path}')
             return None, 0, 0, 0, 0
         else:
-            _dur_hrs, _dur_mins,_codec, _res_width, _res_height = match.group(1, 2, 3, 4, 5)
-            filesize = os.path.getsize(path) / (1024*1024)
+            _dur_hrs, _dur_mins, _codec, _res_width, _res_height = match.group(1, 2, 3, 4, 5)
+            filesize = os.path.getsize(path) / (1024 * 1024)
             return _codec, int(_res_width), int(_res_height), (int(_dur_hrs) * 60) + int(_dur_mins), filesize
 
 
 def perform_transcodes():
-    global keep_source
+    global keep_source, config
 
     while not thread_queue.empty():
         try:
             _inpath, _outpath, profile_name = thread_queue.get()
-            profile = profiles[profile_name]
-            oinput = profile['input_options'].split()
-            ooutput = profile['output_options'].split()
-            cli = [FFMPEG] + oinput + ['-i',_inpath] + ooutput + [_outpath]
-            #cli = [FFMPEG, '-hide_banner', '-nostats', '-hwaccel', 'cuvid', '-i', _inpath, '-c:v', 'hevc_nvenc',
+            _profile = profiles[profile_name]
+            oinput = _profile['input_options'].split()
+            ooutput = _profile['output_options'].split()
+            cli = [config['ffmpeg']] + oinput + ['-i', _inpath] + ooutput + [_outpath]
+            # cli = [FFMPEG, '-hide_banner', '-nostats', '-hwaccel', 'cuvid', '-i', _inpath, '-c:v', 'hevc_nvenc',
             #       '-profile:v', 'main', '-preset', 'medium', '-crf', '22', '-c:a', 'copy', '-c:s', 'copy', '-f',
             #       'matroska',
             #       _outpath]
@@ -112,7 +103,7 @@ def perform_transcodes():
                 if not keep_source:
                     print('removing ' + _inpath)
                     os.remove(_inpath)
-                    print('renaming ' +_outpath)
+                    print('renaming ' + _outpath)
                     os.rename(_outpath, _outpath[:-4])
             else:
                 print('error during transcode, .tmp file removed')
@@ -120,13 +111,16 @@ def perform_transcodes():
         finally:
             thread_queue.task_done()
 
-def load_config(path):
-    global profiles, matching_rules
 
-    with open(path, 'r') as f:
-        config = yaml.load(f)
-        profiles = config['profiles']
-        matching_rules = config['rules']
+def load_config(_path):
+    global profiles, matching_rules, config, concurrent_jobs
+
+    with open(_path, 'r') as f:
+        yml = yaml.load(f)
+        profiles = yml['profiles']
+        matching_rules = yml['rules']
+        config = yml['config']
+        concurrent_jobs = config['concurrent_jobs']
 
 
 if __name__ == '__main__':
@@ -141,12 +135,16 @@ if __name__ == '__main__':
             'If full paths not used, defaults to current directory')
         print('OPTIONS:')
         print('  -s         Process files sequentially even if configured for multiple concurrent jobs')
-        print('  -k         Keep source files after transcoding. If used, the transcoded file will have the same name and .tmp extension')
+        print(
+            '  -k         Keep source files after transcoding. If used, the transcoded file will have the same name and .tmp extension')
         print('  -y <file>  Full path to configuration file.  Default is ~/.transcode.yml')
         print('  -p         profile to use. If used with --from-file, applies to all listed media in <filename>')
         print('             Otherwise, applies to all following files up to the next occurrance')
-        print('                 Ex: {} --from-file /home/me/batch.txt -p hevc_hd /tmp/testvid1.mp4 /tmp/testvid2.mp4'.format(sys.argv[0]))
-        print('                   This will transcode all videos listed in batch.txt using the rules, using hevc_hd profile for the others')
+        print(
+            '                 Ex: {} --from-file /home/me/batch.txt -p hevc_hd /tmp/testvid1.mp4 /tmp/testvid2.mp4'.format(
+                sys.argv[0]))
+        print(
+            '                   This will transcode all videos listed in batch.txt using the rules, using hevc_hd profile for the others')
         print('                 Ex: {} -p hevc_25fps --from-file /home/me/batch.txt'.format(sys.argv[0]))
         print('                   This will transcode all videos listed in batch.txt using the the hevc_25fps profile')
         print('                 Ex: {} -p hevc_25fps /tmp/vid1.mp4 -p hevc_hd /tmp/vid2.mp4'.format(sys.argv[0]))
@@ -162,29 +160,34 @@ if __name__ == '__main__':
         arg = 1
         while arg < len(sys.argv):
             if sys.argv[arg] == '--from-file':
-                queue_path = sys.argv[arg+1]
+                queue_path = sys.argv[arg + 1]
                 arg += 1
                 tmpfiles = loadq(queue_path)
-                files = files.extend([(f, profile) for f in tmpfiles])
+                files.extend([(f, profile) for f in tmpfiles])
             elif sys.argv[arg] == '-p':
-                profile = sys.argv[arg+1]
+                profile = sys.argv[arg + 1]
                 arg += 1
             elif sys.argv[arg] == '-y':
                 arg += 1
                 load_config(sys.argv[arg])
             elif sys.argv[arg] == '-s':
-                CONCURRENT_JOBS = 1
+                concurrent_jobs = 1
             elif sys.argv[arg] == '-k':
                 keep_source = True
             else:
                 files.append((sys.argv[arg], profile))
             arg += 1
 
-    if files is None:
-        exit(0)
-
     if len(profiles) == 0:
         load_config(DEFAULT_CONFIG)
+
+    if len(files) == 0 and queue_path is None and 'default_queue_file' in config:
+        queue_path = config['default_queue_file']
+        tmpfiles = loadq(queue_path)
+        files.extend([(f, profile) for f in tmpfiles])
+
+    if files is None:
+        exit(0)
 
     for path, forced_profile in files:
         #
@@ -211,7 +214,7 @@ if __name__ == '__main__':
                     print(f'Skipping due to profile rule: {rule}')
                     complete.add(path)
                     continue
-                if  matched_profile not in profiles:
+                if matched_profile not in profiles:
                     print(f'profile "{matched_profile}" referenced from rule "{rule}" not found')
                     exit(1)
                 the_profile = profiles[matched_profile]
@@ -234,12 +237,12 @@ if __name__ == '__main__':
             #     complete.add(path)
             #     continue
 
-
     #
     # all files are listed in the queue so start the threads
     #
     jobs = list()
-    for _ in range(CONCURRENT_JOBS):
+    concurrent_jobs = min(concurrent_jobs, thread_queue.qsize())
+    for _ in range(concurrent_jobs):
         t = Thread(target=perform_transcodes)
         jobs.append(t)
         t.start()
@@ -258,19 +261,28 @@ if __name__ == '__main__':
         else:
             os.remove(queue_path)
 
-    if PLEX_SERVER is not None:
+    if 'plex_server' in config:
         try:
             from plexapi.server import PlexServer
 
-            plex = PlexServer(f'http://{PLEX_SERVER}')
+            plex = PlexServer('http://{}'.format(config['plex_server']))
             plex.library.update()
-            #plex.library.section(PLEX_DEFAULT_REFRESH_LIBRARY).update()
+            # plex.library.section(PLEX_DEFAULT_REFRESH_LIBRARY).update()
         except Exception as ex:
             print(
-                'Library not installed. To use Plex notifications please install the Python 3 Plex API ("pip3 install plexapi")')
-
+                'Library not installed. To use Plex notifications please install the Python 3 Plex API ' +
+                '("pip3 install plexapi")')
 
 SAMPLE_YAML = """
+##
+# global configuration
+##
+config:
+  default_queue_file: '/volume1/config/sonarr/transcode_queue.txt'
+  ffmpeg: '/usr/bin/ffmpeg'
+  concurrent_jobs: 2
+  plex_server: null 
+
 ##
 # profile definitions
 ##

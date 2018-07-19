@@ -1,7 +1,15 @@
 ##
+# global configuration
+##
+config:
+  default_queue_file: '/volume1/config/sonarr/transcode_queue.txt'
+  ffmpeg: '/usr/bin/ffmpeg'
+  concurrent_jobs: 2
+  plex_server: null           # can be 'server:port'
+
+##
 # profile definitions.  You can model all your transcoding combinations here.
 ##
-
 profiles:
   hevc_hd_preserved:          # what I use for almost everything
       input_options: |
@@ -96,7 +104,7 @@ rules:
   'skip video if resolution < 720':
       profile: SKIP
       rules:
-        res_height: '<720'
+        res_height: '<700'
 
   'for content I consider too big for their runtime':
       profile: hevc_hd_25fps
