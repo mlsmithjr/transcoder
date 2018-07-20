@@ -27,22 +27,23 @@ sure to preserve the YAML formatting.
 
 There are 3 sections:
 
-##### config
-> Global configuration information
+##### config - Global configuration information
 
 Sample
 ``` 
+config:
   default_queue_file:   '/path/to/default/list/of/files/if/none/given'
   ffmpeg:               '/usr/bin/ffmpeg'       # path to ffmpeg for this config
   concurrent_jobs:      2              # set to 1 to disable concurrency
   plex_server:          null           # can be 'server:port'
 ```
 
-##### profiles
-> Transcoding profiles (ffmpeg options)
+##### profiles - Transcoding profiles (ffmpeg options)
 
-Sample:
-``` 
+Sample: (Note that profile options can be formatted in multiple ways)
+```yml
+# long form of option formatting, allowing for comments
+profiles:
   hevc_hd_preserved:          # profile name
       input_options: |        # ffmpeg input options
         -hide_banner
@@ -58,21 +59,49 @@ Sample:
         -c:s copy
         -f matroska
       extension: '.mkv'
+
+  # alternate style of option formatting
+  x264:                            # profile name
+      input_options: ' -hide_banner -nostats -loglevel quiet'
+      output_options: '-crf 20 -c:a copy -c:s copy -f matroska'
+      extension: '.mkv'
+
+
 ```
-##### rules
-> Simple expression to match video files with the appropriate profile. They are evaluated top-down so
+##### rules - simple profile matching rules
+
+Simple expression to match video files with the appropriate profile. They are evaluated top-down so
 make sure your default is the last one. You don't need to use the rules system. You can either
 explicitly give the desired profile name on the commandline or just have a single rule for default.
 But if you transcode certain media differently then having the rules system make it easy to transcode
 using various options depending on the media.
-ß
+
 Samples:
-``` 
-  'for content I consider too big for their runtime':
+```yml
+  'for content I consider too big':
       profile: hevc_hd_25fps    # profile to use if the criterial below match
       rules:
         runtime:      '<180'    # less than 3 hours
         source_size:  '>5000'   # ..and larger than 5 gigabytes
+        fps: '>25'
+
+  'already best codec':
+    profile: 'SKIP'    # special keyword SKIP, means anything that matches this rule won't get transcoded
+    rules:
+      'vcodec': 'hevc'
+
+  'skip files that are not appropriate for hevc':
+    profile: 'SKIP'
+    rules:
+      source_size: '<600'
+      runtime: '<40'
+
+  'half-hour videos':
+    profile: 'x264'
+    rules:
+      source_size: '>500'  # 400mb file size or greater
+      runtime: '<31'         # 30 minutes or less
+      vcodec: '!hevc'	       # not hevc
 
   'default':                    # this will be the DEFAULT (no rules implies a match)
       profile: hevc_hd_preserved
@@ -96,6 +125,11 @@ Easy - let the script do the work of selecting the right *ffmpeg* options.
 But you aren't required to use rules.  You can specify the profile on the commandline each
 run using the -p option. Or you can define 1 rules that acts as a default (see example above).
 
+When changing or adding profiles and rules it is useful to test them out by running in *--dry-run* mode first.
+
+### Running without Concurrency
+If you cannot transcode concurrently, or just don't want to you can still get value from this script.  Just edit the transcode.yml file as described above and change concurrent_jobs to 1.  You still get the use of profiles
+and rules to help with your transcoding needs.
 
 ### Notes on Concurrency
 
@@ -136,29 +170,34 @@ If you want to keep the source *be sure to use the -k* parameter.  The transcode
 folder as the source with the same name and a .tmp extension.
 
 To get help:
-```
-   # python3 transcode.py -h
+```bash
+   python3 transcode.py -h
 ```
 
 To transcode 2 files using a specific profile:
-```
-    # python3 transcode.py -p x264 /tmp/video1.mp4 /tmp/video2.mp4
+```bash
+    python3 transcode.py -p x264 /tmp/video1.mp4 /tmp/video2.mp4
     
 ```
 
 To transcode everything in a master file, defaulting to rules to match profiles:
-```
-    # python3 transcode.py --from-file /tmp/queue.txt
+```bash
+    python3 transcode.py --from-file /tmp/queue.txt
     
+```
+To do a test run without transcoding, to see which profiles will match and the *ffmpeg* command:
+```bash
+    python3 transcode.py --dry-run atestvideo.mp4
+
 ```
 
 To transcode everything in a master file, using a forced profile for all:
-```
-    # python3 transcode.py -p hevc_hd_preserve --from-file /tmp/queue.txt
+```bash
+    python3 transcode.py -p hevc_hd_preserve --from-file /tmp/queue.txt
     
 ```
 
 If configured for concurrency but want o transcode a bunch of files sequentially only:
-```
-    # python3 transcode.py -s *.mp4
+```bash
+    python3 transcode.py -s *.mp4
 ```
