@@ -10,8 +10,8 @@ from threading import Thread
 
 DEFAULT_CONFIG = os.path.expanduser('~/.transcode.yml')
 
-valid_predicates = ['vcodec', 'res_height', 'res_width', 'runtime', 'source_size']
-video_re = re.compile('^.*Duration: (\d+):(\d+):.* Stream #0:0.*: Video: (\w+).*, (\d+)x(\d+).*$', re.DOTALL)
+valid_predicates = ['vcodec', 'res_height', 'res_width', 'runtime', 'source_size', 'fps']
+video_re = re.compile('^.*Duration: (\d+):(\d+):.* Stream #0:0.*: Video: (\w+).*, (\d+)x(\d+).* (\d+) fps,.*$', re.DOTALL)
 thread_queue = Queue(10)
 complete = set()
 queue_path = None
@@ -20,38 +20,96 @@ matching_rules = dict()
 config = dict()
 concurrent_jobs = 2
 keep_source = False
+dry_run = False
 
 
-def match_profile(path, vcodec, width, height, runtime, filesize_mb) -> (str, str):
+class MediaInfo:
+
+    def __init__(self, path, vcodec, res_height, res_width, runtime, source_size, fps):
+        self._path = path
+        self._vcodec = vcodec
+        self._res_height = res_height
+        self._res_width = res_width
+        self._runtime = runtime
+        self._filesize_mb = source_size
+        self._fps = fps
+
+    @property
+    def path(self):
+        return self._path
+
+    @property
+    def vcodec(self):
+        return self._vcodec
+
+    @property
+    def res_height(self):
+        return self._res_height
+
+    @property
+    def res_width(self):
+        return self._res_width
+
+    @property
+    def runtime(self):
+        return self._runtime
+
+    @property
+    def filesize_mb(self):
+        return self._filesize_mb
+
+    @property
+    def fps(self):
+        return self._fps
+
+
+def match_profile(path, mediainfo) -> (str, str):
     for description, body in matching_rules.items():
         if 'rules' not in body:
             # no rules section, match by default
             return body['profile'], description
         for pred, value in body['rules'].items():
+            inverted = False
             if pred not in valid_predicates:
                 print(f'Invalid predicate {pred} in rule {description}')
                 exit(1)
-            if pred == 'vcodec' and vcodec != value:
+            if isinstance(value, str) and len(value) > 1 and value[0] == '!':
+              inverted = True
+              value = value[1:]
+            if pred == 'vcodec' and mediainfo.vcodec != value and not inverted:
                 break
+            if pred == 'path':
+                try:
+                    m = re.match(mediainfo.path, value)
+                    if m is None:
+                        break
+                except Exception as ex:
+                    print(f'invalid regex {mediainfo.path} in rule {description}')
+                    exit(0)
             if pred == 'res_height' and len(value) > 1:
                 if value.isnumeric():
                     value = '==' + value  # make python-friendly
-                if not eval(f'{height}{value}'):
+                if not eval(f'{mediainfo.res_height}{value}'):
                     break
             if pred == 'res_width' and len(value) > 1:
                 if value.isnumeric():
                     value = '==' + value  # make python-friendly
-                if not eval(f'{width}{value}'):
+                if not eval(f'{mediainfo.res_width}{value}'):
                     break
             if pred == 'runtime' and len(value) > 1:
                 if value.isnumeric():
                     value = '==' + value  # make python-friendly
-                if not eval(f'{runtime}{value}'):
+                if not eval(f'{mediainfo.runtime}{value}'):
+                    break
+            if pred == 'fps' and len(value) > 1:
+                if value.isnumeric():
+                    value = '==' + value  # make python-friendly
+                if not eval(f'{mediainfo.fps}{value}'):
                     break
             if pred == 'source_size' and len(value) > 1:
                 if value.isnumeric():
                     value = '==' + value  # make python-friendly
-                if not eval(f'{filesize_mb}{value}'):
+                if not eval(f'{mediainfo.filesize_mb}{value}'):
                     break
         else:
             # didn't bail out on any predicates, have a match
@@ -68,25 +126,26 @@ def loadq(queuepath) -> list:
         return _files
 
 
-def fetch_details(_path) -> (str, int, int):
+def fetch_details(_path) -> MediaInfo:
     with subprocess.Popen(['ffmpeg', '-i', path], stderr=subprocess.PIPE) as proc:
         output = proc.stderr.read().decode(encoding='utf8')
         match = video_re.match(output)
-        if match is None or len(match.groups()) != 5:
+        if match is None or len(match.groups()) != 6:
             print(f'>>>> regex match on video stream data failed: ffmpeg -i {_path}')
-            return None, 0, 0, 0, 0
+            return MediaInfo(path, None, 0, 0, 0, 0, 0)
         else:
-            _dur_hrs, _dur_mins, _codec, _res_width, _res_height = match.group(1, 2, 3, 4, 5)
+            _dur_hrs, _dur_mins, _codec, _res_width, _res_height, fps = match.group(1, 2, 3, 4, 5, 6)
             filesize = os.path.getsize(path) / (1024 * 1024)
-            return _codec, int(_res_width), int(_res_height), (int(_dur_hrs) * 60) + int(_dur_mins), filesize
+            return MediaInfo(_path, _codec, int(_res_width), int(_res_height), (int(_dur_hrs) * 60) + int(_dur_mins), filesize, int(fps))
 
 
 def perform_transcodes():
-    global keep_source, config
+    global keep_source, config, dry_run
 
     while not thread_queue.empty():
         try:
             _inpath, _outpath, profile_name = thread_queue.get()
+            print(f'transcoding {_inpath}:')
             _profile = profiles[profile_name]
             oinput = _profile['input_options'].split()
             ooutput = _profile['output_options'].split()
@@ -95,7 +154,9 @@ def perform_transcodes():
             #       '-profile:v', 'main', '-preset', 'medium', '-crf', '22', '-c:a', 'copy', '-c:s', 'copy', '-f',
             #       'matroska',
             #       _outpath]
-            print('executing: ' + ' '.join(cli))
+            print(profile_name + ' -->  ' + ' '.join(cli) + '\n')
+            if dry_run:
+                continue
             p = subprocess.Popen(cli)
             p.wait()
             if p.returncode == 0:
@@ -135,6 +196,7 @@ if __name__ == '__main__':
             'If full paths not used, defaults to current directory')
         print('OPTIONS:')
         print('  -s         Process files sequentially even if configured for multiple concurrent jobs')
+        print('  --dry-run  Run without actually transcoding or modifying anything, useful to test rules and profiles')
         print(
             '  -k         Keep source files after transcoding. If used, the transcoded file will have the same name and .tmp extension')
         print('  -y <file>  Full path to configuration file.  Default is ~/.transcode.yml')
@@ -174,6 +236,8 @@ if __name__ == '__main__':
                 concurrent_jobs = 1
             elif sys.argv[arg] == '-k':
                 keep_source = True
+            elif sys.argv[arg] == '--dry-run':
+                dry_run = True
             else:
                 files.append((sys.argv[arg], profile))
             arg += 1
@@ -202,11 +266,13 @@ if __name__ == '__main__':
         if not os.path.isfile(path):
             print('path not found, skipping: ' + path)
             continue
-        print('path=' + path)
-        vcodec, res_width, res_height, runtime, filesize_mb = fetch_details(path)
-        if vcodec is not None:
+
+        path = os.path.abspath(path)	# convert to full path so that rule filtering can work
+        print('processing ' + path)
+        minfo = fetch_details(path)
+        if minfo.vcodec is not None:
             if forced_profile is None:
-                matched_profile, rule = match_profile(path, vcodec, res_width, res_height, runtime, filesize_mb)
+                matched_profile, rule = match_profile(path, minfo)
                 if matched_profile is None:
                     print(f'No matching profile found - skipped')
                     continue
@@ -237,6 +303,7 @@ if __name__ == '__main__':
             #     complete.add(path)
             #     continue
 
+    print()
     #
     # all files are listed in the queue so start the threads
     #
@@ -250,7 +317,7 @@ if __name__ == '__main__':
     # wait for all jobs to complete
     thread_queue.join()
 
-    if queue_path is not None:
+    if not dry_run and queue_path is not None:
         # pick up any newly added files
         files = set(loadq(queue_path))
         files = files - complete
@@ -261,7 +328,7 @@ if __name__ == '__main__':
         else:
             os.remove(queue_path)
 
-    if 'plex_server' in config:
+    if 'plex_server' in config and config['plex_server'] is not None and not dry_run:
         try:
             from plexapi.server import PlexServer
 
