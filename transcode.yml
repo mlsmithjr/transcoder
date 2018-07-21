@@ -98,7 +98,7 @@ profiles:
 #            vcodec         Video codec of the source ('ffmpeg -codecs' to see full list), may preceed with ! for not-equal test
 #            res_height     Source video resolution height, operators < and > allowed
 #            res_width      Source video resolution width, operators < and > allowed
-#            source_size    Size of the source file (in megabytes), operators allowed
+#            filesize_mb    Size of the source file (in megabytes), operators allowed
 #            runtime        Source runtime in minutes, operators allowed
 #            fps            Framerate of the source
 #            path           Full path of the source file. Value can be a regular expression (ie. '.*/Television/.*').
@@ -116,7 +116,7 @@ rules:
       profile: hevc_30fps
       rules:
         fps: '>30'
-        source_size: '>500'
+        filesize_mb: '>500'
 
   'skip video if resolution < 700':
       profile: SKIP
@@ -127,7 +127,7 @@ rules:
       profile: hevc_hd_25fps
       rules:
         runtime:      '<180'      # less than 3 hours
-        source_size:  '>6000'  # ..and larger than 6 gigabytes
+        filesize_mb:  '>6000'  # ..and larger than 6 gigabytes
         fps: '>25'
 
   'default':    # this will be the DEFAULT (no rules implies a match)
