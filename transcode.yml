@@ -1,4 +1,7 @@
 ##
+# NOTE: This file is a sample configuration and also acts as a basis for unit testing.  Change with caution.
+##
+##
 # global configuration
 ##
 config:

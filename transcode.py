@@ -25,45 +25,24 @@ keep_source = False
 dry_run = False
 verbose = False
 
-
 class MediaInfo:
+    filesize_mb : int
+    path : str
+    res_height : int
+    res_width : int
+    runtime : int
+    fps : int
+    vcoded : str
 
-    def __init__(self, path, vcodec, res_height, res_width, runtime, source_size, fps):
-        self._path = path
-        self._vcodec = vcodec
-        self._res_height = res_height
-        self._res_width = res_width
-        self._runtime = runtime
-        self._filesize_mb = source_size
-        self._fps = fps
+    def __init__(self, path, vcodec, res_width, res_height, runtime, source_size, fps):
+        self.path = path
+        self.vcodec = vcodec
+        self.res_height = res_height
+        self.res_width = res_width
+        self.runtime = runtime
+        self.filesize_mb = source_size
+        self.fps = fps
 
-    @property
-    def path(self):
-        return self._path
-
-    @property
-    def vcodec(self):
-        return self._vcodec
-
-    @property
-    def res_height(self):
-        return self._res_height
-
-    @property
-    def res_width(self):
-        return self._res_width
-
-    @property
-    def runtime(self):
-        return self._runtime
-
-    @property
-    def filesize_mb(self):
-        return self._filesize_mb
-
-    @property
-    def fps(self):
-        return self._fps
 
 
 def match_profile(mediainfo: MediaInfo) -> (str, str):
@@ -150,15 +129,19 @@ def loadq(queuepath) -> list:
 def fetch_details(_path: str) -> MediaInfo:
     with subprocess.Popen(['ffmpeg', '-i', _path], stderr=subprocess.PIPE) as proc:
         output = proc.stderr.read().decode(encoding='utf8')
-        match = video_re.match(output)
-        if match is None or len(match.groups()) < 6:
-            print(f'>>>> regex match on video stream data failed: ffmpeg -i {_path}')
-            return MediaInfo(_path, None, 0, 0, 0, 0, 0)
-        else:
-            _dur_hrs, _dur_mins, _codec, _res_width, _res_height, fps = match.group(1, 2, 3, 4, 5, 6)
-            filesize = os.path.getsize(_path) / (1024 * 1024)
-            return MediaInfo(_path, _codec, int(_res_width), int(_res_height), (int(_dur_hrs) * 60) + int(_dur_mins),
-                             filesize, int(fps))
+        return parse_details(_path, output)
+
+
+def parse_details(_path, output):
+    match = video_re.match(output)
+    if match is None or len(match.groups()) < 6:
+        print(f'>>>> regex match on video stream data failed: ffmpeg -i {_path}')
+        return MediaInfo(_path, None, 0, 0, 0, 0, 0)
+    else:
+        _dur_hrs, _dur_mins, _codec, _res_width, _res_height, fps = match.group(1, 2, 3, 4, 5, 6)
+        filesize = os.path.getsize(_path) / (1024 * 1024)
+        return MediaInfo(_path, _codec, int(_res_width), int(_res_height), (int(_dur_hrs) * 60) + int(_dur_mins),
+                         filesize, int(fps))
 
 
 def perform_transcodes():
