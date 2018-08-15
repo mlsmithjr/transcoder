@@ -16,6 +16,7 @@ video_re = re.compile('^.*Duration: (\d+):(\d+):.* Stream #0:0.*: Video: (\w+).*
                       re.DOTALL)
 thread_queue = Queue(10)
 complete = set()
+single_mode = False
 queue_path = None
 profiles = dict()
 matching_rules = dict()
@@ -154,7 +155,11 @@ def perform_transcodes():
             _profile = profiles[profile_name]
             oinput = _profile['input_options'].split()
             ooutput = _profile['output_options'].split()
-            cli = [config['ffmpeg']] + oinput + ['-i', _inpath] + ooutput + [_outpath]
+            if single_mode and sys.stdout.isatty():
+                quiet = ''
+            else:
+                quiet = ['-nostats','-loglevel', 'quiet']
+            cli = [config['ffmpeg'], *quiet, *oinput,  '-i', _inpath, *ooutput, _outpath]
             # cli = [FFMPEG, '-hide_banner', '-nostats', '-hwaccel', 'cuvid', '-i', _inpath, '-c:v', 'hevc_nvenc',
             #       '-profile:v', 'main', '-preset', 'medium', '-crf', '22', '-c:a', 'copy', '-c:s', 'copy', '-f',
             #       'matroska',
@@ -331,6 +336,9 @@ if __name__ == '__main__':
 
     if files is None:
         exit(0)
+
+    if len(files) == 1:
+        single_mode = True
 
     enqueue_files(files)
     print()
