@@ -14,7 +14,7 @@ DEFAULT_CONFIG = os.path.expanduser('~/.transcode.yml')
 valid_predicates = ['vcodec', 'res_height', 'res_width', 'runtime', 'filesize_mb', 'fps']
 video_re = re.compile('^.*Duration: (\d+):(\d+):.* Stream #0:0.*: Video: (\w+).*, (\d+)x(\d+).* (\d+)(\.\d.)? fps,.*$',
                       re.DOTALL)
-thread_queue = Queue(10)
+thread_queue = Queue()
 complete = set()
 single_mode = False
 queue_path = None
