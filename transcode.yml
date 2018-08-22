@@ -29,6 +29,7 @@ profiles:
         -c:s copy
         -f matroska
       extension: '.mkv'
+      threshold: 20         # 20% minimum size reduction %, otherwise source is preserved as-is
 
   hevc_25fps:               # when movie source is just too big, cut down fps
       input_options: |

@@ -59,6 +59,7 @@ profiles:
         -c:s copy
         -f matroska
       extension: '.mkv'
+      threshold: 20            # minimum file size reduction %, otherwise keep original
 
   # alternate style of option formatting
   x264:                            # profile name

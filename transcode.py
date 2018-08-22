@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-
+import math
 import os
 import re
 import sys
@@ -170,6 +170,18 @@ def perform_transcodes():
             p = subprocess.Popen(cli)
             p.wait()
             if p.returncode == 0:
+                if 'threshold' in _profile:
+                    # see if size reduction matches minimum requirement
+                    pct_threshold = _profile['threshold']
+                    orig_size = os.path.getsize(_inpath)
+                    new_size = os.path.getsize(_outpath)
+                    pct_savings = 100 - math.floor((new_size * 100) / orig_size)
+                    if pct_savings < pct_threshold:
+                        # oops, this transcode didn't do so well, lets keep the original and scrap this attempt
+                        print(f'Transcoded file did not meet minimum threshold of {pct_threshold}, skipped')
+                        complete.add(_inpath)
+                        os.remove(_outpath)
+                        continue
                 complete.add(_inpath)
                 if not keep_source:
                     print('removing ' + _inpath)
