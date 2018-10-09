@@ -361,7 +361,7 @@ if __name__ == '__main__':
     jobs = list()
     concurrent_jobs = min(concurrent_jobs, thread_queue.qsize())
     for _ in range(concurrent_jobs):
-        t = Thread(target=perform_transcodes)
+        t = Thread(target=perform_transcodes, daemon=True)
         jobs.append(t)
         t.start()
 
