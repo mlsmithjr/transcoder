@@ -14,6 +14,19 @@ config:
 # profile definitions.  You can model all your transcoding combinations here.
 ##
 profiles:
+
+  #
+  # Sample Intel QSV transcode setup
+  #
+  hevc_qsv:
+    input_options: -hwaccel vaapi -hwaccel_device /dev/dri/renderD129 -hwaccel_output_format vaapi
+    output_options: -vf scale_vaapi=format=p010 -c:v hevc_vaapi -crf 20 -c:a copy -c:s copy -f matroska
+    extension: '.mkv'
+    threshold: 20
+
+  #
+  # Sample nVidia transcode setup
+  #
   hevc_hd_preserved:          # what I use for almost everything
       input_options: |
         -hide_banner
