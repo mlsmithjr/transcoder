@@ -17,15 +17,16 @@ nVida CUDA-enabled graphics card or Intel accelerated video (QSV)
 
 * Linux
 * latest *ffmpeg* (3.4.3-2 or higher, lower versions may still work)
-* latest nVidia CUDA drivers (_optional_)
-* Intel QSV enabled (_optional_)
+* nVidea graphics card with latest nVidia CUDA drivers (_optional_)
+* Intel CPU with QSV enabled (_optional_)
 * Python 3 (3.6 or higher)
 * Python PlexAPI package (optional).  Install with `pip3 install plexapi`
 
 ### Configuration
 
 There is a supplied sample *transcode.yml* config file.  This can be customized all you like, however be
-sure to preserve the YAML formatting.
+sure to preserve the YAML formatting. Either specify this file on the commandline with the *-y* option
+or copy it to your home directory as *.transcode.yml* (default)
 
 There are 3 sections:
 
