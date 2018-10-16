@@ -147,23 +147,6 @@ def parse_details(_path, output):
                          filesize, int(fps))
 
 
-def split_cli(cli):
-    words = cli.split()
-    lines = list()
-    buf = ''
-    for word in words:
-        if len(buf) > 35:
-            lines.append(buf)
-            buf = word + ' '
-            continue
-        else:
-            buf += word + ' '
-    lines.append(buf)
-    for i in range(len(lines)):
-        if i > 0:
-            lines[i] = (' ' * 10) + lines[i]
-    return lines
-
 def perform_transcodes():
     global keep_source, config, dry_run
 
@@ -189,19 +172,18 @@ def perform_transcodes():
             # display useful information
             #
             print('-' * 40)
-            print(f'Filename : {_infile}')
+            print(f'Filename : {_inpath}')
             print(f'Profile  : {profile_name}')
-            printable_cli = split_cli(cli)
-            print('ffmpeg   : ', end='')
-            for line in printable_cli:
-                print(line)
+            print( 'ffmpeg   : ' + ' '.join(cli) + '\n')
 
             if dry_run:
                 continue
-            devnull = open(os.devnull)
-            p = subprocess.Popen(cli, stdin=devnull)
+            devnull = open(os.devnull, 'r')
+            devnull2 = open(os.devnull, 'w')
+            p = subprocess.Popen(cli, stdin=devnull, stderr=devnull2)
             p.wait()
             devnull.close()
+            devnull2.close()
             if p.returncode == 0:
                 if 'threshold' in _profile:
                     # see if size reduction matches minimum requirement
