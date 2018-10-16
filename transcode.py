@@ -147,13 +147,30 @@ def parse_details(_path, output):
                          filesize, int(fps))
 
 
+def split_cli(cli):
+    words = cli.split()
+    lines = list()
+    buf = ''
+    for word in words:
+        if len(buf) > 35:
+            lines.append(buf)
+            buf = word + ' '
+            continue
+        else:
+            buf += word + ' '
+    lines.append(buf)
+    for i in range(len(lines)):
+        if i > 0:
+            lines[i] = (' ' * 10) + lines[i]
+    return lines
+
 def perform_transcodes():
     global keep_source, config, dry_run
 
     while not thread_queue.empty():
         try:
             _inpath, _outpath, profile_name = thread_queue.get()
-            print(f'transcoding {_inpath}:')
+#            print(f'transcoding {_inpath}:')
             _profile = profiles[profile_name]
             oinput = _profile['input_options'].split()
             ooutput = _profile['output_options'].split()
@@ -166,7 +183,19 @@ def perform_transcodes():
             #       '-profile:v', 'main', '-preset', 'medium', '-crf', '22', '-c:a', 'copy', '-c:s', 'copy', '-f',
             #       'matroska',
             #       _outpath]
-            print(profile_name + ' -->  ' + ' '.join(cli) + '\n')
+#            print(profile_name + ' -->  ' + ' '.join(cli) + '\n')
+
+            #
+            # display useful information
+            #
+            print('-' * 40)
+            print(f'Filename : {_infile}')
+            print(f'Profile  : {profile_name}')
+            printable_cli = split_cli(cli)
+            print('ffmpeg   : ', end='')
+            for line in printable_cli:
+                print(line)
+
             if dry_run:
                 continue
             devnull = open(os.devnull)
@@ -182,7 +211,7 @@ def perform_transcodes():
                     pct_savings = 100 - math.floor((new_size * 100) / orig_size)
                     if pct_savings < pct_threshold:
                         # oops, this transcode didn't do so well, lets keep the original and scrap this attempt
-                        print(f'Transcoded file did not meet minimum threshold of {pct_threshold}, skipped')
+                        print(f'Transcoded file {_inpath} did not meet minimum threshold of {pct_threshold}, skipped')
                         complete.add(_inpath)
                         os.remove(_outpath)
                         continue
@@ -193,7 +222,7 @@ def perform_transcodes():
                     print('renaming ' + _outpath)
                     os.rename(_outpath, _outpath[:-4])
             else:
-                print('error during transcode, .tmp file removed')
+                print(f'error during transcode of {_inpath}, .tmp file removed')
                 os.remove(_outpath)
         finally:
             thread_queue.task_done()
