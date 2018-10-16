@@ -128,8 +128,10 @@ def loadq(queuepath) -> list:
 
 
 def fetch_details(_path: str) -> MediaInfo:
-    with subprocess.Popen(['ffmpeg', '-i', _path], stderr=subprocess.PIPE) as proc:
+    devnull = open(os.devnull)
+    with subprocess.Popen(['ffmpeg', '-i', _path], stderr=subprocess.PIPE, stdin=devnull) as proc:
         output = proc.stderr.read().decode(encoding='utf8')
+        devnull.close()
         return parse_details(_path, output)
 
 
@@ -167,8 +169,10 @@ def perform_transcodes():
             print(profile_name + ' -->  ' + ' '.join(cli) + '\n')
             if dry_run:
                 continue
-            p = subprocess.Popen(cli)
+            devnull = open(os.devnull)
+            p = subprocess.Popen(cli, stdin=devnull)
             p.wait()
+            devnull.close()
             if p.returncode == 0:
                 if 'threshold' in _profile:
                     # see if size reduction matches minimum requirement
