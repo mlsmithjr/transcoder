@@ -48,7 +48,7 @@ Sample: (Note that profile options can be formatted in multiple ways)
 # long form of option formatting, allowing for comments
 profiles:
   #
-  # Sample Intel QSV transcode setup
+  # Sample Intel QSV transcode setup (note to customize -hwaccel_device param for your environment)
   #
   hevc_qsv:
     input_options: -hwaccel vaapi -hwaccel_device /dev/dri/renderD129 -hwaccel_output_format vaapi
