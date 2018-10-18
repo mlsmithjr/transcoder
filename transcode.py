@@ -6,7 +6,7 @@ import sys
 import yaml
 import subprocess
 from queue import Queue
-from threading import Thread
+from threading import Thread, Lock
 
 
 DEFAULT_CONFIG = os.path.expanduser('~/.transcode.yml')
@@ -128,10 +128,8 @@ def loadq(queuepath) -> list:
 
 
 def fetch_details(_path: str) -> MediaInfo:
-    devnull = open(os.devnull)
-    with subprocess.Popen(['ffmpeg', '-i', _path], stderr=subprocess.PIPE, stdin=devnull) as proc:
+    with subprocess.Popen(['ffmpeg', '-i', _path], stderr=subprocess.PIPE) as proc:
         output = proc.stderr.read().decode(encoding='utf8')
-        devnull.close()
         return parse_details(_path, output)
 
 
@@ -147,7 +145,7 @@ def parse_details(_path, output):
                          filesize, int(fps))
 
 
-def perform_transcodes():
+def perform_transcodes(lock):
     global keep_source, config, dry_run
 
     while not thread_queue.empty():
@@ -171,19 +169,19 @@ def perform_transcodes():
             #
             # display useful information
             #
-            print('-' * 40)
-            print(f'Filename : {_inpath}')
-            print(f'Profile  : {profile_name}')
-            print( 'ffmpeg   : ' + ' '.join(cli) + '\n')
+            lock.acquire()		# used to synchronize threads so multiple threads don't create a jumble of output
+            try:
+                print('-' * 40)
+                print(f'Filename : {_inpath}')
+                print(f'Profile  : {profile_name}')
+                print( 'ffmpeg   : ' + ' '.join(cli) + '\n')
+            finally:
+                lock.release()
 
             if dry_run:
                 continue
-            devnull = open(os.devnull, 'r')
-            devnull2 = open(os.devnull, 'w')
-            p = subprocess.Popen(cli, stdin=devnull, stderr=devnull2)
+            p = subprocess.Popen(cli)
             p.wait()
-            devnull.close()
-            devnull2.close()
             if p.returncode == 0:
                 if 'threshold' in _profile:
                     # see if size reduction matches minimum requirement
@@ -375,8 +373,9 @@ if __name__ == '__main__':
     #
     jobs = list()
     concurrent_jobs = min(concurrent_jobs, thread_queue.qsize())
+    lock = Lock()
     for _ in range(concurrent_jobs):
-        t = Thread(target=perform_transcodes, daemon=True)
+        t = Thread(target=perform_transcodes, daemon=True, args=(lock,))
         jobs.append(t)
         t.start()
 
@@ -395,6 +394,7 @@ if __name__ == '__main__':
             os.remove(queue_path)
 
     notify_plex()
+    os.system("stty sane")
 
 
 
