@@ -20,7 +20,6 @@ setuptools.setup(
     'Programming Language :: Python :: 3',
     'Environment :: Console',
     'Topic :: Multimedia :: Video :: Conversion',
-    'Intended Audience :: Other',
     'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
     'Natural Language :: English',
     'Operating System :: POSIX :: Linux',
