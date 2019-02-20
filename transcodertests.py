@@ -1,5 +1,5 @@
 import unittest
-import transcode
+from transcoder import transcode
 import os
 
 class TranscoderTests(unittest.TestCase):

@@ -1,1 +1,5 @@
 .idea
+dist
+.AppleDouble
+*egg-info
+__pycache__
