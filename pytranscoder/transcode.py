@@ -290,7 +290,8 @@ def enqueue_files(files: list):
             #     complete.add(path)
             #     continue
 
-if __name__ == '__main__':
+
+def main():
 
     if len(sys.argv) == 2 and sys.argv[1] == '-h':
         print('usage: {} [OPTIONS]'.format(sys.argv[0], ))
@@ -396,6 +397,9 @@ if __name__ == '__main__':
     notify_plex()
     os.system("stty sane")
 
+
+if __name__ == '__main__':
+    main()
 
 
 SAMPLE_YAML = """

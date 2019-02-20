@@ -22,6 +22,12 @@ nVida CUDA-enabled graphics card or Intel accelerated video (QSV)
 * Python 3 (3.6 or higher)
 * Python PlexAPI package (optional).  Install with `pip3 install plexapi`
 
+### Installation
+
+```
+pip3 install pytranscoder-ffmpeg
+```
+
 ### Configuration
 
 There is a supplied sample *transcode.yml* config file.  This can be customized all you like, however be
@@ -207,39 +213,39 @@ folder as the source with the same name and a .tmp extension.
 
 To get help:
 ```bash
-   python3 transcode.py -h
+   pytranscoder -h
 ```
 
 To transcode 2 files using a specific profile:
 ```bash
-    python3 transcode.py -p x264 /tmp/video1.mp4 /tmp/video2.mp4
+    pytranscoder -p x264 /tmp/video1.mp4 /tmp/video2.mp4
     
 ```
 
 To transcode 2 files using different profiles:
 ```bash
-    python3 transcode.py -p x264 /tmp/video1.mp4 -p hevc  /tmp/video2.mp4
+    pytranscoder -p x264 /tmp/video1.mp4 -p hevc  /tmp/video2.mp4
     
 ```
 
 To transcode everything in a master file, defaulting to rules to match profiles:
 ```bash
-    python3 transcode.py --from-file /tmp/queue.txt
+    pytranscoder --from-file /tmp/queue.txt
     
 ```
 To do a test run without transcoding, to see which profiles will match and the *ffmpeg* command:
 ```bash
-    python3 transcode.py --dry-run atestvideo.mp4
+    pytranscoder --dry-run atestvideo.mp4
 
 ```
 
 To transcode everything in a master file, using a forced profile for all:
 ```bash
-    python3 transcode.py -p hevc_hd_preserve --from-file /tmp/queue.txt
+    pytranscoder -p hevc_hd_preserve --from-file /tmp/queue.txt
     
 ```
 
 If configured for concurrency but want to transcode a bunch of files sequentially only:
 ```bash
-    python3 transcode.py -s *.mp4
+    pytranscoder -s *.mp4
 ```
