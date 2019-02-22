@@ -4,7 +4,7 @@ import re
 import os
 
 if sys.version_info < (3, 6):
-    print('Glances requires at least Python 3.6 to run.')
+    print('pytranscoder requires at least Python 3.6 to run.')
     sys.exit(1)
 
 with open(os.path.join('pytranscoder', '__init__.py'), encoding='utf-8') as f:
