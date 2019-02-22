@@ -1,6 +1,7 @@
 import unittest
-from transcoder import transcode
+from pytranscoder import transcode
 import os
+
 
 class TranscoderTests(unittest.TestCase):
 

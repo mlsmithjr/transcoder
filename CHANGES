@@ -1,0 +1,25 @@
+
+### Version History
+
+Version 1.0.1
+=============
+
+Enhancements and new features:
+
+    * Added support for use as a Sonarr connection custom script.
+
+Bugs corrected:
+
+    * Fixed broken unit test.
+
+Others:
+
+    * Install sample transcode.yml file in /usr/share/pytranscoder folder.
+    * Revised some details in README.md
+    * Started this CHANGES file.
+
+
+Version 1.0.0
+=============
+
+    * Initial Release to pypi.org

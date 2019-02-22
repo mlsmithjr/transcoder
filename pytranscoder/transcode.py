@@ -7,7 +7,7 @@ import yaml
 import subprocess
 from queue import Queue
 from threading import Thread, Lock
-
+from pytranscoder import __version__
 
 DEFAULT_CONFIG = os.path.expanduser('~/.transcode.yml')
 
@@ -26,14 +26,15 @@ keep_source = False
 dry_run = False
 verbose = False
 
+
 class MediaInfo:
-    filesize_mb : int
-    path : str
-    res_height : int
-    res_width : int
-    runtime : int
-    fps : int
-    vcoded : str
+    filesize_mb: int
+    path: str
+    res_height: int
+    res_width: int
+    runtime: int
+    fps: int
+    vcoded: str
 
     def __init__(self, path, vcodec, res_width, res_height, runtime, source_size, fps):
         self.path = path
@@ -43,7 +44,6 @@ class MediaInfo:
         self.runtime = runtime
         self.filesize_mb = source_size
         self.fps = fps
-
 
 
 def match_profile(mediainfo: MediaInfo) -> (str, str):
@@ -151,30 +151,30 @@ def perform_transcodes(lock):
     while not thread_queue.empty():
         try:
             _inpath, _outpath, profile_name = thread_queue.get()
-#            print(f'transcoding {_inpath}:')
+            #            print(f'transcoding {_inpath}:')
             _profile = profiles[profile_name]
             oinput = _profile['input_options'].split()
             ooutput = _profile['output_options'].split()
             if single_mode and sys.stdout.isatty():
                 quiet = ''
             else:
-                quiet = ['-nostats','-loglevel', 'quiet']
-            cli = [config['ffmpeg'], *quiet, *oinput,  '-i', _inpath, *ooutput, _outpath]
+                quiet = ['-nostats', '-loglevel', 'quiet']
+            cli = [config['ffmpeg'], *quiet, *oinput, '-i', _inpath, *ooutput, _outpath]
             # cli = [FFMPEG, '-hide_banner', '-nostats', '-hwaccel', 'cuvid', '-i', _inpath, '-c:v', 'hevc_nvenc',
             #       '-profile:v', 'main', '-preset', 'medium', '-crf', '22', '-c:a', 'copy', '-c:s', 'copy', '-f',
             #       'matroska',
             #       _outpath]
-#            print(profile_name + ' -->  ' + ' '.join(cli) + '\n')
+            #            print(profile_name + ' -->  ' + ' '.join(cli) + '\n')
 
             #
             # display useful information
             #
-            lock.acquire()		# used to synchronize threads so multiple threads don't create a jumble of output
+            lock.acquire()  # used to synchronize threads so multiple threads don't create a jumble of output
             try:
                 print('-' * 40)
                 print(f'Filename : {_inpath}')
                 print(f'Profile  : {profile_name}')
-                print( 'ffmpeg   : ' + ' '.join(cli) + '\n')
+                print('ffmpeg   : ' + ' '.join(cli) + '\n')
             finally:
                 lock.release()
 
@@ -239,7 +239,6 @@ def notify_plex():
 
 
 def enqueue_files(files: list):
-
     for path, forced_profile in files:
         #
         # do some prechecks...
@@ -292,6 +291,7 @@ def enqueue_files(files: list):
 
 
 def main():
+    global single_mode, concurrent_jobs, keep_source, verbose, dry_run
 
     if len(sys.argv) == 2 and sys.argv[1] == '-h':
         print('usage: {} [OPTIONS]'.format(sys.argv[0], ))
@@ -320,6 +320,7 @@ def main():
         print('                 Ex: {} -p hevc_25fps /tmp/vid1.mp4 -p hevc_hd /tmp/vid2.mp4'.format(sys.argv[0]))
         print('                   This will transcode the given videos using different profiles')
         print('Individual files may be listed on the command line for processing\n')
+        print('** Version ' + __version__)
         sys.exit(0)
 
     files = list()
@@ -354,6 +355,24 @@ def main():
 
     if len(profiles) == 0:
         load_config(DEFAULT_CONFIG)
+
+    if 'sonarr_eventtype' in os.environ and os.environ['sonarr_eventtype'] == 'Download':
+        # Being called from Sonarr after download/import.
+        # It is not a good idea to start transcoding since this may be called rapidly during
+        # an import, in which case the concurrency model fails.
+        # Solution is to log the incoming file to the queue and let user run the transcode at an
+        # appropriate time.
+        path = os.environ['sonarr_episodefile_path']
+        print('Writing "{path}" to default queue')
+        if 'default_queue_file' in config:
+            qfilename = config['default_queue_file']
+            try:
+                with open(qfilename, 'a+') as qfile:
+                    qfile.write(f'{path}\n')
+            except Exception as ex:
+                print(f'Unable to write to {qfilename}')
+                print(ex)
+            exit(0)
 
     if len(files) == 0 and queue_path is None and 'default_queue_file' in config:
         queue_path = config['default_queue_file']
@@ -400,7 +419,6 @@ def main():
 
 if __name__ == '__main__':
     main()
-
 
 SAMPLE_YAML = """
 ##

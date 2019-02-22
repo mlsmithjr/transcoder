@@ -10,14 +10,15 @@ This script is intended to help automate transcoding for people running a media 
 nVida CUDA-enabled graphics card or Intel accelerated video (QSV)
 * Configurable transcoding profiles
 * Configurable rules to auto-match a video file to a transcoding profile
-* Transcode from a list of files or all on the command line
+* Transcode from a list of files (queue) or all on the command line
 * Optionally trigger Plex library update via API
+* Handles Sonarr download events and logs file path to default queue for later batch processing
 
 ### Requirements
 
 * Linux
 * latest *ffmpeg* (3.4.3-2 or higher, lower versions may still work)
-* nVidea graphics card with latest nVidia CUDA drivers (_optional_)
+* nVidia graphics card with latest nVidia CUDA drivers (_optional_)
 * Intel CPU with QSV enabled (_optional_)
 * Python 3 (3.6 or higher)
 * Python PlexAPI package (optional).  Install with `pip3 install plexapi`
@@ -44,14 +45,13 @@ config:
   default_queue_file:   '/path/to/default/list/of/files/if/none/given'
   ffmpeg:               '/usr/bin/ffmpeg'       # path to ffmpeg for this config
   concurrent_jobs:      2              # set to 1 to disable concurrency
-  plex_server:          null           # can be 'server:port'
+  plex_server:          null           # can be 'address:port'
 ```
 
 ## profiles - Transcoding profiles (ffmpeg options)
 
-Sample: (Note that profile options can be formatted in multiple ways)
+Sample:
 ```yml
-# long form of option formatting, allowing for comments
 profiles:
   #
   # Sample Intel QSV transcode setup (note to customize -hwaccel_device param for your environment)
@@ -75,8 +75,8 @@ profiles:
         -profile:v main
         -preset medium
         -crf 20
-        -c:a copy
-        -c:s copy
+        -c:a copy             # copy audio without transcoding
+        -c:s copy             # copy subtitles
         -f matroska
       extension: '.mkv'
       threshold: 20            # minimum file size reduction %, otherwise keep original
@@ -102,35 +102,41 @@ Samples:
   'for content I consider too big':  # comment and unique identifier for this rule
       profile: hevc_hd_25fps    # profile to use if the criterial below match
       rules:
-        runtime:      '<180'    	# less than 3 hours long
-        source_size:  '>5000'  	# ..and media file larger than 5 gigabytes
-        fps: '>25'			# ..and framerate > 25
+        runtime:      '<180'    # less than 3 hours long
+        source_size:  '>5000'   # ..and media file larger than 5 gigabytes
+        fps: '>25'              # ..and framerate > 25
 
   'already best codec':
-    profile: 'SKIP'    # special keyword SKIP, means anything that matches this rule won't get transcoded
+    profile: 'SKIP'     # special keyword SKIP, means anything that matches this rule won't get transcoded
     rules:
       'vcodec': 'hevc'	# if media video is encoded with hevc already
 
   'skip files that are not appropriate for hevc':
     profile: 'SKIP'
     rules:
-      source_size: '<600'		# video file is less than 600mb
+      source_size: '<600'       # video file is less than 600mb
       runtime: '<40'          	# ..and total runtime < 40 minutes
 
   'half-hour videos':
-    profile: 'x264'		# use profile called "x264"
+    profile: 'x264'             # use profile called "x264"
     rules:
-      source_size: '>500'  # 400mb file size or greater
+      source_size: '>500'       # 400mb file size or greater
       runtime: '<31'        	# 30 minutes or less runtime
       vcodec: '!hevc'	       	# NOT hevc encoded video
 
-  'default':                    # this will be the DEFAULT (no criteria implies a match)
-      profile: hevc_hd_preserved	# use profile named "hevc_hd_preserved"
+  'default':                       # this will be the DEFAULT (no criteria implies a match)
+      profile: hevc_hd_preserved   # use profile named "hevc_hd_preserved"
 ```
 
 Since there are people who will run this script in synchronous mode, the *concurrent_jobs* value should be set to 1.
 There really is no good reason to increase this number if you are not using hardware transcoding as the CPU will be fully engaged already.
 
+
+### Sonarr-aware
+You can invoke pytranscoder from a Sonarr custom script connection to handle recording of downloads and upgrades
+to your queue file.  The filename passed from Sonarr will be appended to your default_queue_file (see global configuration above).
+Media is not transcoded at this time, only recorded for future processing.  Simply having Sonarr call pytranscoder is all you need
+to configure - pytranscoder will detect it was invoked from Sonarr and act accordingly.  No parameters are required.
 
 ### Profiles and Rules
 
@@ -164,9 +170,10 @@ When changing or adding profiles and rules it is useful to test them out by runn
        - If the selected profile has a threshold value, compare original and transcoded file size.
           - If threshold met:
              - If -k not given, remove original and replace with newly transcoded .tmp file.
+             - If -k given, keep the original and leave the transcoded .tmp version in place for inspection.
           - If threshold not met, inform user and remove .tmp file leaving original intact.
        - If -k not given, remove original and replace with newly transcoded .tmp file.
-       - If a list file was given, the completed media file will be removed from that list.
+       - If a list file (queue) was used, the completed media file will be removed from that list.
 - Exit script execution
 
 ### Running without Concurrency
@@ -184,18 +191,19 @@ To change the concurrent jobs default you must edit *transcode.yml*, look for *c
 change its value from 2 to whatever your system can handle, or 1 to disable. You must also supply the
 appropriate options for your transcode profiles to use the supported hardware, otherwise you'll
 completely bog down your system (see the transcode.yml "hevc" and "qsv" samples). If you transcode with a profile not
-setup for hardware support, or the rules matcher selects a profile without the setup, that file will
+setup for hardware support, or the rules matcher selects a profile without hardware support, that file will
 transcode using CPU time. Therefore, when using concurrent hardware transcoding using rules it is best that all your rules map
 to only profiles with hardware support.  You can always run non-concurrent CPU-based transcodes from
-the command line, selecting sequential-only and bypassing profile rules.
+the command line, selecting sequential-only (-s) and bypassing profile rules.
 
 
-### How I use this tool
+### Typical Use-Case
 My *concurrent_jobs* is set to 2.  I run on Ubuntu with a nVidia GTX 960 card with 4gb, which allows me 2 concurrent transcodes using very little CPU.
-If you have a more powerful card with more memory you can try increasing the value.
+If you have a more powerful card with more memory you can try increasing the value. An 8gb nVidia card you will likely support 
+4 concurrent sessions. Monitor carefully to find the performance sweet spot for your needs.
 
-I use Sonarr and Radarr to curate my library.  When items are downloaded I have a post script that records those items in a shared "queue" file, which is just a list of media files - full pathnames.
-Routinely I run the script to walk through my accumulated list to transcode everything. But, there are things I do not want transcoded so I use the rules as a way to skip those videos.
+I use Sonarr to curate my library.  When items are downloaded I have a post script that records those items in a shared "queue" file, which is just a list of media files - full pathnames.
+Routinely I run the *pytranscoder* to walk through my accumulated list to transcode everything. But, there are things I do not want transcoded so I use the rules as a way to skip those videos.
 Also, I transcode some things differently. There are rules for those too.  And finally, I 
 sometimes just want to transcode some files very specifically in a way that isn't compatible
 with hardware transcoding, so I'll run the tool using -p and -s options.  Using the rules system is helpful if you have multiple profile needs and are automating
@@ -203,7 +211,7 @@ your transcoding in a _cron_ job or just want to fire it off and walk away.
 
 ### Running
 
-Note that if using a list file as input, when the process is done that file will contain only those
+Note that if using a list file (queue) as input, when the process is done that file will contain only those
 video files that failed to transcode, or it will be removed if all files were processed. So if you need to keep
 this file make a copy first.
 
@@ -218,34 +226,39 @@ To get help:
 
 To transcode 2 files using a specific profile:
 ```bash
-    pytranscoder -p x264 /tmp/video1.mp4 /tmp/video2.mp4
+    pytranscoder -p my_fave_x264 /tmp/video1.mp4 /tmp/video2.mp4
     
+```
+
+To auto transcode a file but keep the original:
+```bash
+    pytranscoder -k testvid.mp4
 ```
 
 To transcode 2 files using different profiles:
 ```bash
-    pytranscoder -p x264 /tmp/video1.mp4 -p hevc  /tmp/video2.mp4
+    pytranscoder -p my_fave_x264 /tmp/video1.mp4 -p cuda_hevc  /tmp/video2.mp4
     
 ```
 
-To transcode everything in a master file, defaulting to rules to match profiles:
+To auto transcode everything in a queue file, defaulting to rules to match profiles:
 ```bash
     pytranscoder --from-file /tmp/queue.txt
     
 ```
-To do a test run without transcoding, to see which profiles will match and the *ffmpeg* command:
+To do a test run without transcoding, to see which profiles will match and the *ffmpeg* commandline:
 ```bash
     pytranscoder --dry-run atestvideo.mp4
 
 ```
 
-To transcode everything in a master file, using a forced profile for all:
+To transcode everything in a queue file, using a forced profile for all:
 ```bash
-    pytranscoder -p hevc_hd_preserve --from-file /tmp/queue.txt
+    pytranscoder -p cuda_hevc --from-file /tmp/queue.txt
     
 ```
 
-If configured for concurrency but want to transcode a bunch of files sequentially only:
+If configured for concurrency but want to auto transcode a bunch of files sequentially only:
 ```bash
     pytranscoder -s *.mp4
 ```
