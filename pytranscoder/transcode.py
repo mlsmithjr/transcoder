@@ -34,7 +34,7 @@ class MediaInfo:
     res_width: int
     runtime: int
     fps: int
-    vcoded: str
+    vcodec: str
 
     def __init__(self, path, vcodec, res_width, res_height, runtime, source_size, fps):
         self.path = path
@@ -153,7 +153,7 @@ def perform_transcodes(lock):
             _inpath, _outpath, profile_name = thread_queue.get()
             #            print(f'transcoding {_inpath}:')
             _profile = profiles[profile_name]
-            if 'input_optons' in _profile and _profile['input_options'] is not None:
+            if 'input_options' in _profile and _profile['input_options'] is not None:
                 oinput = _profile['input_options'].split()
             else:
                 oinput = []
