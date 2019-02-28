@@ -153,7 +153,10 @@ def perform_transcodes(lock):
             _inpath, _outpath, profile_name = thread_queue.get()
             #            print(f'transcoding {_inpath}:')
             _profile = profiles[profile_name]
-            oinput = _profile['input_options'].split()
+            if 'input_optons' in _profile and _profile['input_options'] is not None:
+                oinput = _profile['input_options'].split()
+            else:
+                oinput = []
             ooutput = _profile['output_options'].split()
             if single_mode and sys.stdout.isatty():
                 quiet = ''
