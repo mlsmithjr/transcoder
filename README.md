@@ -12,7 +12,7 @@ nVida CUDA-enabled graphics card or Intel accelerated video (QSV)
 * Configurable transcoding profiles
 * Configurable rules to auto-match a video file to a transcoding profile
 * Transcode from a list of files (queue) or all on the command line
-* Cluster mode allows use of other machines See [Cluster.md](Cluster.md) for details.
+* Cluster mode allows use of other machines See [Cluster.md](https://github.com/mlsmithjr/transcoder/blob/master/Cluster.md) for details.
 * Optionally trigger Plex library update via API
 * Handles Sonarr download events and logs file path to default queue for later batch processing
 

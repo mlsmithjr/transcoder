@@ -1,6 +1,21 @@
 
 ### Version History
 
+Version 1.2.1
+=============
+Enhancements and new features:
+
+    * Multiple queue definitions, allowing for more fine threading control.
+    * New cluster mode to allow for agent-less, multi-machine encode offloading.
+    * Cluster host definitions support Linux, MacOS, and Windows.
+    * Support for running on Windows 10.
+    * Rule criteria now allows for range testing with numeric types.
+
+Others:
+
+    * Continue to improve unit testing suite.
+    * Documentation revisions.
+
 Version 1.1.0
 =============
 
