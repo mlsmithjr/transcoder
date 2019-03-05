@@ -90,7 +90,7 @@ config:
 | working_dir   | Required for streaming type hosts. Indicates the temporary directory to use for encoding. |
 | profile       | The profile to use for all encodes on this host. Required |
 | path-substitution | Optional. Applicable only to mounted type hosts. Uses when the server media files and host mount paths are different. Any part of the media pathname matching *src* will be replaced with *dest*. |
-| status        | enabled or disabled. Disabled hosts will be skipped. Default is enabled.
+| status        | enabled or disabled. Disabled hosts will be skipped. Default is enabled.|
 
 ==== Sample Walkthrough
 
