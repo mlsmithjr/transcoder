@@ -24,16 +24,21 @@ setuptools.setup(
     long_description_content_type = 'text/markdown',
     extras_require={'with_plexapi': ['plexapi>=3.1.0']},
     url='https://github.com/mlsmithjr/transcoder',
-    data_files=[('share/doc/pytranscoder', ['README.md', 'transcode.yml'])],
+    data_files=[('share/doc/pytranscoder', ['README.md', 'Cluster.md', 'transcode.yml'])],
     packages=['pytranscoder'],
+    install_requires=['pyyaml'],
     entry_points={"console_scripts": ["pytranscoder=pytranscoder.transcode:main"]},
     classifiers=[
       'Programming Language :: Python :: 3',
       'Environment :: Console',
       'Topic :: Multimedia :: Video :: Conversion',
       'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
+      'Intended Audience :: End Users/Desktop',
       'Natural Language :: English',
       'Operating System :: POSIX :: Linux',
+      'Operating System :: MacOS :: MacOS X',
+      'Operating System :: Microsoft :: Windows :: Windows 10',
     ],
+    keywords='ffmpeg qsv cuda encode transcode',
 )
 

@@ -1,4 +1,5 @@
-import transcode
+from . import transcode
+
 
 def main():
-  trancoder.main()
+    transcode.main()

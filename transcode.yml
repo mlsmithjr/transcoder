@@ -1,14 +1,42 @@
 ##
-# NOTE: This file is a sample configuration and also acts as a basis for unit testing.  Change with caution.
+# NOTE: This file is a sample configuration and also acts as a basis for unit testing.
+#       Copy it to customize.
 ##
+
 ##
 # global configuration
 ##
 config:
   default_queue_file: '/volume1/config/sonarr/transcode_queue.txt'
-  ffmpeg: '/usr/bin/ffmpeg'
-  concurrent_jobs: 2
-  plex_server: null           # can be 'server:port'
+  ffmpeg:             '/usr/bin/ffmpeg'
+  queues:                       # define your queues here
+    qsv: 1                      # max 1 job at a time for QSV transcode
+    cuda: 2                     # max 2 jobs at a time for nVidia CUDA transcodes
+                                # everything else defaults to 1 (sequential transcode)
+  clusters:
+    household:                  # name for this cluster
+      macpro:
+        os: linux               # Choices are win10, linux, macos
+        type: mounted           # machine with source media and host share a filesystem (nfs, samba, etc)
+        ip: 192.168.2.65
+        user: sshuser
+        ffmpeg: '/usr/bin/ffmpeg'
+        path-substitution:      # optional, map source pathnames to equivalent on host
+          src: /volume2/
+          dest: /media/
+        profile: hevc
+        status: enabled         # set to disabled to temporarily stop using
+      win10:
+        os: win10               # Choices are win10, linux, macos
+        type: streaming         # host not using shared filesystem
+        ip: 192.168.2.64        # address of host
+        user: matt              # ssh login user
+        working_dir: 'c:\temp'  # working folder on remote host, required for streaming type
+        ffmpeg: '/usr/bin/ffmpeg'
+        profile: hevc_cuda      # profile for all transcoding on this host, required
+        status: enabled         # set to disabled to temporarily stop using
+
+  plex_server: null             # optional. can be 'server:port'
 
 
 ##
@@ -17,22 +45,30 @@ config:
 profiles:
 
   #
-  # Sample Intel QSV transcode setup
+  # Sample cpu-based transcode, uses built-in default sequential queue
+  #
+  hevc:
+    input_options:
+    output_options: -threads 4 -c:v hevc -crf 20 -c:a copy -c:s copy -f matroska
+    extension: '.mkv'
+    threshold: 20
+
+
+  #
+  # Sample Intel QSV transcode setup, uses 'qsv' queue defined above
   #
   hevc_qsv:
     input_options: -hwaccel vaapi -hwaccel_device /dev/dri/renderD129 -hwaccel_output_format vaapi
     output_options: -vf scale_vaapi=format=p010 -c:v hevc_vaapi -crf 20 -c:a copy -c:s copy -f matroska
     extension: '.mkv'
+    queue: qsv
     threshold: 20
 
   #
-  # Sample nVidia transcode setup
+  # Sample nVidia transcode setup, uses 'cuda' queue defined above
   #
-  hevc_hd_preserved:          # what I use for almost everything
+  hevc_cuda:          # what I use for almost everything
       input_options: |
-        -hide_banner
-        -nostats
-        -loglevel quiet
         -hwaccel cuvid
       output_options: |
         -c:v hevc_nvenc
@@ -42,14 +78,12 @@ profiles:
         -c:a copy
         -c:s copy
         -f matroska
+      queue: cuda
       extension: '.mkv'
       threshold: 20         # 20% minimum size reduction %, otherwise source is preserved as-is
 
   hevc_25fps:               # when movie source is just too big, cut down fps
       input_options: |
-         -hide_banner
-         -nostats
-         -loglevel quiet
          -hwaccel cuvid
       output_options: |
         -c:v hevc_nvenc
@@ -60,13 +94,11 @@ profiles:
         -c:s copy
         -f matroska
         -r 25
+      queue: cuda
       extension: '.mkv'
 
   hevc_30fps:               # when movie source is just too big, cut down fps
       input_options: |
-         -hide_banner
-         -nostats
-         -loglevel quiet
          -hwaccel cuvid
       output_options: |
         -c:v hevc_nvenc
@@ -77,13 +109,11 @@ profiles:
         -c:s copy
         -f matroska
         -r 30
+      queue: cuda
       extension: '.mkv'
 
   hevc_hd_lq:                 # lower quality, for when source material isn't that good anyhow
       input_options: |
-         -hide_banner
-         -nostats
-         -loglevel quiet
          -hwaccel cuvid
       output_options: |
         -c:v hevc_nvenc
@@ -93,12 +123,11 @@ profiles:
         -c:a copy
         -c:s copy
         -f matroska
+      queue: cuda
       extension: '.mkv'
+
   x264:                    # basic x264 transcode using CPU (no CUDA support)
-      input_options: |
-         -hide_banner
-         -nostats
-         -loglevel quiet
+      input_options:
       output_options: |
         -c:v x264
         -crf 22
@@ -120,6 +149,7 @@ profiles:
 #            runtime        Source runtime in minutes, operators allowed
 #            fps            Framerate of the source
 #            path           Full path of the source file. Value can be a regular expression (ie. '.*/Television/.*').
+#            vcodec         Video codec used to encode the media
 #
 # Rules are evaluated in order.  First matching rule wins so order wisely.
 # Rules with a profile of "SKIP" mean to skip processing of the matched video
@@ -148,8 +178,15 @@ rules:
         filesize_mb:  '>6000'  # ..and larger than 6 gigabytes
         fps: '>25'
 
+  'small enough already':   # skip if <2.5g size and higher than 720p and between 30 and 64 minutes long.
+      profile: SKIP         # transcoding these will probably cause a noticeable quality loss so skip.
+      rules:
+        filesize_mb: '<2500'    # less than 2.5 gigabytes
+        res_height: '720-1081'  # 1080p, allowing for random oddball resolutions still in the HD range
+        runtime:  '30-65'       # between 30 and 65 minutes long
+
   'default':    # this will be the DEFAULT (no rules implies a match)
-      profile: hevc_hd_preserved
+      profile: hevc_cuda
       rules:
         vcodec: '!hevc'
 
