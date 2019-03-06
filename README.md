@@ -18,7 +18,7 @@ nVida CUDA-enabled graphics card or Intel accelerated video (QSV)
 
 #### Requirements
 
-* Linux or MacOS, Windows 10 supported as a cluster host only.
+* Linux or MacOS, Windows 10. For Windows, WSL recommended.
 * latest *ffmpeg* (3.4.3-2 or higher, lower versions may still work)
 * nVidia graphics card with latest nVidia CUDA drivers (_optional_)
 * Intel CPU with QSV enabled (_optional_)
@@ -31,8 +31,14 @@ Please log issues or questions via the github home page for now.
 
 #### Installation
 
+There are a few possible ways to install a python app - one of these should work for you.
 ```
 pip3 install --user pytranscoder-ffmpeg
+# or...
+python3 -m pip install --user pytranscoder-ffmpeg 
+# or...
+python -m pip install --user pytranscoder-ffmpeg   # the Windows 10 way
+
 ```
 
 After installing you will find this document and others in **$HOME/.local/shared/doc/pytranscoder** (on Linux/MacOS)
@@ -74,6 +80,7 @@ Sample
 config:
   default_queue_file:   '/path/to/default/list/of/files/if/none/given'
   ffmpeg:               '/usr/bin/ffmpeg'       # path to ffmpeg for this config
+  ssh:                '/usr/bin/ssh'    # used only in cluster mode
   queues:
     qsv:                1                   # sequential encodes
     cuda:               2                   # maximum of 2 encodes at a time
@@ -83,7 +90,8 @@ config:
 | setting      | purpose |
 | ----------- | ----------- |
 | default_queue_file    | A queue file is just a text file listing out all the media you want to encode. It is not required, but useful when automating a workflow. You can always indicate a queue file on the command line.     |
-| ffmpeg                | Full path to your ffmpeg on this host        |
+| ffmpeg                | Full path to ffmpeg on this host |
+| ssh                   | Full path to ssh on this host |
 | queues                | If using concurrency, define your queues here. The queue name is whatever you want. Each name specifies a maximum number of concurrent encoding jobs. If none defined, a default sequential queue is used. |
 | plex_server           | optional, if you want your Plex server notified after media is encoded. Use address:port format. |
 

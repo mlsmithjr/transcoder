@@ -1,6 +1,12 @@
 
 ### Version History
 
+Version 1.2.2
+=============
+Enhancements and new features:
+
+    * Path to ssh is now configurable.
+
 Version 1.2.1
 =============
 Enhancements and new features:

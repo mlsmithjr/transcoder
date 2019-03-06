@@ -50,6 +50,7 @@ Sample
 config:
   default_queue_file:   '/path/to/default/list/of/files/if/none/given'
   ffmpeg:               '/usr/bin/ffmpeg'       # path to ffmpeg for this config
+  ssh:                '/usr/bin/ssh'    # used only in cluster mode
   queues:
     qsv:                1                   # sequential encodes
     cuda:               2                   # maximum of 2 encodes at a time

@@ -20,7 +20,7 @@ class Host(Thread):
     _cluster = None
 
     def __init__(self, hostname, props, queue, lock, cluster):
-        super().__init__(name = hostname, group = None, daemon=True)
+        super().__init__(name=hostname, group=None, daemon=True)
         self.hostname = hostname
         self.props = props
         self.queue = queue
@@ -51,7 +51,7 @@ class Host(Thread):
             return str(Path(path))
 
     def ssh_cmd(self):
-        return ['/usr/bin/ssh', self.props['user'] + '@' + self.props['ip']]
+        return [self._cluster.ssh, self.props['user'] + '@' + self.props['ip']]
 
     def ping_test_ok(self):
         addr = self.props['ip']
@@ -104,7 +104,7 @@ class StreamingHost(Host):
         if 'working_dir' not in self.props:
             print(f'Missing "working_dir" setting for host {self.hostname}')
             return
-        ssh_cmd = ['/usr/bin/ssh', self.props['user'] + '@' + self.props['ip']]
+        ssh_cmd = [self._cluster.ssh, self.props['user'] + '@' + self.props['ip']]
 
         while not self.queue.empty():
             profile_name = self.props['profile']
@@ -271,7 +271,7 @@ class MountedHost(Host):
                 ooutput = _profile['output_options'].split()
                 quiet = ['-nostats', '-hide_banner']
                 cmd = [self.props['ffmpeg'], '-y', *quiet, *oinput, '-i', f'"{remote_inpath}"', *ooutput, f'"{remote_outpath}"']
-                cli = ['/usr/bin/ssh', self.props['user'] + '@' + self.props['ip'], *cmd]
+                cli = [self._cluster.ssh, self.props['user'] + '@' + self.props['ip'], *cmd]
 
                 #
                 # display useful information
@@ -322,15 +322,17 @@ class Cluster(Thread):
     queue: Queue
     lock: Lock
     profiles: List
+    ssh: str
     dry_run: bool
     verbose: bool
 
-    def __init__(self, name, configs: Dict, profiles: Dict, lock: Lock, dry_run: bool, verbose: bool):
+    def __init__(self, name, configs: Dict, profiles: Dict, lock: Lock, ssh: str, dry_run: bool, verbose: bool):
         super().__init__(name=name, group=None, daemon=True)
         self.queue = Queue()
         self.lock = lock
         self.dry_run = dry_run
         self.verbose = verbose
+        self.ssh = ssh
         self.hosts = list()
         self.profiles = profiles
         for host, props in configs.items():
@@ -377,6 +379,7 @@ class Cluster(Thread):
 def manage_cluster(files, config, profiles, dry_run: bool = False, verbose: bool = False, testing=False):
 
     cluster_config = config['clusters']
+    ssh = config.get('ssh', '/usr/bin/ssh')
     lock = Lock()
     clusters = dict()
     for name, this_config in cluster_config.items():
@@ -385,7 +388,7 @@ def manage_cluster(files, config, profiles, dry_run: bool = False, verbose: bool
             if target_cluster != name:
                 continue
             if target_cluster not in clusters:
-                clusters[target_cluster] = Cluster(target_cluster, this_config, profiles, lock, dry_run, verbose)
+                clusters[target_cluster] = Cluster(target_cluster, this_config, profiles, lock, ssh, dry_run, verbose)
             clusters[target_cluster].enqueue(filepath)
 
     #
