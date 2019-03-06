@@ -1,4 +1,7 @@
-import math
+"""
+    Cluster support
+"""
+
 import os
 import shutil
 import subprocess
@@ -12,21 +15,33 @@ from pytranscoder.utils import filter_threshold
 
 
 class Host(Thread):
+    """
+        Base thread class for all host types.
+    """
+
     hostname: str
     props: Dict
     queue: Queue
-    lock: Lock
     _complete: Set
     _cluster = None
 
-    def __init__(self, hostname, props, queue, lock, cluster):
+    def __init__(self, hostname, props, queue, cluster):
+        """
+        :param hostname:    name of host from config/clusters
+        :param props:       dictionary of properties from config/clusters
+        :param queue:       Work queue assigned to this thread, could be many-to-one in the future.
+        :param cluster:     Reference to parent Cluster object
+        """
         super().__init__(name=hostname, group=None, daemon=True)
         self.hostname = hostname
         self.props = props
         self.queue = queue
-        self.lock = lock
         self._complete = set()
         self._cluster = cluster
+
+    @property
+    def lock(self):
+        return self._cluster.lock
 
     def complete(self, source):
         self._complete.add(source)
@@ -83,9 +98,10 @@ class Host(Thread):
 
 
 class StreamingHost(Host):
+    """Implementation of a streaming host worker thread"""
 
-    def __init__(self, hostname, props, queue, lock, cluster):
-        super().__init__(hostname, props, queue, lock, cluster)
+    def __init__(self, hostname, props, queue, cluster):
+        super().__init__(hostname, props, queue, cluster)
 
     #
     # initiate tests through here to avoid a new thread
@@ -106,22 +122,27 @@ class StreamingHost(Host):
             return
         ssh_cmd = [self._cluster.ssh, self.props['user'] + '@' + self.props['ip']]
 
+        #
+        # Keep pulling items from the queue until done. Other threads will be pulling from the same queue
+        # if multiple hosts configured on the same cluster.
+        #
         while not self.queue.empty():
             profile_name = self.props['profile']
             try:
                 _profile = self._cluster.profiles[profile_name]
                 inpath = self.queue.get()
                 #
-                # for escaped spaces convert back to normal
+                # Convert escaped spaces back to normal. Typical for bash to escape spaces and special characters
+                # in filenames.
                 #
                 inpath = inpath.replace('\\ ', ' ')
 
                 #
-                # calculate paths
+                # calculate full input and output paths
                 #
-                working_dir = self.props['working_dir']
-                remote_inpath = os.path.join(working_dir, os.path.basename(inpath))
-                remote_outpath = os.path.join(working_dir, os.path.basename(inpath) + '.tmp')
+                remote_working_dir = self.props['working_dir']
+                remote_inpath = os.path.join(remote_working_dir, os.path.basename(inpath))
+                remote_outpath = os.path.join(remote_working_dir, os.path.basename(inpath) + '.tmp')
 
                 #
                 # build remote ffmpeg commandline
@@ -156,10 +177,10 @@ class StreamingHost(Host):
                 #
                 # Copy source file to remote
                 #
-                target_dir = working_dir
+                target_dir = remote_working_dir
                 if self.is_windows():
                     # trick to make scp work on the Windows side
-                    target_dir = '/' + working_dir
+                    target_dir = '/' + remote_working_dir
                 scp = ['scp', inpath, self.props['user'] + '@' + self.props['ip'] + ':' + target_dir]
                 self.log(' '.join(scp))
                 p = subprocess.Popen(scp, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
@@ -191,6 +212,10 @@ class StreamingHost(Host):
                 self.log(' '.join(cmd))
                 p = subprocess.Popen(cmd)
                 p.wait()
+
+                #
+                # process completed, check results and finish
+                #
                 if p.returncode == 0:
                     if not filter_threshold(_profile, inpath, retrieved_copy_name):
                         self.log(
@@ -207,7 +232,7 @@ class StreamingHost(Host):
                 else:
                     self.log(f'error during remote transcode of {inpath}')
 
-                self.log(f'Removing temporary media copies from {working_dir}')
+                self.log(f'Removing temporary media copies from {remote_working_dir}')
                 if self.is_windows():
                     remote_outpath = self.converted_path(remote_outpath)
                     remote_inpath = self.converted_path(remote_inpath)
@@ -222,9 +247,10 @@ class StreamingHost(Host):
 
 
 class MountedHost(Host):
+    """Implementation of a mounted host worker thread"""
 
-    def __init__(self, hostname, props, queue, lock, cluster):
-        super().__init__(hostname, props, queue, lock, cluster)
+    def __init__(self, hostname, props, queue, cluster):
+        super().__init__(hostname, props, queue, cluster)
 
     #
     # initiate tests through here to avoid a new thread
@@ -295,6 +321,10 @@ class MountedHost(Host):
                 self.log('Starting transcode')
                 p = subprocess.Popen(cli, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
                 output = p.communicate()[0].decode('utf-8')
+
+                #
+                # process completed, check results and finish
+                #
                 if p.returncode == 0:
                     if not filter_threshold(_profile, inpath, outpath):
                         self.log(
@@ -318,18 +348,29 @@ class MountedHost(Host):
 
 
 class Cluster(Thread):
-    hosts: List[Host]
-    queue: Queue
-    lock: Lock
-    profiles: List
-    ssh: str
-    dry_run: bool
-    verbose: bool
+    """Thread to create host threads and wait for their completion."""
+
+    hosts:          List[Host]
+    queue:          Queue
+    terminal_lock:  Lock
+    profiles:       List
+    ssh:            str
+    dry_run:        bool
+    verbose:        bool
 
     def __init__(self, name, configs: Dict, profiles: Dict, lock: Lock, ssh: str, dry_run: bool, verbose: bool):
+        """
+        :param name:        Cluster name, used only for thread naming
+        :param configs:     The "clusters" section of the global config
+        :param profiles:    The "profiles" section of the global config
+        :param lock:        Lock used to synchronize terminal output only
+        :param ssh:         Path to local ssh
+        :param dry_run:     True or False, is this a dry run.
+        :param verbose:     True or False, use verbose output.
+        """
         super().__init__(name=name, group=None, daemon=True)
         self.queue = Queue()
-        self.lock = lock
+        self.terminal_lock = lock
         self.dry_run = dry_run
         self.verbose = verbose
         self.ssh = ssh
@@ -337,10 +378,12 @@ class Cluster(Thread):
         self.profiles = profiles
         for host, props in configs.items():
             if props.get('status', 'enabled') != 'enabled':
+                print(f'Host {host} disabled - skipping')
                 continue
             hosttype = props['type']
+
             if hosttype == 'mounted':
-                _h = MountedHost(host, props, self.queue, self.lock, self)
+                _h = MountedHost(host, props, self.queue, self)
                 if not _h.host_ok():
                     continue
 
@@ -349,16 +392,18 @@ class Cluster(Thread):
                     continue
 
                 self.hosts.append(_h)
+
             elif hosttype == 'streaming':
-                _h = StreamingHost(host, props, self.queue, self.lock, self)
+                _h = StreamingHost(host, props, self.queue, self)
                 if not _h.host_ok():
                     continue
                 self.hosts.append(_h)
+
             else:
-                print(f'Unknown cluster host type "{hosttype}"')
-                sys.exit(1)
+                print(f'Unknown cluster host type "{hosttype}" - skipping')
 
     def enqueue(self, file):
+        """Add a media file to this cluster queue"""
         self.queue.put(file)
 
     def testrun(self):
@@ -366,6 +411,8 @@ class Cluster(Thread):
             host.testrun()
 
     def run(self):
+        """Start all host threads and wait until queue is drained"""
+
         if len(self.hosts) == 0:
             print(f'No hosts available in cluster "{self.name}"')
             return
@@ -376,11 +423,15 @@ class Cluster(Thread):
         self.queue.join()
 
 
-def manage_cluster(files, config, profiles, dry_run: bool = False, verbose: bool = False, testing=False):
+def manage_clusters(files, config, profiles, dry_run: bool = False, verbose: bool = False, testing=False):
+    """Main entry point for setup and execution of all clusters
+
+        There is one thread per cluster, and each cluster manages multiple hosts, each having their own thread.
+    """
 
     cluster_config = config['clusters']
     ssh = config.get('ssh', '/usr/bin/ssh')
-    lock = Lock()
+    terminal_lock = Lock()
     clusters = dict()
     for name, this_config in cluster_config.items():
         for item in files:
@@ -388,7 +439,7 @@ def manage_cluster(files, config, profiles, dry_run: bool = False, verbose: bool
             if target_cluster != name:
                 continue
             if target_cluster not in clusters:
-                clusters[target_cluster] = Cluster(target_cluster, this_config, profiles, lock, ssh, dry_run, verbose)
+                clusters[target_cluster] = Cluster(target_cluster, this_config, profiles, terminal_lock, ssh, dry_run, verbose)
             clusters[target_cluster].enqueue(filepath)
 
     #

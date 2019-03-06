@@ -3,7 +3,7 @@ import unittest
 from pytranscoder import transcode
 import os
 
-from pytranscoder.cluster import manage_cluster
+from pytranscoder.cluster import manage_clusters
 from pytranscoder.transcode import MediaInfo, match_profile
 
 
@@ -147,7 +147,7 @@ class TranscoderTests(unittest.TestCase):
             ('/tmp/pytranscode-test/test1' + mediaext, 'cluster1')
         ]
 
-        manage_cluster(testfiles, setup, False, testing=True)
+        manage_clusters(testfiles, setup, False, testing=True)
 
     def test_cluster_streaming(self):
         if 'TEST_VIDEO' not in os.environ:
@@ -166,7 +166,7 @@ class TranscoderTests(unittest.TestCase):
             ('/tmp/pytranscode-test/test2' + mediaext, 'cluster2')
         ]
 
-        manage_cluster(testfiles, setup, False, testing=True)
+        manage_clusters(testfiles, setup, False, testing=True)
 
 
 if __name__ == '__main__':

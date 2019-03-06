@@ -8,7 +8,7 @@ import subprocess
 from queue import Queue
 from threading import Thread, Lock
 from pytranscoder import __version__
-from pytranscoder.cluster import manage_cluster
+from pytranscoder.cluster import manage_clusters
 from pytranscoder.utils import filter_threshold
 
 DEFAULT_CONFIG = os.path.expanduser('~/.transcode.yml')
@@ -224,6 +224,8 @@ def thread_runner(lock, queue):
 
 
 def load_config(_path):
+    """load configuration file (defaults to $HOME/.transcode.yml)"""
+
     global profiles, matching_rules, config
 
     with open(_path, 'r') as f:
@@ -237,6 +239,8 @@ def load_config(_path):
 
 
 def notify_plex():
+    """If plex notifications enabled, tell it to refresh"""
+
     global config
 
     if 'plex_server' in config and config['plex_server'] is not None and not dry_run:
@@ -258,6 +262,11 @@ def notify_plex():
 
 
 def enqueue_files(files: list):
+    """Add requested files to the appropriate queue
+
+    :param files: list of (path,profile) tuples
+    :return:
+    """
     global queues
 
     for path, forced_profile in files:
@@ -311,6 +320,8 @@ def enqueue_files(files: list):
 
 
 def sonarr_handler():
+    """Handle Sonarr as caller"""
+
     global config
 
     # Being called from Sonarr after download/import.
@@ -426,7 +437,7 @@ def start():
         exit(0)
 
     if cluster_mode:
-        manage_cluster(files, config, profiles, dry_run, verbose)
+        manage_clusters(files, config, profiles, dry_run, verbose)
         sys.exit(0)
 
     if len(files) == 1:
