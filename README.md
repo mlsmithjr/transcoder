@@ -3,6 +3,11 @@
 Python wrapper for ffmpeg for batch, concurrent, or clustered transcoding
 
 This script is intended to help automate transcoding for people running a media server or encoding lots of video.
+It is more than a wrapper - it is a workflow and job manager.
+
+There are 2 modes: local and clustered.  Local mode is the most common usage and is for running this script on the same machine where it is installed.  Cluster mode turns pytranscoder into a remote encoding manager.  In this mode it does no transcoding on the local machine but instead delegates and manages encode jobs running on other hosts.  This requires more advanced configuration and is documented separately in [Cluster.md](https://github.com/mlsmithjr/transcoder/blob/master/Cluster.md)
+
+The remainder of this document focuses on using pytranscoder in local mode.
 
 #### Features:
 * Sequential or concurrent transcoding. 
@@ -18,7 +23,7 @@ nVida CUDA-enabled graphics card or Intel accelerated video (QSV)
 
 #### Requirements
 
-* Linux or MacOS, Windows 10. For Windows, WSL recommended.
+* Linux or MacOS, Windows 10. For Windows, WSL (Ubuntu) recommended.
 * latest *ffmpeg* (3.4.3-2 or higher, lower versions may still work)
 * nVidia graphics card with latest nVidia CUDA drivers (_optional_)
 * Intel CPU with QSV enabled (_optional_)
@@ -32,46 +37,57 @@ Please log issues or questions via the github home page for now.
 #### Installation
 
 There are a few possible ways to install a python app - one of these should work for you.
-```
+
+**Linux**
+ The confusion is due to the fact that not all distributions or OS's install pip3 by default. Either way, pytranscoder is available in the **pypi** repo.
+```bash
 pip3 install --user pytranscoder-ffmpeg
 # or...
 python3 -m pip install --user pytranscoder-ffmpeg 
-# or...
-python -m pip install --user pytranscoder-ffmpeg   # the Windows 10 way
-
 ```
 
+**Windows (WSL - Ubuntu)**
+Windows Subsystem for Linux is the best option, but requires a couple of maintenance steps first if you don't have pip3:
+```bash
+sudo apt update
+sudo apt upgrade
+sudo install python3-pip
+
+# now we can install
+pip3 install --user pytranscoder-ffmpeg
+```
+At this point you have a choice - either install ffmpeg for Windows [ffmpeg.exe](https://www.ffmpeg.org) or install in bash as an Ubuntu package. Either will work but there are caveats, or  you could install both and not worry.
+
+* ffmpeg.exe can be run in Windows command shell or from bash but requires special attention when configuring pytranscoder paths.
+* ffmpeg apt package can only be run from bash but is a more natural Linux path mapping.
+
 After installing you will find this document and others in **$HOME/.local/shared/doc/pytranscoder** (on Linux/MacOS)
-and in **$HOME/AppData/Python/*pythonversion*/shared/doc/pytranscoder** (on Windows).
+and in **$HOME/AppData/Python/*pythonversion*/shared/doc/pytranscoder** (on Windows). Also available [online](https://github.com/mlsmithjr/transcoder/blob/master/README.md)
 
 #### Operation - Profiles and Rules
 
-A profile is a named group of *ffmpeg* commandline options to encode a specific way. You can
+>A profile is a named group of *ffmpeg* commandline options to encode a specific way. You can
 define all the combinations you use regularly in *transcode.yml* for easy selection later.
 At least 1 profile definition is required.
 
-A rule is a YAML syntax of predefined predicates to allow simple matching on source media details
-and match to a specific profile.  For example, if you transcode 720p differently than 1080p, and still different
+>A rule is a YAML syntax of predefined predicates to allow simple matching on source media details
+and relate to a specific profile.  For example, if you transcode 720p differently than 1080p, and still different
 than 4k you can set up rules to match those 3 resolutions to a specific transcode profile.
 Easy - let the script do the work of selecting the right *ffmpeg* options.
 
-But you aren't required to use rules.  You can specify the profile on the commandline each
-run using the -p option. Or you can define 1 rule that acts as a default (see examples).
+But you aren't required to use rules.  You can specify the profile name on the commandline each
+run using the -p option. Or you can define 1 rule that acts as a default (see examples). It's up to you. But using rules is a great way to automate a tedious manual workflow.
 
 When changing or adding profiles and rules it is useful to test them out by running in *--dry-run* mode first, 
 which will show you everything that would happen if running for real.
 
-
-
 #### Configuration
 
-There is a supplied sample *transcode.yml* config file.  This can be customized all you like, however be
+There is a supplied sample *transcode.yml* config file, or you can download it [here](https://github.com/mlsmithjr/transcoder/blob/master/transcode.yml).  This can be customized all you like, however be
 sure to preserve the YAML formatting. Either specify this file on the commandline with the *-y* option
 or copy it to your home directory as *.transcode.yml* (default)
-IF you installed via pip you will find the sample in either $HOME/.local/share/doc/pytranscoder/ (if installed with --user) 
-or /usr/share/doc/pytranscoder (if installed globally)
 
-There are 3 sections:
+There are 3 sections in the file:
 
 #### config - Global configuration information
 
@@ -89,7 +105,7 @@ config:
 
 | setting      | purpose |
 | ----------- | ----------- |
-| default_queue_file    | A queue file is just a text file listing out all the media you want to encode. It is not required, but useful when automating a workflow. You can always indicate a queue file on the command line.     |
+| default_queue_file    | A queue file is just a text file listing out all the media you want to encode. It is not required, but useful when automating a workflow. You can always indicate a queue file on the command line. This just sets the default, if any.   |
 | ffmpeg                | Full path to ffmpeg on this host |
 | ssh                   | Full path to ssh on this host |
 | queues                | If using concurrency, define your queues here. The queue name is whatever you want. Each name specifies a maximum number of concurrent encoding jobs. If none defined, a default sequential queue is used. |
@@ -99,8 +115,7 @@ config:
 
 Profiles are used to provide ffmpeg with various options for encoding. One profile definition is required, but mostly likely
 you will define multiples for different encoding scenarios.  The name of the profile can be provided on the command line
-to select the appropriate one for your needs. Alternatively, you can define rules (see below) to auto-match media with profiles
-for a less manual encoding workflow.
+to select the appropriate one for your needs. Alternatively, you can define rules (see below) to auto-match media with profiles for a less manual encoding workflow.
 
 Sample:
 ```yaml
@@ -120,7 +135,6 @@ profiles:
 
   hevc_hd_preserved:          # profile name
       input_options: |        # ffmpeg input options
-        -hide_banner
         -hwaccel cuvid        # REQUIRED for CUDA
       output_options: |       # ffmpeg output options
         -c:v hevc_nvenc       # REQUIRED for CUDA
@@ -131,11 +145,12 @@ profiles:
         -c:s copy             # copy subtitles
         -f matroska
       extension: '.mkv'
+      queue: cuda		# manage this encode in the 'cuda' queue defined globally
       threshold: 20            # minimum file size reduction %, otherwise keep original
 
   # alternate style of option formatting
   x264:                            # profile name
-      input_options: ' -hide_banner'
+      input_options: 
       output_options: '-crf 20 -c:a copy -c:s copy -f matroska'
       extension: '.mkv'
 ```
@@ -145,8 +160,8 @@ profiles:
 | input_options    | ffmpeg options related to the input (see ffmpeg docs)  |
 | output_options   | ffmpeg options related to the output (see ffmpeg docs)  |
 | extension        | Filename extension to use for the encoded file |
-| threshold        | optional. If provided this number represents a minimum percentage compression for the encoded media. If it does not meet this threshold the transcoded file is discarded and the source job marked as complete. This is useful if a particular file doesn't compress much and you would rather just keep the original. |
-
+| queue           | optional. Assign encodes for this profile to a specific queue (defined in *config* section)   |
+| threshold        | optional. If provided this number represents a minimum percentage compression savings for the encoded media. If it does not meet this threshold the transcoded file is discarded, source file remains as-is, and the source job marked as complete. This is useful if a particular file doesn't compress much and you would rather just keep the original. |
 
 #### rules - simple profile matching rules
 
@@ -156,10 +171,8 @@ explicitly give the desired profile name on the commandline or just have a singl
 But if you encode certain media differently then having the rules system make it a little easier
 using various options depending on the media attributes.  No specific criteria is required - use the ones
 applicable to your rule.
-The name of each rule is just a brief string describing the rule and is displayed in output to confirm which profile
-was selected for encoding.
 
-Rule evaluation is as follows: for each input media file, compare against each rule criteria. They must all match
+Rule evaluation is as follows: for each input media file, compare against each rule criteria. All criteria of a rule must all match
 in order for the given profile to be selected for encoding.  If any one fails, evaluation continues to the next
 rule. If there are no matches, the *default* rule is selected.
 
@@ -190,7 +203,7 @@ Samples:
       runtime: '<31'        	# 30 minutes or less runtime
       vcodec: '!hevc'	       	# NOT hevc encoded video
 
-  'small enough already':       # skip if <2.5g size and higher than 720p and between 30 and 64 minutes long.
+  'small enough already':       # skip if <2.5g size, between 720p and 1080p, and between 30 and 64 minutes long.
       profile: SKIP             # transcoding these will probably cause a noticeable quality loss so skip.
       rules:
         filesize_mb: '<2500'    # less than 2.5 gigabytes
@@ -215,7 +228,7 @@ So, for example, using the sample rule *'for content I consider too big'*, if th
 size is larger than 5 gigabytes and frames-per-second is greater than 25 then use the hevc_hd_25fps profile to encode.
 
 For those settings that allow operators, put the operator first (< or >) followed by the number. For those that allow a range
-provide the lower and upper range with a hyphen (-) between.  No spaces are allowed in any setting values.
+provide the lower and upper range with a hyphen (-) between.  No spaces are allowed in criteria.
 
 #### Sonarr-aware
 You can invoke pytranscoder from a Sonarr custom script connection to handle recording of downloads and upgrades
@@ -224,8 +237,10 @@ Media is not transcoded at this time, only recorded for future processing.  Simp
 to configure - pytranscoder will detect it was invoked from Sonarr and act accordingly.  No parameters are required.
 
 #### Process Flow
+High-level steps the script takes to process your media.
+
 - Determine list of input files to transcode
-    - If a profile is given (-p) make that the starting default to use for all subsequent media.
+    - If a profile is given (-p) make that the starting default
     - If a list file is given, read list of media files from that file.
     - If media files are given on the command line, add those to the list, observing any -p profile overrides along the way.
 - Check concurrency value and allocate additional threads, if applicable.
@@ -256,38 +271,32 @@ Normally an encode run will almost max out a CPU until it is finished. But with 
 very little of the CPU is used and most work is offloaded to the hardware. This allows the CPU to handle
 multiple files and still have processing power left over for regular system activities.
 
-To change the concurrent jobs default you must edit *transcode.yml*, look for *concurrent_jobs*, and 
-change its value from 2 to whatever your system can handle, or 1 to disable. You must also supply the
-appropriate options for your transcode profiles to use the supported hardware, otherwise you'll
+In the global profile section of *transcode.yml* you define your queues. Use whatever names you like, and provide a maximum number of concurrent jobs for that queue.  Use 1 for synchronous or a higher value to run multiples (but not more than your hardware can support - use trial and error to figure out, but 2 is a good number to stick with).
+
+You can optionally designate a specific queue for each of your profiles.  If none defined, the *default* queue is used, which is sequential.  What queue assigned allows is finer management of concurrent transcoding jobs.  Queues are not necessary if you only plan to transcode sequentially.
+
+>If you want maximum use of your machine consider this scenario:
+>
+>You have an 8th generation Intel i5 6-core machine with nVidia graphics card that can handle 2 concurrent encodes. You define 2 queues:
+```yaml
+     queues:
+        one: 1
+        two: 2
+```
+> You have 2 profiles: "qsv" (configured to use Intel QSV) and "cuda" (configured for nVidia CUDA).  You associate the "qsv" profile with queue **one**, and "cuda" with queue **two**.  You start a job like:
+```bash
+pytranscoder -p qsv /media/tv/new/*.mp4 -p cuda /media/movies/new/*.mp4
+```
+> This example will run 3 concurrent jobs - 1 running on the CPU using QSV and 2 running on the nVidia card!
+> This is how a multi queue configuration can be used. But I hope you have good system fans.
+
+You must also supply the appropriate options for your transcode profiles to use the supported hardware, otherwise you'll
 completely bog down your system (see the transcode.yml "hevc" and "qsv" samples). If you transcode with a profile not
 setup for hardware support, or the rules matcher selects a profile without hardware support, that file will
-transcode using CPU time. Therefore, when using concurrent hardware transcoding using rules it is best that all your rules map
-to only profiles with hardware support.  You can always run non-concurrent CPU-based transcodes from
-the command line, selecting sequential-only (-s) and bypassing profile rules.
+transcode using CPU time. Therefore, when using concurrent hardware transcoding using rules it is best that all your rules map to only profiles with hardware support.
 
+You can always force non-concurrent CPU-based transcodes from the command line, selecting sequential-only (-s) and bypassing profile rules.
 
-#### Typical Use-Case
-I run on Ubuntu with a nVidia GTX 970 card with 4gb, which allows me 2 concurrent transcodes using very little CPU. So I
-have defined a queue called "cuda", set to 2, that I assign to all my profiles in which I specify nVidia hardware encoding.
-This means that all media matched to those profiles will be queued to encode 2 at a time using nVidia CUDA.
-If you have a more powerful card with more memory you can try increasing the value. An 8gb nVidia card you will likely support 
-4 concurrent sessions. Monitor carefully to find the performance sweet spot for your needs.
-
-I also have an 8th generation Intel i5 6-core which allows me to use Intel QSV encoding, which is the Intel encoder/decoder on
-the CPU itself. It support h264 and h265. Intel-based encoding is slower than CUDA but produces a slightly smaller file, and
-arguably slightly better quality.  So I defined a queue called "qsv", set to 1, that I assign to all my profiles in which
-I specify QSV encoding.
-
-If I wanted to max out my hardware I could encode using both queues at the same time, resulting in a total of 3 concurrent
-jobs running - 2 using the CUDA engine and 1 using QSV.  And I would still have plenty of CPU cycle remaining for system
-activities.
-
-I use Sonarr to curate my library.  When items are downloaded I have a post script that records those items in a shared "queue" file, which is just a list of media files - full pathnames.
-Routinely I run the *pytranscoder* to walk through my accumulated list to transcode everything. But, there are things I do not want transcoded so I use the rules as a way to skip those videos.
-Also, I transcode some things differently. There are rules for those too.  And finally, I 
-sometimes just want to transcode some files very specifically in a way that isn't compatible
-with hardware transcoding, so I'll run the tool using -p and -s options.  Using the rules system is helpful if you have multiple profile needs and are automating
-your transcoding in a _cron_ job or just want to fire it off and walk away. 
 
 #### Testing your Setup
 
@@ -296,7 +305,7 @@ how your media will be handled but won't actually do any work or change anything
 see that your defined rules are matching as expected and that hosts can be connected to via ssh.
 
 ```bash
-    pytranscoder --dry-run -c mycluster /volume1/media/any_video_file
+    pytranscoder --dry-run /volume1/media/any_video_file
 ```
 
 #### Running
@@ -305,7 +314,7 @@ Note that if using a list file (queue) as input, when the process is done that f
 video files that failed to encode, or it will be removed if all files were processed. So if you need to keep
 this file make a copy first.
 
-The default behavior is to remove the original video file after encoding and replace it with the new version.
+**The default behavior is to remove the original video file after encoding** and replace it with the new version.
 If you want to keep the source *be sure to use the -k* parameter.  The work file will be placed in the same
 folder as the source with the same name and a .tmp extension while being encoded.
 
@@ -315,12 +324,11 @@ folder as the source with the same name and a .tmp extension while being encoded
 | --from-file <file>    | Load list of files to process from <file>  |
 | -p <profile>          | Specify <profile> to use. Can be used multiple times on command line and applies to all subsequent files (see examples)  |
 | -y <config>           | Specify non-default transcode.yml file.  |
-| -s                    | Force sequential mode. |
+| -s                    | Force sequential mode (no concurrency event for concurrent queues) |
 | -k                    | Keep original media files, leave encoded .tmp file in same folder. |
 | --dry-run             | Show what will happen without actually doing any work |
-| -v                    | Verbose output |
+| -v                    | Verbose output. Show more processing details, useful for debugging |
 | -c <name>             | Cluster mode. See Cluster.md for details |
-
 
 
 ##### Examples:
@@ -369,7 +377,7 @@ To transcode everything in a queue file, using a forced profile for all:
     
 ```
 
-Complex example to show off flexibiliity. Using custom config file test.yml, keep original media, transcode
+Complex example to show off flexibiliity. Using custom config file *test.yml*, keep original media, transcode
 all mp4 files in /media1 using rules,, transcode all files in /media2 using hevc_cuda profile, and 
 transcode all files listed in listoffiles.txt using qsv profile:
 ```bash
@@ -381,7 +389,7 @@ If configured for concurrency but want to auto transcode a bunch of files sequen
     pytranscoder -s *.mp4
 ```
 
-To run in cluster mode (see Cluster.md documentation):
+To run in cluster mode (see Cluster documentation):
 ```bash
     pytranscoder -c *.mp4
 ```

@@ -1,6 +1,19 @@
 
 ### Version History
 
+Version 1.3
+===========
+Enhancements and new features:
+
+    * Added support for local host in the cluster so that the same host managing work also does work.
+    * Monitoring of ffmpeg jobs and progress reporting.
+    * Support for multiple allowed profiles for a host.
+
+Others:
+
+    * Large code refactoring.
+
+
 Version 1.2.2
 =============
 Enhancements and new features:

@@ -16,6 +16,12 @@ config:
                                 # everything else defaults to 1 (sequential transcode)
   clusters:
     household:                  # name for this cluster
+      workstation:
+        os: linux
+        type: local             # special case - use the pytranscoder host also in the cluster
+        ip: 192.168.2.63
+        ffmpeg: '/usr/bin/ffmpeg'
+        status: enabled
       macpro:
         os: linux               # Choices are win10, linux, macos
         type: mounted           # machine with source media and host share a filesystem (nfs, samba, etc)
@@ -25,7 +31,8 @@ config:
         path-substitution:      # optional, map source pathnames to equivalent on host
           src: /volume2/
           dest: /media/
-        profile: hevc
+        profiles:               # profiles allowed on this host
+          - hevc
         status: enabled         # set to disabled to temporarily stop using
       win10:
         os: win10               # Choices are win10, linux, macos
@@ -34,7 +41,10 @@ config:
         user: matt              # ssh login user
         working_dir: 'c:\temp'  # working folder on remote host, required for streaming type
         ffmpeg: '/usr/bin/ffmpeg'
-        profile: hevc_cuda      # profile for all transcoding on this host, required
+        profiles:
+          - hevc_cuda           # profiles allowed on this host
+          - hevc_25fps
+          - hevc_30fps
         status: enabled         # set to disabled to temporarily stop using
 
   plex_server: null             # optional. can be 'server:port'
@@ -113,21 +123,7 @@ profiles:
       queue: cuda
       extension: '.mkv'
 
-  hevc_hd_lq:                 # lower quality, for when source material isn't that good anyhow
-      input_options: |
-         -hwaccel cuvid
-      output_options: |
-        -c:v hevc_nvenc
-        -profile:v main
-        -preset medium
-        -crf 23
-        -c:a copy
-        -c:s copy
-        -f matroska
-      queue: cuda
-      extension: '.mkv'
-
-  x264:                    # basic x264 transcode using CPU (no CUDA support)
+  x264:                    # basic x264 transcode using CPU (no CUDA or QSV support)
       input_options:
       output_options: |
         -c:v x264

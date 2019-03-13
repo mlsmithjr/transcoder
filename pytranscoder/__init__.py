@@ -1,3 +1,10 @@
-__version__ = '1.2.2'
+__version__ = '1.3'
 __author__ = 'Marshall L Smith Jr <marshallsmithjr@gmail.com>'
 __license__ = 'LGPLv3'
+
+
+#
+# Global state indicators
+#
+verbose = False
+

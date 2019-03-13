@@ -1,4 +1,4 @@
-## pytranscoder
+## pytranscoder - cluster mode
 
 Python wrapper for ffmpeg for batch, concurrent, or clustered transcoding
 
@@ -7,98 +7,164 @@ This script is intended to help automate transcoding for people running a media 
 This documentation is specific to the clustering functionality of the tool.  It is separate from the main
 docs, README.md, because it is a more advanced feature.
 
-#### System Setup
+### System Setup
 We will refer to the machine you use pytranscode on as your *cluster manager* and other machines as *hosts*.
->###### Linux
+
+Setting up remote hosts is as follows:
+#### Linux
 Linux is natively supported as long as the following conditions are true:
 * Each host machine in the cluster is running an ssh server.
+* Each host has ffmpeg installed.
 * The *cluster manager* machine must be able to ssh to each host without a password prompt (see `man ssh-copy-id`).
-###### MacOS
-MacOS, being based on BSD, is also natively supported.  See Linux section. Check your MacOS version of ffmpeg for what hardware support is available, if any.
-###### Windows 10
-* Install OpenSSH server
-* Set server to auto-start
+#### MacOS
+MacOS, being based on BSD, is also natively supported.  See Linux section. Check your MacOS version of ffmpeg for what hardware acceleration support is available, if any.
+#### Windows 10
+There are 2 ways to enable SSH access for Windows. Each method is further complicated depending on which ffmpeg you use.  These instructions assume a certain level of proficiency with Windows and optionally WSL.
+
+**Windows SSH**:
+> This method will only allow streaming cluster support due to Windows OpenSSH not being able to access network shares or drives consistently. Avoid if you can.
+
+> * Install OpenSSH server
+* Set server to auto-start (delayed)
 * Start server
 * Copy RSA key from *cluster manager* 
 
-> Install openssh server via `Settings > Apps > manage optional features > OpenSSH Server > Install`
-
->You cannot use ssh-copy-id to authenticate to openssh on Windows. Instead, in the home folder of the user account create
+> Install openssh server via `Settings > Apps > manage optional features > Add a Feature > OpenSSH Server > Install`
+>
+>You cannot use `ssh-copy-id` to authenticate to openssh on Windows. Instead, in the home folder of the user account create
 a directory called **.ssh**.  Then from your *cluster manager* copy your **$HOME/.ssh/id_rsa.pub** to **c:/Users/*username*/.ssh/authorized_keys** on Windows.
-
+>
 >In the search bar type **services* and click on **Services Desktop App**.  Scroll down to OpenSSH Server and
 right-click to select Properties. Change the startup type to *Automatic* then OK. Now right-click
 again and select *Start*. The service is now running and set to start automatically after each reboot.
-
+>
 >Finally, if you have a supported nVidia card download the nVidia CUDA drivers and install if you plan on using CUDA encoding.
 It's a large download. Choose Custom install and deselect all the documentation and other things you don't need if you want to
 minimize space usage.
+
+**WSL (Ubuntu) OpenSSH**
+> This is the better method but requires more fiddling around at the shell. By installing Windows Subsystem for Linux you enable
+> a more standard bash experience and can use **mount** on network share drive mappings and enable **mounted* mode (faster).  I will cover the highlights but the details are yours to research. Some helpful details [here](https://www.reddit.com/r/bashonubuntuonwindows/comments/5gh4c8/ssh_to_bash_on_wsl/).
+
+> * From the Windows Store search for and install Ubuntu.
+> * On the search bar search for "Enable Features" and click on *Turn Windows features on and off*. Scroll down to Windows Subsystem for Linux and enable.
+> * Launch Ubuntu and create your new user as prompted.
+> * From *bash* you must uninstall and reinstall openssh-server (to fix a problem with the Microsoft-provided distribution):
+>     * `sudo apt remove --purge openssh-server`
+>     * `sudo rm -rf /etc/ssh`
+>     * `sudo apt install openssh-server`
+> * Try to ssh to your Windows machine now.
+> * From your *cluster manager* host, use `ssh-copy-id` to setup password-less ssh to your Windows host.
+> * Back on Windows, map a drive letter to your network media share (ex. *Z:*).
+> * This is where it gets more confusing:
+    * **(easiest)** If installing the Windows [ffmpeg package](https://www.ffmpeg.org/):
+         * Download and install now.
+         * NOTE that your path mappings for pytranscoder will use *Z:* since the ffmpeg you are running is still a Windows program and expects commandline parameters to be Windows-like.
+    * If installing the Ubuntu ffmpeg package:
+        * In *bash*: `sudo apt install ffmpeg`
+        * Create a folder under /mnt representing your media folder mount point.
+        * Now test mount your mapped drive (ie. `sudo mount -t drvfs 'z:' /mnt/media`)
+        * If /mnt/media is mounted to your shared media server you are good to proceed.
+        * Finally, make the mount permanent by adding it to /etc/fstab:
+            `z: /mnt/media drvfs defaults 0 0`
+         * NOTE that your path mappings for pytranscoder will use */mnt/media/*, not *Z:*
 
 When pytranscoder starts it will verify that it can ssh to each host using the provided configuration before continuing.
 
 
 #### Configuration
 
+If you skipped right to this documentation you need to read the [README](https://github.com/mlsmithjr/transcoder/blob/master/README.md) first.
+
+Each of your hosts can be designated as *mounted* or *streaming*. The difference is huge so plan appropriately.
+A *mounted* host is one that has network access to the same media you are transcoding via a NFS or Samba/CIFS mount. This is the ideal configuration since files need not be copied to and from a host - they are already shared.
+A *streaming* host is one that does not have network access to the media. This most likely will be due to not having the ability to setup a network share on that host. Each file to be encoded is copied to that host, encoded, then the output copied back to your *cluster manager*. This is very inefficient, but works.
+
+
 There is a new section in the transcode.yml file, under the global *config* section, called *clusters*. A cluster is a
 group of one or more host machines you will use for encoding.  You may define multiple clusters if you have a large
 network of machines at your disposal. **Note**: all hosts in the cluster do not need to be available at runtime - they
 will simply be ignored and other hosts in the cluster used.
-
+Add an ssh item to your global configuration, then define the cluster:
 
 Sample
 ```yaml
 config:
-  default_queue_file:   '/path/to/default/list/of/files/if/none/given'
-  ffmpeg:               '/usr/bin/ffmpeg'       # path to ffmpeg for this config
+  ...
   ssh:                '/usr/bin/ssh'    # used only in cluster mode
-  queues:
-    qsv:                1                   # sequential encodes
-    cuda:               2                   # maximum of 2 encodes at a time
-  plex_server:          192.168.2.61:32400  # optional, use 'address:port'
-
+  ...
   # 
   # cluster definitions
   #
   clusters:
     household:                  # name for this cluster
+
+      mediacenter:
+        type: local		# Indicates this is where pytranscoder is running (cluster manager) so it can be used in the cluster as well.
+        ffmpeg: '/usr/bin/ffmpeg'
+        status: enabled
+  
       macpro:                   # name of this host (does not need to be the same as network hostname)
         type: mounted           # machine with source media and host share a filesystem (nfs, samba, etc)
+        os: linux               # choices are linux, macos, win10
         ip: 192.168.2.65
         user: sshuser           # user account used to ssh to this host
-        ffmpeg: '/usr/bin/ffmpeg'
+        ffmpeg:      '/usr/bin/ffmpeg'
         path-substitution:      # optional, map source pathnames to equivalent on host
           src: /volume1/media/
           dest: /media/
-        profile: hevc           # profile for all encoding on this host, required
+        profiles:               # profiles allowed on this host
+          - hevc
         status: enabled         # set to disabled to temporarily stop using
-      win10:
+
+      gamer:                    # machine configured with Windows OpenSSH server
         type: streaming         # host not using shared filesystem
+        os: win10               # choices are linux, macos, win10
         ip: 192.168.2.64        # address of host
         user: matt              # ssh login user
         working_dir: 'c:/temp'  # working folder on remote host, required for streaming type
-        ffmpeg: '/usr/bin/ffmpeg'
-        profile: hevc_cuda      # profile for all encoding on this host, required
+        ffmpeg:      'c:/ffmpeg/bin/ffmpeg'
+        profiles:               # profiles allowed on this host
+          - hevc_cuda
         status: enabled         # set to disabled to temporarily stop using
 
+      family:                   # machine configured to use WSL ssh server
+        type: mounted
+        os: win10
+        ip: 192.168.2.66
+        user: chris
+        ffmpeg: /mnt/c/ffmpeg/bin/ffmpeg.exe  # using Windows ffmpeg.exe build
+        path-substitution:      # how to map media paths on source to destination mount point
+          src: '/volume1/media'
+          dest: 'Z:/'
+        profiles:               # profiles allowed on this host
+          - hevc_cuda
+          - hevc_cuda_30fps
+        status: enabled
 ```
 
 | setting      | purpose |
 | -----------   | ----------- |
-| type          | Host type, either *mounted* or *streaming*. A mounted type indicates the input media files are accessible via a shared filesystem mounted on the host. A streaming type indicates no sharing, and each media file being encoded is copied to that host, encoded, then copied back. |
-| ip            | Address or host name of the host  |
-| user          | User to log into this host as via ssh. The user must be pre-authenticated to the host so that a password is not required. See https://www.ssh.com/ssh/copy-id. |
-| ffmpeg        | Path on the host to ffmpeg |
-| working_dir   | Required for streaming type hosts. Indicates the temporary directory to use for encoding. |
-| profile       | The profile to use for all encodes on this host. Required |
-| path-substitution | Optional. Applicable only to mounted type hosts. Uses when the server media files and host mount paths are different. Any part of the media pathname matching *src* will be replaced with *dest*. |
-| status        | enabled or disabled. Disabled hosts will be skipped. Default is enabled.|
+| type          | Host type, either *mounted* or *streaming*. There can be one host in all clusters with type *local*. A *mounted* type indicates the input media files are accessible via a shared filesystem mounted on the host. A *streaming* type indicates no sharing, and each media file being encoded is copied to that host, encoded, then copied back.  A *local* type is used to also include the *cluster manager* machine (system running pytranscoder) in the cluster so it won't sit idle. **This is completely optional.** There are fewer required configuration attributes for this type.
+| os      | One of linux,macos, or win10. **[1]** |
+| ip            | Address or host name of the host.  **[1]**  |
+| user          | User to log into this host as via ssh. The user must be pre-authenticated to the host so that a password is not required. See https://www.ssh.com/ssh/copy-id.  **[1]** |
+| ffmpeg        | Path on the host to ffmpeg. |
+| working_dir   | Indicates the temporary directory to use for encoding.  **[2]** |
+| profiles       | The allowed profiles to use for all encodes on this host. If not provided, assumes all. An encode matching a profile that is not assigned to a particular host will be run on a host that will, if any. This is how, for example, you restrict CPU-based encodings to hosts with no hardware acceleration - or vice versa. |
+| path-substitution | Optional. Applicable only to *mounted* type hosts. Uses when the server media files and host mount paths are different. Any part of the media pathname matching *src* will be replaced with *dest*. |
+| status        | *enabled* or *disabled*. Disabled hosts will be skipped. Default is *enabled*.|
 
-==== Sample Walkthrough
+**[1]** Required for *mounted* and *streaming* types.
+**[2]** Required for *streaming* type.
+
+
+#### Sample Walkthrough
 
 You have a media server called **mediaserver**. It has an NFS-exported path to the root of your media storage. This folder is 
 on a RAID mounted at /volume1/media. You want to enable all the machines in your household to be used for encoding. You want to
-transcode all media to HEVC because it's just better, but it's very time-consuming so you decide to use other machine that
-are under-utilized for such tasks. Because your uptight over security you create a special user account on all hosts just for
+transcode all media to HEVC because it's just better, but it's very time-consuming so you decide to use other machines that
+are under-utilized for such tasks. Because you are uptight over security you create a special user account on all hosts just for
 encoding and setup password-less ssh login to each host using *ssh-copy-id*.
 You plan to kick off clustered encoding from **mediaserver**, using 2 other machines to do the work.
 
@@ -121,14 +187,16 @@ Here is the configuration for the scenario above:
         path-substitution:      # optional, map source pathnames to equivalent on host
           src: /volume1/media/
           dest: /mnt/media/
-        profile: qsv
+        profiles:
+          - qsv
       shared:
         type: streaming
         ip: 192.168.2.64
         user: encodeuser
         working_dir: '/tmp'
         ffmpeg: '/usr/bin/ffmpeg'
-        profile: hevc_cuda
+        profiles:
+          - hevc_cuda
 
 ```
 
@@ -145,12 +213,12 @@ Now, assuming you have a bunch of media files on **mediaserver** you want to tra
     pytrancoder -c household /volume1/media/*
 ```
 
-This will pick up each file in /volume1/media and queue them for encoding.  Two threads are started - one for *workstation* and
+This will pick up each file in /volume1/media and queue them for encoding.  Two threads are started - one for **workstation** and
 the other for **shared**.  Each thread examines the queue, pulling the next video to be transcoded until all files are
 processed.
 
 For **workstation**, a file is pulled from the queue, /volume1/media/file1.mp4 for instance. Since there is a *path-substitution*
-configured, change the path to /mnt/media/file1.mp4.  Finally, ssh to **workstation** as encodeuser and run ffmpeg to encode /mnt/media/file1.mp4 using qsv.
+configured, change the path to /mnt/media/file1.mp4.  Finally, ssh to **workstation** as encodeuser and run ffmpeg to encode /mnt/media/file1.mp4 using QSV.
 The temporary encoded file will be placed in the same folder as the source. Since the filesystem is NFS-mounted, it will already
 be available on *mediaserver* when the process completes.
 

@@ -1,34 +1,30 @@
 import shutil
 import unittest
-from pytranscoder import transcode
 import os
 
 from pytranscoder.cluster import manage_clusters
-from pytranscoder.transcode import MediaInfo, match_profile
+from pytranscoder.config import ConfigFile
+from pytranscoder.media import MediaInfo
+from pytranscoder.utils import files_from_file
 
 
 class TranscoderTests(unittest.TestCase):
 
-    def setup(self):
-        transcode.load_config('transcode.yml')
-
     def test_loadconfig(self):
-        self.setup()
-        self.assertIsNotNone(transcode.config, 'Config object not loaded')
+        config = ConfigFile('transcode.yml')
+        self.assertIsNotNone(config.settings, 'Config object not loaded')
 
     def test_loadqueue(self):
-        self.setup()
         testpath = '/tmp/transcode_parsertest_loadqueue.tmp'
         with open(testpath, 'w') as t:
             t.write('one\ntwo\nthree')
-        files = transcode.loadq(testpath)
+        files = files_from_file(testpath)
         self.assertTrue(len(files) == 3, 'did not load file queue properly')
         os.remove(testpath)
 
     def test_mediainfo(self):
-        self.setup()
         with open('tests/ffmpeg.out', 'r') as ff:
-            info = transcode.parse_details('/dev/null', ff.read())
+            info = MediaInfo.parse_details('/dev/null', ff.read())
             self.assertIsNotNone(info)
             self.assertEqual(info.vcodec, 'h264')
             self.assertEqual(info.res_width, 1280)
@@ -37,65 +33,40 @@ class TranscoderTests(unittest.TestCase):
             self.assertEqual(info.path, '/dev/null')
 
     def test_default_profile(self):
-        self.setup()
-        rule = {
-            'too small': {
-                'profile': 'SKIP',
-                'rules': {
-                    'filesize_mb': '<500'
-                }
-            },
-            'default': {
-                'profile': 'hevc_cuda',
-                'rules': {
-                    'vcodec': '!hevc'
-                }
-            }
-        }
         with open('tests/ffmpeg.out', 'r') as ff:
-            info = transcode.parse_details('/dev/null', ff.read())
+            info = MediaInfo.parse_details('/dev/null', ff.read())
             info.filesize_mb = 1000
             info.res_height = 720
-            matched_profile, rule = transcode.match_profile(info, rule)
-            self.assertEqual(matched_profile, 'hevc_cuda')
-            self.assertEqual(rule, 'default')
+            config = ConfigFile(self.get_setup())
+            rule = config.match_rule(info)
+            self.assertIsNotNone(rule, 'expected to match a rule')
+            self.assertEqual(rule.profile, 'copy')
+            self.assertEqual(rule.name, 'default')
 
     def test_skip_profile(self):
-        self.setup()
-        rule = {
-            'too small': {
-                'profile': 'SKIP',
-                'rules': {
-                    'filesize_mb': '<1100'
-                }
-            }
-        }
         with open('tests/ffmpeg.out', 'r') as ff:
-            info = transcode.parse_details('/dev/null', ff.read())
-            info.filesize_mb = 1000
-            matched_profile, rule = transcode.match_profile(info, rule)
-            self.assertEqual(matched_profile, 'SKIP')
+            info = MediaInfo.parse_details('/dev/null', ff.read())
+            info.filesize_mb = 499
+            config = ConfigFile(self.get_setup())
+            rule = config.match_rule(info)
+            self.assertIsNotNone(rule, 'Expected rule match')
+            self.assertTrue(rule.is_skip(), 'Expected a SKIP rule')
 
     def test_rule_match(self):
-        rule = {
-            'small enough already': {
-                'profile': 'SKIP',
-                'rules': {
-                    'filesize_mb': '<2500',
-                    'res_height': '720-1081',
-                    'runtime': '30-65'
-                }
-            }
-        }
         info = MediaInfo(None, None, None, 1080, 45, 2300, None)
-        profile, rulename = match_profile(info, rule)
-        self.assertIsNotNone(profile, 'Expected a matched profile')
-        self.assertIsNotNone(rulename, 'Expected a matched rule')
+        config = ConfigFile(self.get_setup())
+        rule = config.match_rule(info)
+        self.assertIsNotNone(rule, 'Expected a matched profile')
 
-
-    def get_setup(self):
+    @staticmethod
+    def get_setup():
         setup = {
             'config': {
+                'ffmpeg': '/usr/bin/ffmpeg',
+                'queues': {
+                    'q1': 1,
+                    'q2': 2
+                },
                 'clusters': {
                     'cluster1': {
                         'm1': {
@@ -107,8 +78,16 @@ class TranscoderTests(unittest.TestCase):
                                 'src': '/volume2/',
                                 'dest': '/media/'
                             },
-                            'profile': 'copy',
+                            'profiles': ['copy'],
+                            'status': 'enabled',
                         },
+                        'workstation': {
+                            'os': 'linux',
+                            'type': 'local',
+                            'ip': '192.168.2.63',
+                            'ffmpeg': '/usr/bin/ffmpeg',
+                            'status': 'enabled',
+                        }
                     },
                     'cluster2': {
                         'm2': {
@@ -117,17 +96,47 @@ class TranscoderTests(unittest.TestCase):
                             'user': 'mark',
                             'ffmpeg': '/usr/bin/ffmpeg',
                             'working_dir': '/tmp/pytranscode-remote',
-                            'profile': 'copy'
-                        }
+                            'profiles': ['copy'],
+                            'status': 'enabled',
+                        },
                     },
                 },
             },
             "profiles": {
+                "hevc_cuda": {
+                    "input_options": None,
+                    "output_options": "-threads 4 -c:v copy -c:a copy -c:s copy -f matroska",
+                    "threshold": 1,
+                    "extension": ".mkv",
+                },
                 "copy": {
                     "input_options": None,
                     "output_options": "-threads 4 -c:v copy -c:a copy -c:s copy -f matroska",
+                    "threshold": 1,
                     "extension": ".mkv",
                 },
+            },
+            "rules": {
+                'too small': {
+                    'profile': 'SKIP',
+                    'rules': {
+                        'filesize_mb': '<500'
+                    }
+                },
+                'small enough already': {
+                    'profile': 'SKIP',
+                    'rules': {
+                        'filesize_mb': '<2500',
+                        'res_height': '720-1081',
+                        'runtime': '30-65'
+                    }
+                },
+                'default': {
+                    'profile': 'copy',
+                    'rules': {
+                        'vcodec': '!hevc'
+                    }
+                }
             }
         }
         return setup
@@ -138,7 +147,7 @@ class TranscoderTests(unittest.TestCase):
             return
         mediafile = os.environ['TEST_VIDEO']
         mediaext = mediafile[-4:]
-        setup = self.get_setup()
+        setup = ConfigFile(self.get_setup())
         if not os.path.exists('/tmp/pytranscode-test'):
             os.mkdir('/tmp/pytranscode-test', 0o777)
         shutil.copyfile(mediafile, '/tmp/pytranscode-test/test1' + mediaext)
@@ -155,7 +164,7 @@ class TranscoderTests(unittest.TestCase):
             return
         mediafile = os.environ['TEST_VIDEO']
         mediaext = mediafile[-4:]
-        setup = self.get_setup()
+        setup = ConfigFile(self.get_setup())
         if not os.path.exists('/tmp/pytranscode-test'):
             os.mkdir('/tmp/pytranscode-test', 0o777)
         shutil.copyfile(mediafile, '/tmp/pytranscode-test/test2' + mediaext)
