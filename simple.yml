@@ -1,0 +1,69 @@
+##
+# NOTE: Very simple starter config for pytranscode
+#
+# Run using: pytranscoder -y simple.yml ...
+##
+
+##
+# global configuration
+##
+config:
+  default_queue_file: '/tmp/fileoffiles.txt'
+  ffmpeg:             '/usr/bin/ffmpeg'
+
+##
+# profile definitions.  You can model all your transcoding combinations here.
+##
+profiles:
+
+  #
+  # Sample cpu-based transcode, uses built-in default sequential queue
+  #
+  h264:
+    input_options:
+    output_options: -threads 4 -c:v x264 -crf 20 -c:a copy -c:s copy -f matroska
+    extension: '.mkv'
+    threshold: 20
+
+  #
+  # Sample nVidia transcode setup, uses 'cuda' queue defined above
+  #
+  hevc_cuda:
+      input_options: -hwaccel cuvid
+      output_options: -c:v hevc_nvenc -profile:v main -preset medium -crf 20 -c:a copy -c:s copy -f matroska
+      extension: '.mkv'
+      threshold: 20         # 20% minimum size reduction %, otherwise source is preserved as-is
+
+#
+# Rules are evaluated in order.  First matching rule wins so order wisely.
+# Rules with a profile of "SKIP" mean to skip processing of the matched video
+#
+rules:
+  'skip video if already encoded in hevc/h265':
+      profile: SKIP
+      rules:
+        vcodec: 'hevc'
+
+  'skip video if resolution < 700':
+      profile: SKIP
+      rules:
+        res_height: '<700'
+
+  'content just too big':
+      profile: hevc_cuda
+      rules:
+        runtime:      '>90'     # more than 90 minutes
+        filesize_mb:  '>4000'   # ..and larger than 4 gigabytes
+
+  'small enough already':       # skip if <2.5g size and higher than 720p and between 30 and 64 minutes long.
+      profile: SKIP             # transcoding these will probably cause a noticeable quality loss so skip.
+      rules:
+        filesize_mb: '<2500'    # less than 2.5 gigabytes
+        res_height: '720-1081'  # 1080p, allowing for random oddball resolutions still in the HD range
+        runtime:  '30-65'       # between 30 and 65 minutes long
+
+  'default':                    # this will be the DEFAULT (no criteria implies a match)
+      profile: h264
+      rules:
+        vcodec: '!hevc'
+
