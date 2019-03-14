@@ -17,9 +17,7 @@ config:
   clusters:
     household:                  # name for this cluster
       workstation:
-        os: linux
         type: local             # special case - use the pytranscoder host also in the cluster
-        ip: 192.168.2.63
         ffmpeg: '/usr/bin/ffmpeg'
         status: enabled
       macpro:
@@ -28,9 +26,9 @@ config:
         ip: 192.168.2.65
         user: sshuser
         ffmpeg: '/usr/bin/ffmpeg'
-        path-substitution:      # optional, map source pathnames to equivalent on host
-          src: /volume2/
-          dest: /media/
+        path-substitutions:     # optional, map source pathnames to equivalent on host
+          - /volume2/ /media/
+          - /volume3/ /media3/
         profiles:               # profiles allowed on this host
           - hevc
         status: enabled         # set to disabled to temporarily stop using

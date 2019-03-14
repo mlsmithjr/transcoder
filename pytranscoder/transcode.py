@@ -287,7 +287,7 @@ def start():
         print('usage: {} [OPTIONS]'.format(sys.argv[0], ))
         print('  or   {} [OPTIONS] --from-file <filename>'.format(sys.argv[0], ))
         print('  or   {} [OPTIONS] file ...'.format(sys.argv[0], ))
-        print('  or   {} -c <cluster> file ... -r <cluster> ...'.format(sys.argv[0], ))
+        print('  or   {} -c <cluster> file ... -c <cluster> ...'.format(sys.argv[0], ))
         print('No parameters indicates to process the default queue files using profile matching rules.')
         print(
             'The --from-file filename is a file containing a list of full paths to files for transcoding. ' +
@@ -321,11 +321,12 @@ def start():
     queue_path = None
     cluster = None
     configfile: ConfigFile = None
+    host_override = None
     if len(sys.argv) > 1:
         files = []
         arg = 1
         while arg < len(sys.argv):
-            if sys.argv[arg] == '--from-file':
+            if sys.argv[arg] == '--from-file':          # load filenames to encode from given file
                 queue_path = sys.argv[arg + 1]
                 arg += 1
                 tmpfiles = files_from_file(queue_path)
@@ -333,21 +334,24 @@ def start():
                     files.extend([(f, profile) for f in tmpfiles])
                 else:
                     files.extend([(f, cluster) for f in tmpfiles])
-            elif sys.argv[arg] == '-p':
+            elif sys.argv[arg] == '-p':                 # specific profile
                 profile = sys.argv[arg + 1]
                 arg += 1
-            elif sys.argv[arg] == '-y':
+            elif sys.argv[arg] == '-y':                 # specify yaml config file
                 arg += 1
                 configfile = ConfigFile(sys.argv[arg])
-            elif sys.argv[arg] == '-s':
+            elif sys.argv[arg] == '-s':                 # force single threading/sequential
                 single_mode = True
-            elif sys.argv[arg] == '-k':
+            elif sys.argv[arg] == '-k':                 # keep original
                 keep_source = True
             elif sys.argv[arg] == '--dry-run':
                 dry_run = True
-            elif sys.argv[arg] == '-v':
+            elif sys.argv[arg] == '--host':             # run all cluster encodes on specific host
+                host_override = sys.argv[arg + 1]
+                arg += 1
+            elif sys.argv[arg] == '-v':                 # verbose
                 pytranscoder.verbose = True
-            elif sys.argv[arg] == '-c':
+            elif sys.argv[arg] == '-c':                 # cluster
                 cluster = sys.argv[arg + 1]
                 arg += 1
             else:
@@ -372,6 +376,12 @@ def start():
         exit(0)
 
     if cluster is not None:
+        if host_override is not None:
+            # disable all other hosts in-memory only to force encodes to the designated host
+            cluster_config = configfile.settings['clusters']
+            for name, this_config in cluster_config.items():
+                if name != host_override:
+                    this_config['status'] = 'disabled'
         manage_clusters(files, configfile, dry_run)
         sys.exit(0)
 

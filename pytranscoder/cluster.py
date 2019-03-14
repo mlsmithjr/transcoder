@@ -62,17 +62,17 @@ class RemoteHostProperties:
 
     @property
     def has_path_subst(self):
-        return 'path-substitution' in self.props and \
-            'src' in self.props['path-substitution'] and \
-            'dest' in self.props['path-substitution']
+        return 'path-substitutions' in self.props
 
-    @property
-    def path_subst_src(self):
-        return self.props['path-substitution']['src']
-
-    @property
-    def path_subst_dest(self):
-        return self.props['path-substitution']['dest']
+    def substitute_paths(self, in_path, out_path) -> (str, str):
+        lst = self.props['path-substitutions']
+        for item in lst:
+            src, dest = item.split(' ')
+            if src in in_path:
+                in_path = in_path.replace(src, dest)
+                out_path = out_path.replace(src, dest)
+                break
+        return in_path, out_path
 
     def is_windows(self):
         if self.props['type'] == 'local':
@@ -400,7 +400,6 @@ class MountedRemoteHost(RemoteHost):
         if self.host_ok():
             self.go()
 
-
     def go(self):
 
         while not self.queue.empty():
@@ -432,10 +431,7 @@ class MountedRemoteHost(RemoteHost):
                     #
                     # fix the input path to match what the remote machine expects
                     #
-                    src = self.props.path_subst_src
-                    dest = self.props.path_subst_dest
-                    remote_inpath = inpath.replace(src, dest)
-                    remote_outpath = outpath.replace(src, dest)
+                    remote_inpath, remote_outpath = self.props.substitute_paths(inpath, outpath)
 
                 #
                 # build command line
@@ -641,7 +637,6 @@ class Cluster(Thread):
         for host, props in configs.items():
             hostprops = RemoteHostProperties(host, props)
             if not hostprops.is_enabled:
-                print(f'Host {host} disabled - skipping')
                 continue
             hosttype = hostprops.host_type
 

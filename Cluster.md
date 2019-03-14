@@ -110,9 +110,8 @@ config:
         ip: 192.168.2.65
         user: sshuser           # user account used to ssh to this host
         ffmpeg:      '/usr/bin/ffmpeg'
-        path-substitution:      # optional, map source pathnames to equivalent on host
-          src: /volume1/media/
-          dest: /media/
+        path-substitutions:     # optional, map source pathnames to equivalent on host
+          - /volume1/media/ /media/
         profiles:               # profiles allowed on this host
           - hevc
         status: enabled         # set to disabled to temporarily stop using
@@ -134,9 +133,8 @@ config:
         ip: 192.168.2.66
         user: chris
         ffmpeg: /mnt/c/ffmpeg/bin/ffmpeg.exe  # using Windows ffmpeg.exe build
-        path-substitution:      # how to map media paths on source to destination mount point
-          src: '/volume1/media'
-          dest: 'Z:/'
+        path-substitutions:     # how to map media paths on source to destination mount point
+          - '/volume1/media Z:/'
         profiles:               # profiles allowed on this host
           - hevc_cuda
           - hevc_cuda_30fps
@@ -152,7 +150,7 @@ config:
 | ffmpeg        | Path on the host to ffmpeg. |
 | working_dir   | Indicates the temporary directory to use for encoding.  **[2]** |
 | profiles       | The allowed profiles to use for all encodes on this host. If not provided, assumes all. An encode matching a profile that is not assigned to a particular host will be run on a host that will, if any. This is how, for example, you restrict CPU-based encodings to hosts with no hardware acceleration - or vice versa. |
-| path-substitution | Optional. Applicable only to *mounted* type hosts. Uses when the server media files and host mount paths are different. Any part of the media pathname matching *src* will be replaced with *dest*. |
+| path-substitutions | Optional. Applicable only to *mounted* type hosts. Use when the server media files and host mount paths are different. |
 | status        | *enabled* or *disabled*. Disabled hosts will be skipped. Default is *enabled*.|
 
 **[1]** Required for *mounted* and *streaming* types.
@@ -184,9 +182,8 @@ Here is the configuration for the scenario above:
         ip: 192.168.2.63
         user: encodeuser
         ffmpeg: '/usr/bin/ffmpeg'
-        path-substitution:      # optional, map source pathnames to equivalent on host
-          src: /volume1/media/
-          dest: /mnt/media/
+        path-substitutions:      # optional, map source pathnames to equivalent on host
+          - /volume1/media/ /mnt/media/
         profiles:
           - qsv
       shared:
@@ -266,3 +263,7 @@ To troubleshoot problems, use verbose mode
 
 ```
 
+To force encode(s) to a specific host named 'wopr'
+```bash
+    pytranscoder -c mycluster -h wopr /volume1/media/*.mp4
+```

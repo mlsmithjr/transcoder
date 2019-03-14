@@ -1,11 +1,13 @@
 import shutil
 import unittest
 import os
+from typing import Dict
 
-from pytranscoder.cluster import manage_clusters
+from pytranscoder.cluster import manage_clusters, RemoteHostProperties
 from pytranscoder.config import ConfigFile
 from pytranscoder.media import MediaInfo
-from pytranscoder.utils import files_from_file
+from pytranscoder.transcode import LocalHost
+from pytranscoder.utils import files_from_file, get_local_os_type
 
 
 class TranscoderTests(unittest.TestCase):
@@ -13,6 +15,7 @@ class TranscoderTests(unittest.TestCase):
     def test_loadconfig(self):
         config = ConfigFile('transcode.yml')
         self.assertIsNotNone(config.settings, 'Config object not loaded')
+        self.assertEqual(len(config.queues), 2, 'Expected 2 queues')
 
     def test_loadqueue(self):
         testpath = '/tmp/transcode_parsertest_loadqueue.tmp'
@@ -58,6 +61,21 @@ class TranscoderTests(unittest.TestCase):
         rule = config.match_rule(info)
         self.assertIsNotNone(rule, 'Expected a matched profile')
 
+    def test_loc_os(self):
+        self.assertEqual(get_local_os_type(), 'linux', 'Expected linux as os type')
+
+    def test_path_substitutions(self):
+        config: Dict = self.get_setup()
+        props = RemoteHostProperties('m1', config['config']['clusters']['cluster1']['m1'])
+        intest, outtest = props.substitute_paths('/volume2/test.in', '/volume2/test.out')
+        self.assertEqual(intest, '/media/test.in', 'Path substitution failed on input path')
+        self.assertEqual(outtest, '/media/test.out', 'Path substitution failed on output path')
+
+    def test_local_host_setup(self):
+        config: Dict = self.get_setup()
+        host = LocalHost(ConfigFile(config))
+        self.assertEqual(len(host.queues), 3, 'Expected 3 queues configured')
+
     @staticmethod
     def get_setup():
         setup = {
@@ -74,10 +92,10 @@ class TranscoderTests(unittest.TestCase):
                             'ip': '127.0.0.1',
                             'user': 'mark',
                             'ffmpeg': '/usr/bin/ffmpeg',
-                            'path-substitution': {
-                                'src': '/volume2/',
-                                'dest': '/media/'
-                            },
+                            'path-substitutions': [
+                                '/v2/ /m2/',
+                                '/volume2/ /media/'
+                            ],
                             'profiles': ['copy'],
                             'status': 'enabled',
                         },
