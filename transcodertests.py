@@ -1,3 +1,4 @@
+import re
 import shutil
 import unittest
 import os
@@ -5,12 +6,18 @@ from typing import Dict
 
 from pytranscoder.cluster import manage_clusters, RemoteHostProperties
 from pytranscoder.config import ConfigFile
-from pytranscoder.media import MediaInfo
+from pytranscoder.media import MediaInfo, status_re
 from pytranscoder.transcode import LocalHost
 from pytranscoder.utils import files_from_file, get_local_os_type
 
 
 class TranscoderTests(unittest.TestCase):
+
+    def test_ffmpeg_status_regex(self):
+        sample = 'frame=  307 fps= 86 q=-0.0 size=    3481kB time=00:00:13.03 bitrate=2187.9kbits/s speed=3.67x   \n'
+        match = status_re.match(sample)
+        self.assertIsNotNone(match, 'no ffmpeg status match')
+        self.assertTrue(len(match.groups()) == 5, 'Expected 5 matches')
 
     def test_loadconfig(self):
         config = ConfigFile('transcode.yml')
@@ -91,6 +98,7 @@ class TranscoderTests(unittest.TestCase):
                             'type': 'mounted',
                             'ip': '127.0.0.1',
                             'user': 'mark',
+                            'os': 'linux',
                             'ffmpeg': '/usr/bin/ffmpeg',
                             'path-substitutions': [
                                 '/v2/ /m2/',
@@ -111,6 +119,7 @@ class TranscoderTests(unittest.TestCase):
                         'm2': {
                             'type': 'streaming',
                             'ip': '127.0.0.1',
+                            'os': 'linux',
                             'user': 'mark',
                             'ffmpeg': '/usr/bin/ffmpeg',
                             'working_dir': '/tmp/pytranscode-remote',
