@@ -1,6 +1,19 @@
 
 ### Version History
 
+Version 1.4.1
+=============
+
+Enhancements and new features:
+
+Bugs corrected:
+
+    * Regex problem monitoring ffmpeg output.
+
+Others:
+
+    * Refactored ffmpeg control into a class
+
 Version 1.3
 ===========
 

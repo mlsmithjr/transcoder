@@ -15,9 +15,10 @@ import pytranscoder
 
 from pytranscoder import verbose
 from pytranscoder.config import ConfigFile
-from pytranscoder.media import MediaInfo, fetch_details
+from pytranscoder.ffmpeg import FFmpeg
+from pytranscoder.media import MediaInfo
 from pytranscoder.profile import Profile
-from pytranscoder.utils import filter_threshold, get_local_os_type, monitor_ffmpeg
+from pytranscoder.utils import filter_threshold, get_local_os_type
 
 
 class RemoteHostProperties:
@@ -107,8 +108,9 @@ class RemoteHostProperties:
             'ip' in self.props or msg.append(f'Missing "ip"')
             'user' in self.props or msg.append(f'Missing "user"')
             'os' in self.props or msg.append(f'Missing "os"')
-            _os = self.props['os']
-            _os in ['macos', 'linux', 'win10'] or msg.append(f'Unsupported "os" type {_os}')
+            if 'os' in self.props:
+                _os = self.props['os']
+                _os in ['macos', 'linux', 'win10'] or msg.append(f'Unsupported "os" type {_os}')
         if self.props['type'] == 'streaming':
             'working_dir' in self.props or msg.append(f'Missing "working_dir"')
         if len(msg) > 0:
@@ -152,6 +154,7 @@ class RemoteHost(Thread):
         self.queue = queue
         self._complete = set()
         self._manager = cluster
+        self.ffmpeg = FFmpeg(props.ffmpeg_path)
 
     def validate_settings(self):
         return self.props.validate_settings()
@@ -284,7 +287,7 @@ class StreamingRemoteHost(RemoteHost):
                 ooutput = _profile.output_options
 #                quiet = ['-nostats', '-hide_banner']
 
-                cmd = [self.props.ffmpeg_path, '-y', *oinput, '-i', self.converted_path(remote_inpath),
+                cmd = ['-y', *oinput, '-i', self.converted_path(remote_inpath),
                        *ooutput, self.converted_path(remote_outpath)]
                 cli = [*ssh_cmd, *cmd]
 
@@ -323,14 +326,16 @@ class StreamingRemoteHost(RemoteHost):
                         self.log(output)
                     continue
 
-                #
-                # run remote shell to ffmpeg
-                #
-                p = subprocess.Popen(cli, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
-                                     shell=False)
-                for name, stats in monitor_ffmpeg(os.path.basename(job.inpath), p):
+                basename = os.path.basename(job.inpath)
+
+                def log_callback(stats):
                     pct_done = int((stats['time'] / job.media_info.runtime) * 100)
-                    self.log(f'{name}: {pct_done:3}%, speed: {stats["speed"]}x')
+                    self.log(f'{basename}: {pct_done:3}%, speed: {stats["speed"]}x')
+
+                #
+                # Start remote ffmpeg
+                #
+                p = self.ffmpeg.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, log_callback)
 
                 if p.returncode != 0:
                     self.log('Unknown error encoding on remote')
@@ -345,8 +350,8 @@ class StreamingRemoteHost(RemoteHost):
                 retrieved_copy_name = os.path.join('/tmp', os.path.basename(remote_outpath))
                 cmd = ['scp', self.props.user + '@' + self.props.ip + ':' + remote_outpath, retrieved_copy_name]
                 self.log(' '.join(cmd))
-                p = subprocess.Popen(cmd)
-                p.wait()
+                with subprocess.Popen(cmd) as p:
+                    p.wait()
 
                 #
                 # process completed, check results and finish
@@ -443,9 +448,7 @@ class MountedRemoteHost(RemoteHost):
                 remote_inpath = self.converted_path(remote_inpath)
                 remote_outpath = self.converted_path(remote_outpath)
 
-                cmd = [self.props.ffmpeg_path, '-y', *oinput, '-i', f'"{remote_inpath}"',
-                       *ooutput, f'"{remote_outpath}"']
-                cli = [self._manager.ssh, self.props.user + '@' + self.props.ip, *cmd]
+                cmd = ['-y', *oinput, '-i', f'"{remote_inpath}"', *ooutput, f'"{remote_outpath}"']
 
                 #
                 # display useful information
@@ -456,21 +459,24 @@ class MountedRemoteHost(RemoteHost):
                     print(f'Host     : {self.hostname} (mounted)')
                     print(f'Filename : {remote_inpath}')
                     print(f'Profile  : {_profile.name}')
-                    print('ssh      : ' + ' '.join(cli) + '\n')
+                    print('ffmeg    : ' + ' '.join(cmd) + '\n')
                 finally:
                     self.lock.release()
 
                 if self._manager.dry_run:
                     continue
 
+                basename = os.path.basename(job.inpath)
+
+                def log_callback(stats):
+                    pct_done = int((stats['time'] / job.media_info.runtime) * 100)
+                    self.log(f'{basename}: {pct_done:3}%, speed: {stats["speed"]}x')
+
                 #
                 # Start remote ffmpeg
                 #
-                p = subprocess.Popen(cli, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
-                                     shell=False)
-                for name, stats in monitor_ffmpeg(os.path.basename(job.inpath), p):
-                    pct_done = int((stats['time'] / job.media_info.runtime) * 100)
-                    self.log(f'{name}: {pct_done:3}%, speed: {stats["speed"]}x')
+                p = self.ffmpeg.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, log_callback)
+
                 #
                 # process completed, check results and finish
                 #
@@ -551,8 +557,7 @@ class ManagerHost(RemoteHost):
                 remote_inpath = self.converted_path(inpath)
                 remote_outpath = self.converted_path(outpath)
 
-                cli = [self.props.ffmpeg_path, '-y', *oinput, '-i', remote_inpath,
-                       *ooutput, remote_outpath]
+                cli = ['-y', *oinput, '-i', remote_inpath, *ooutput, remote_outpath]
 
                 #
                 # display useful information
@@ -570,14 +575,16 @@ class ManagerHost(RemoteHost):
                 if self._manager.dry_run:
                     continue
 
+                basename = os.path.basename(job.inpath)
+
+                def log_callback(stats):
+                    pct_done = int((stats['time'] / job.media_info.runtime) * 100)
+                    self.log(f'{basename}: {pct_done:3}%, speed: {stats["speed"]}x')
+
                 #
                 # Start ffmpeg
                 #
-                p = subprocess.Popen(cli, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
-                                     shell=False)
-                for name, stats in monitor_ffmpeg(os.path.basename(job.inpath), p):
-                    pct_done = int((stats['time'] / job.media_info.runtime) * 100)
-                    self.log(f'{name}: {pct_done:3}%, speed: {stats["speed"]}x')
+                p = self.ffmpeg.run(cli, log_callback)
 
                 #
                 # process completed, check results and finish
@@ -634,6 +641,8 @@ class Cluster(Thread):
         self.hosts = list()
         self.config = config
         self.verbose = verbose
+        self.ffmpeg = FFmpeg(config.ffmpeg_path)
+
         for host, props in configs.items():
             hostprops = RemoteHostProperties(host, props)
             if not hostprops.is_enabled:
@@ -670,7 +679,7 @@ class Cluster(Thread):
         if pytranscoder.verbose:
             print('matching ' + path)
 
-        media_info = fetch_details(path, self.config.ffmpeg_path)
+        media_info = self.ffmpeg.fetch_details(path)
         if media_info.vcodec is not None:
 
             rule = self.config.match_rule(media_info)

@@ -25,7 +25,7 @@ class ConfigFile:
                 yml = configuration
             else:
                 with open(configuration, 'r') as f:
-                    yml = yaml.load(f)
+                    yml = yaml.load(f, Loader=yaml.FullLoader)
             self.settings = yml['config']
             if 'queues' not in self.settings:
                 print('"queues" definition missing from transcode.yml configuration file')

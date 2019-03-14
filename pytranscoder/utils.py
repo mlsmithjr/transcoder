@@ -1,9 +1,6 @@
-import datetime
 import math
 import os
 import platform
-import re
-from typing import Dict, Any
 
 from pytranscoder.profile import Profile
 
@@ -37,20 +34,3 @@ def get_local_os_type():
     elif platform.system() == 'Darwin':
         return 'macos'
     return 'unknown'
-
-
-def monitor_ffmpeg(name, proc):
-    stats = re.compile(r'^.*fps=(?P<fps>.*) q=(?P<q>\d+\.\d) size=(?P<size>.*)kB time=(?P<time>\d\d:\d\d:\d\d\.\d\d) .*speed=(?P<speed>.*?)x')
-    diff = datetime.timedelta(seconds=30)
-    event = datetime.datetime.now() + diff
-    while proc.poll() is None:
-        line = proc.stdout.readline()
-        match = stats.match(line)
-        if match is not None and len(match.groups()) >= 5:
-            if datetime.datetime.now() > event:
-                event = datetime.datetime.now() + diff
-                info: Dict[str, Any] = match.groupdict()
-                info['size'] = int(info['size'].strip()) * 1024
-                hh, mm, ss = info['time'].split(':')
-                info['time'] = (int(hh) * 60) + int(mm)
-                yield name, info

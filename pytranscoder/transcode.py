@@ -3,7 +3,6 @@ import os
 import sys
 from typing import Dict
 
-import subprocess
 from queue import Queue
 from threading import Thread, Lock
 
@@ -12,9 +11,10 @@ import pytranscoder
 from pytranscoder import __version__
 from pytranscoder.cluster import manage_clusters
 from pytranscoder.config import ConfigFile
-from pytranscoder.media import MediaInfo, fetch_details
+from pytranscoder.ffmpeg import FFmpeg
+from pytranscoder.media import MediaInfo
 from pytranscoder.profile import Profile
-from pytranscoder.utils import filter_threshold, files_from_file, monitor_ffmpeg
+from pytranscoder.utils import filter_threshold, files_from_file
 
 DEFAULT_CONFIG = os.path.expanduser('~/.transcode.yml')
 
@@ -55,6 +55,7 @@ class QueueThread(Thread):
         self.queue = queue
         self.config = configfile
         self._manager = manager
+        self.ffmpeg = FFmpeg(self.config.ffmpeg_path)
 
     @property
     def lock(self):
@@ -87,7 +88,7 @@ class QueueThread(Thread):
 #                    quiet = ''
 #                else:
 #                    quiet = ['-nostats', '-loglevel', 'quiet']
-                cli = [self.config.ffmpeg_path, '-y', *oinput, '-i', job.inpath, *ooutput, job.outpath]
+                cli = ['-y', *oinput, '-i', job.inpath, *ooutput, job.outpath]
 
                 #
                 # display useful information
@@ -104,12 +105,13 @@ class QueueThread(Thread):
                 if dry_run:
                     continue
 
-                p = subprocess.Popen(cli, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
-                                     shell=False)
-                for name, stats in monitor_ffmpeg(os.path.basename(job.inpath), p):
-                    pct_done = int((stats['time'] / job.info.runtime) * 100)
-                    self.log(f'{name}: {pct_done:3}%, speed: {stats["speed"]}x')
+                basename = os.path.basename(job.inpath)
 
+                def log_callback(stats):
+                    pct_done = int((stats['time'] / job.info.runtime) * 100)
+                    self.log(f'{basename}: {pct_done:3}%, speed: {stats["speed"]}x')
+
+                p = self.ffmpeg.run(cli, log_callback)
                 if p.returncode == 0:
                     if not filter_threshold(job.profile, job.inpath, job.outpath):
                         # oops, this transcode didn't do so well, lets keep the original and scrap this attempt
@@ -143,6 +145,7 @@ class LocalHost:
     def __init__(self, configfile: ConfigFile):
         self.queues = dict()
         self.configfile = configfile
+        self.ffmpeg = FFmpeg(self.configfile.ffmpeg_path)
         #
         # initialize the queues
         #
@@ -203,7 +206,7 @@ class LocalHost:
             path = os.path.abspath(path)  # convert to full path so that rule filtering can work
             if pytranscoder.verbose:
                 print('matching ' + path)
-            media_info = fetch_details(path, self.configfile.ffmpeg_path)
+            media_info = self.ffmpeg.fetch_details(path)
             if media_info.vcodec is not None:
 
                 if forced_profile is None:

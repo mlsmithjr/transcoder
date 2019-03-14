@@ -1,9 +1,7 @@
 import os
 import re
-import subprocess
 
 from pytranscoder import verbose
-
 
 video_re = re.compile(r'^.*Duration: (\d+):(\d+):.* Stream #0:0.*: Video: (\w+).*, (\d+)x(\d+).* (\d+)(\.\d.)? fps,.*$',
                       re.DOTALL)
@@ -18,8 +16,6 @@ class MediaInfo:
     fps: int
     vcodec: str
 
-    __verbose: bool = False
-
     def __init__(self, path, vcodec, res_width, res_height, runtime, source_size, fps):
         self.path = path
         self.vcodec = vcodec
@@ -29,7 +25,7 @@ class MediaInfo:
         self.filesize_mb = source_size
         self.fps = fps
 
-    def eval_numeric(self, rulename, pred, value) -> bool:
+    def eval_numeric(self, rulename: str, pred: str, value: str) -> bool:
         attr = self.__dict__.get(pred, None)
         if attr is None:
             print(f'Error: Rule "{rulename}" unknown attribute: {pred} ')
@@ -71,15 +67,3 @@ class MediaInfo:
             filesize = os.path.getsize(_path) / (1024 * 1024)
             return MediaInfo(_path, _codec, int(_res_width), int(_res_height), (int(_dur_hrs) * 60) + int(_dur_mins),
                              filesize, int(fps))
-
-
-def fetch_details(_path: str, ffmpeg: str) -> MediaInfo:
-    """Use ffmpeg to get media information
-
-    :param _path:   Absolute path to media file
-    :param ffmpeg: Absolut path for ffmpeg
-    :return:        Instance of MediaInfo
-    """
-    with subprocess.Popen([ffmpeg, '-i', _path], stderr=subprocess.PIPE) as proc:
-        output = proc.stderr.read().decode(encoding='utf8')
-        return MediaInfo.parse_details(_path, output)
