@@ -1,6 +1,19 @@
 
 ### Version History
 
+Version 1.4.2
+=============
+
+Enhancements and new features:
+
+Bugs corrected:
+
+    * Cluster mode not honoring default queue file.
+    * Cluster mode --host override fixed.
+
+Others:
+
+
 Version 1.4.1
 =============
 

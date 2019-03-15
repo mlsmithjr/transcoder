@@ -3,6 +3,7 @@ import re
 import subprocess
 from typing import Dict, Any
 
+from pytranscoder import verbose
 from pytranscoder.media import MediaInfo
 
 status_re = re.compile(
@@ -30,6 +31,8 @@ class FFmpeg:
         event = datetime.datetime.now() + diff
         while proc.poll() is None:
             line = proc.stdout.readline()
+            if verbose:
+                print(line, end='')
             match = status_re.match(line)
             if match is not None and len(match.groups()) >= 5:
                 if datetime.datetime.now() > event:

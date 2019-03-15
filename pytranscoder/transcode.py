@@ -287,10 +287,11 @@ def start():
     global single_mode, keep_source, dry_run
 
     if len(sys.argv) == 2 and sys.argv[1] == '-h':
-        print('usage: {} [OPTIONS]'.format(sys.argv[0], ))
-        print('  or   {} [OPTIONS] --from-file <filename>'.format(sys.argv[0], ))
-        print('  or   {} [OPTIONS] file ...'.format(sys.argv[0], ))
-        print('  or   {} -c <cluster> file ... -c <cluster> ...'.format(sys.argv[0], ))
+        print(f'pytrancoder (ver {__version__})')
+        print('usage: pytrancoder [OPTIONS]')
+        print('  or   pytrancoder [OPTIONS] --from-file <filename>')
+        print('  or   pytrancoder [OPTIONS] file ...')
+        print('  or   pytrancoder -c <cluster> file... -c <cluster> file...')
         print('No parameters indicates to process the default queue files using profile matching rules.')
         print(
             'The --from-file filename is a file containing a list of full paths to files for transcoding. ' +
@@ -304,19 +305,6 @@ def start():
             'name and .tmp extension')
         print('  -y <file>  Full path to configuration file.  Default is ~/.transcode.yml')
         print('  -p         profile to use. If used with --from-file, applies to all listed media in <filename>')
-        print('             Otherwise, applies to all following files up to the next occurrance')
-        print(
-            '                 Ex: {} --from-file /home/me/batch.txt -p hevc_hd /tmp/testvid1.mp4 '
-            '/tmp/testvid2.mp4'.format(sys.argv[0]))
-        print(
-            '                   This will transcode all videos listed in batch.txt using the rules, using '
-            'hevc_hd profile for the others')
-        print('                 Ex: {} -p hevc_25fps --from-file /home/me/batch.txt'.format(sys.argv[0]))
-        print('                   This will transcode all videos listed in batch.txt using the the hevc_25fps profile')
-        print('                 Ex: {} -p hevc_25fps /tmp/vid1.mp4 -p hevc_hd /tmp/vid2.mp4'.format(sys.argv[0]))
-        print('                   This will transcode the given videos using different profiles')
-        print('Individual files may be listed on the command line for processing\n')
-        print('** Version ' + __version__)
         sys.exit(0)
 
     files = list()
@@ -372,9 +360,12 @@ def start():
 
     if len(files) == 0 and queue_path is None and configfile.default_queue_file is not None:
         tmpfiles = files_from_file(configfile.default_queue_file)
-        files.extend([(f, profile) for f in tmpfiles])
+        if cluster is None:
+            files.extend([(f, profile) for f in tmpfiles])
+        else:
+            files.extend([(f, cluster) for f in tmpfiles])
 
-    if files is None:
+    if len(files) == 0:
         print(f'Nothing to do')
         exit(0)
 
@@ -382,9 +373,10 @@ def start():
         if host_override is not None:
             # disable all other hosts in-memory only to force encodes to the designated host
             cluster_config = configfile.settings['clusters']
-            for name, this_config in cluster_config.items():
-                if name != host_override:
-                    this_config['status'] = 'disabled'
+            for cluster in cluster_config.values():
+                for name, this_config in cluster.items():
+                    if name != host_override:
+                        this_config['status'] = 'disabled'
         manage_clusters(files, configfile, dry_run)
         sys.exit(0)
 
