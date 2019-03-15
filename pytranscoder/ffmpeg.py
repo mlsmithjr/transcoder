@@ -3,7 +3,7 @@ import re
 import subprocess
 from typing import Dict, Any
 
-from build.lib.pytranscoder.media import MediaInfo
+from pytranscoder.media import MediaInfo
 
 status_re = re.compile(
     r'^.* fps=\s*(?P<fps>.+?) q=(?P<q>.+\.\d) size=\s*(?P<size>\d+?)kB time=(?P<time>\d\d:\d\d:\d\d\.\d\d) .*speed=(?P<speed>.*?)x')
