@@ -6,11 +6,13 @@ import os
 import shutil
 import subprocess
 import sys
+from pathlib import PureWindowsPath, PosixPath
 from queue import Queue
+from tempfile import gettempdir
 from threading import Thread, Lock
 from typing import Dict, List, Set
-from pathlib import Path, PureWindowsPath
 
+import crayons
 import pytranscoder
 
 from pytranscoder import verbose
@@ -125,8 +127,8 @@ class RemoteJob:
     inpath:     str
     media_info: MediaInfo
 
-    def __init__(self, inpath, info: MediaInfo):
-        self.inpath = inpath
+    def __init__(self, inpath: str, info: MediaInfo):
+        self.inpath = os.path.abspath(inpath)
         self.media_info = info
 
 
@@ -173,7 +175,8 @@ class RemoteHost(Thread):
     def log(self, *args):
         self.lock.acquire()
         try:
-            print(f'[{self._manager.name}]({self.hostname}): ', *args)
+            msg = crayons.blue(f'[{self._manager.name}]') + crayons.white(f'({self.hostname}): ')
+            print(msg, *args)
             sys.stdout.flush()
         finally:
             self.lock.release()
@@ -185,7 +188,7 @@ class RemoteHost(Thread):
         if self.props.is_windows():
             return str(PureWindowsPath(path))
         else:
-            return str(Path(path))
+            return str(PosixPath(path))
 
     def ssh_cmd(self):
         return [self._manager.ssh, self.props.user + '@' + self.props.ip]
@@ -196,7 +199,7 @@ class RemoteHost(Thread):
         p = subprocess.Popen(ping, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
         p.communicate()
         if p.returncode != 0:
-            self.log(f'Host at address {addr} cannot be reached - skipped')
+            self.log(crayons.yellow(f'Host at address {addr} cannot be reached - skipped'))
             return False
         return True
 
@@ -263,12 +266,12 @@ class StreamingRemoteHost(RemoteHost):
                 # Got to do the rule matching again.
                 # This time we narrow down the available profiles based on host definition
                 #
-                inpath = os.path.abspath(inpath)
                 if pytranscoder.verbose:
                     self.log('matching ' + inpath)
                 rule = self.configfile.match_rule(job.media_info, restrict_profiles=self.props.profiles)
                 if rule is None:
-                    self.log(f'Failed to match rule/profile for host {self.name} for file {inpath} - skipped')
+                    self.log(crayons.yellow(
+                        f'Failed to match rule/profile for host {self.name} for file {inpath} - skipped'))
                     continue
                 profile_name = rule.profile
                 _profile: Profile = self._manager.profiles[profile_name]
@@ -298,7 +301,7 @@ class StreamingRemoteHost(RemoteHost):
                 try:
                     print('-' * 40)
                     print(f'Host     : {self.hostname} (streaming)')
-                    print(f'Filename : {remote_inpath}')
+                    print('Filename : ' + crayons.green(remote_inpath))
                     print(f'Profile  : {profile_name}')
                     print('ssh      : ' + ' '.join(cli) + '\n')
                 finally:
@@ -321,7 +324,7 @@ class StreamingRemoteHost(RemoteHost):
                 output = p.communicate()[0].decode('utf-8')
 
                 if p.returncode != 0:
-                    self.log('Unknown error copying source to remote - media skipped')
+                    self.log(crayons.red('Unknown error copying source to remote - media skipped'))
                     if self._manager.verbose:
                         self.log(output)
                     continue
@@ -338,7 +341,7 @@ class StreamingRemoteHost(RemoteHost):
                 p = self.ffmpeg.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, log_callback)
 
                 if p.returncode != 0:
-                    self.log('Unknown error encoding on remote')
+                    self.log(crayons.red('Unknown error encoding on remote'))
                     if self._manager.verbose:
                         self.log(output)
                     continue
@@ -346,8 +349,7 @@ class StreamingRemoteHost(RemoteHost):
                 #
                 # copy results back to local
                 #
-#                self.log(f'Retrieving media from {working_dir} on host')
-                retrieved_copy_name = os.path.join('/tmp', os.path.basename(remote_outpath))
+                retrieved_copy_name = os.path.join(gettempdir(), os.path.basename(remote_outpath))
                 cmd = ['scp', self.props.user + '@' + self.props.ip + ':' + remote_outpath, retrieved_copy_name]
                 self.log(' '.join(cmd))
                 with subprocess.Popen(cmd) as p:
@@ -365,14 +367,19 @@ class StreamingRemoteHost(RemoteHost):
                         continue
                     self.complete(inpath)
 
-                    os.rename(retrieved_copy_name, retrieved_copy_name[0:-4])
-                    retrieved_copy_name = retrieved_copy_name[0:-4]
-                    self.log(f'moving media to {inpath}')
-                    shutil.move(retrieved_copy_name, inpath)
+                    if not pytranscoder.keep_source:
+                        os.rename(retrieved_copy_name, retrieved_copy_name[0:-4])
+                        retrieved_copy_name = retrieved_copy_name[0:-4]
+                        if verbose:
+                            self.log(f'moving media to {inpath}')
+                        shutil.move(retrieved_copy_name, inpath)
+                    self.log(crayons.green(f'Finished {inpath}'))
                 else:
-                    self.log(f'error during remote transcode of {inpath}')
+                    self.log(crayons.red(f'error during remote transcode of {inpath}'))
+                    self.log(f' Did not complete normally: {self.ffmpeg.last_command}')
+                    self.log(f'Output can be found in {self.ffmpeg.log_path}')
 
-                self.log(f'Removing temporary media copies from {remote_working_dir}')
+                # self.log(f'Removing temporary media copies from {remote_working_dir}')
                 if self.props.is_windows():
                     remote_outpath = self.converted_path(remote_outpath)
                     remote_inpath = self.converted_path(remote_inpath)
@@ -416,12 +423,12 @@ class MountedRemoteHost(RemoteHost):
                 # Got to do the rule matching again.
                 # This time we narrow down the available profiles based on host definition
                 #
-                inpath = os.path.abspath(inpath)
                 if pytranscoder.verbose:
                     self.log('matching ' + inpath)
                 rule = self.configfile.match_rule(job.media_info, restrict_profiles=self.props.profiles)
                 if rule is None:
-                    self.log(f'Failed to match rule/profile for host {self.name} for file {inpath} - skipped')
+                    self.log(crayons.yellow(
+                        f'Failed to match rule/profile for host {self.name} for file {inpath} - skipped'))
                     continue
                 profile_name = rule.profile
                 _profile: Profile = self._manager.profiles[profile_name]
@@ -457,7 +464,7 @@ class MountedRemoteHost(RemoteHost):
                 try:
                     print('-' * 40)
                     print(f'Host     : {self.hostname} (mounted)')
-                    print(f'Filename : {remote_inpath}')
+                    print('Filename : ' + crayons.green(remote_inpath))
                     print(f'Profile  : {_profile.name}')
                     print('ffmeg    : ' + ' '.join(cmd) + '\n')
                 finally:
@@ -487,15 +494,21 @@ class MountedRemoteHost(RemoteHost):
                         self.complete(inpath)
                         os.remove(outpath)
                         continue
-                    self.log('removing ' + inpath)
-                    os.remove(inpath)
-                    self.log('renaming ' + outpath)
-                    os.rename(outpath, outpath[0:-4])
-                    self.complete(inpath)
+
+                    if not pytranscoder.keep_source:
+                        if verbose:
+                            self.log('removing ' + inpath)
+                        os.remove(inpath)
+                        if verbose:
+                            self.log('renaming ' + outpath)
+                        os.rename(outpath, outpath[0:-4])
+                        self.complete(inpath)
+                    self.log(crayons.green(f'Finished {job.inpath}'))
                 else:
-                    self.log(f'error during encode of {inpath}, .tmp file removed')
-                    self.log(p.stdout.read())
                     os.remove(outpath)
+                    self.log(f' Did not complete normally: {self.ffmpeg.last_command}')
+                    self.log(f'Output can be found in {self.ffmpeg.log_path}')
+
             except Exception as ex:
                 self.log(ex)
             finally:
@@ -532,12 +545,12 @@ class ManagerHost(RemoteHost):
                 # Got to do the rule matching again.
                 # This time we narrow down the available profiles based on host definition
                 #
-                inpath = os.path.abspath(inpath)
                 if pytranscoder.verbose:
                     self.log('matching ' + inpath)
                 rule = self.configfile.match_rule(job.media_info, restrict_profiles=self.props.profiles)
                 if rule is None:
-                    self.log(f'Failed to match rule/profile for host {self.name} for file {inpath} - skipped')
+                    self.log(crayons.yellow(
+                        f'Failed to match rule/profile for host {self.name} for file {inpath} - skipped'))
                     continue
                 profile_name = rule.profile
                 _profile: Profile = self._manager.profiles[profile_name]
@@ -566,7 +579,7 @@ class ManagerHost(RemoteHost):
                 try:
                     print('-' * 40)
                     print(f'Host     : {self.hostname} (local)')
-                    print(f'Filename : {remote_inpath}')
+                    print('Filename : ' + crayons.green(remote_inpath))
                     print(f'Profile  : {_profile.name}')
                     print('ssh      : ' + ' '.join(cli) + '\n')
                 finally:
@@ -596,15 +609,21 @@ class ManagerHost(RemoteHost):
                         self.complete(inpath)
                         os.remove(outpath)
                         continue
-                    self.log('removing ' + inpath)
-                    os.remove(inpath)
-                    self.log('renaming ' + outpath)
-                    os.rename(outpath, outpath[0:-4])
-                    self.complete(inpath)
+
+                    if not pytranscoder.keep_source:
+                        if verbose:
+                            self.log('removing ' + inpath)
+                        os.remove(inpath)
+                        if verbose:
+                            self.log('renaming ' + outpath)
+                        os.rename(outpath, outpath[0:-4])
+                        self.complete(inpath)
+                    self.log(crayons.green(f'Finished {job.inpath}'))
                 else:
-                    self.log(f'error during encode of {inpath}, .tmp file removed')
-                    self.log(p.stdout.read())
                     os.remove(outpath)
+                    self.log(f' Did not complete normally: {self.ffmpeg.last_command}')
+                    self.log(f'Output can be found in {self.ffmpeg.log_path}')
+
             except Exception as ex:
                 self.log(ex)
             finally:
@@ -664,7 +683,7 @@ class Cluster(Thread):
                 self.hosts.append(_h)
 
             else:
-                print(f'Unknown cluster host type "{hosttype}" - skipping')
+                print(crayons.red(f'Unknown cluster host type "{hosttype}" - skipping'))
 
             if _h is not None and not _h.validate_settings():
                 sys.exit(1)
@@ -684,7 +703,7 @@ class Cluster(Thread):
 
             rule = self.config.match_rule(media_info)
             if rule is None:
-                print(f'No matching profile found - skipped')
+                print(crayons.yellow(f'No matching profile found - skipped'))
                 return False
             if rule.is_skip():
                 print(f'Skipping due to profile rule: {rule.name}')

@@ -1,10 +1,12 @@
 #!/usr/bin/python3
 import os
 import sys
-from typing import Dict
+from pathlib import Path
+from typing import Dict, Set
 
 from queue import Queue
 from threading import Thread, Lock
+import crayons
 
 import pytranscoder
 
@@ -19,20 +21,17 @@ from pytranscoder.utils import filter_threshold, files_from_file
 DEFAULT_CONFIG = os.path.expanduser('~/.transcode.yml')
 
 single_mode = False
-keep_source = False
 dry_run = False
 
 
 class LocalJob:
     """One file with matched profile to be encoded"""
-    inpath: str
-    outpath: str
+    inpath: Path
     profile: Profile
     info: MediaInfo
 
-    def __init__(self, inpath, outpath, profile: Profile, info: MediaInfo):
-        self.inpath = inpath
-        self.outpath = outpath
+    def __init__(self, inpath: str, profile: Profile, info: MediaInfo):
+        self.inpath = Path(os.path.abspath(inpath))
         self.profile = profile
         self.info = info
 
@@ -61,7 +60,7 @@ class QueueThread(Thread):
     def lock(self):
         return self._manager.lock
 
-    def complete(self, path):
+    def complete(self, path: Path):
         self._manager.complete.add(path)
 
     def start_test(self):
@@ -77,18 +76,21 @@ class QueueThread(Thread):
         self.lock.release()
 
     def go(self):
-        global keep_source, dry_run
+        global dry_run
 
         while not self.queue.empty():
             try:
                 job: LocalJob = self.queue.get()
                 oinput = job.profile.input_options
                 ooutput = job.profile.output_options
+
+                outpath = job.inpath.with_suffix(job.profile.extension + '.tmp')
+
 #                if single_mode and sys.stdout.isatty():
 #                    quiet = ''
 #                else:
 #                    quiet = ['-nostats', '-loglevel', 'quiet']
-                cli = ['-y', *oinput, '-i', job.inpath, *ooutput, job.outpath]
+                cli = ['-y', *oinput, '-i', str(job.inpath), *ooutput, str(outpath)]
 
                 #
                 # display useful information
@@ -96,7 +98,7 @@ class QueueThread(Thread):
                 self.lock.acquire()  # used to synchronize threads so multiple threads don't create a jumble of output
                 try:
                     print('-' * 40)
-                    print(f'Filename : {job.inpath}')
+                    print('Filename : ' + crayons.green(job.inpath))
                     print(f'Profile  : {job.profile.name}')
                     print('ffmpeg   : ' + ' '.join(cli) + '\n')
                 finally:
@@ -105,7 +107,7 @@ class QueueThread(Thread):
                 if dry_run:
                     continue
 
-                basename = os.path.basename(job.inpath)
+                basename = job.inpath.name
 
                 def log_callback(stats):
                     pct_done = int((stats['time'] / job.info.runtime) * 100)
@@ -113,22 +115,27 @@ class QueueThread(Thread):
 
                 p = self.ffmpeg.run(cli, log_callback)
                 if p.returncode == 0:
-                    if not filter_threshold(job.profile, job.inpath, job.outpath):
+                    if not filter_threshold(job.profile, str(job.inpath), outpath):
                         # oops, this transcode didn't do so well, lets keep the original and scrap this attempt
                         self.log(f'Transcoded file {job.inpath} did not meet minimum savings threshold, skipped')
                         self.complete(job.inpath)
-                        os.remove(job.outpath)
+                        outpath.unlink()
                         continue
 
                     self.complete(job.inpath)
-                    if not keep_source:
-                        self.log('removing ' + job.inpath)
-                        os.remove(job.inpath)
-                        self.log('renaming ' + job.outpath)
-                        os.rename(job.outpath, job.outpath[:-4])
+                    if not pytranscoder.keep_source:
+                        if pytranscoder.verbose:
+                            self.log(f'replacing {job.inpath} with {outpath}')
+                        job.inpath.unlink()
+                        outpath.rename(job.inpath.with_suffix(job.profile.extension))
+                        self.log(crayons.green(f'Finished {job.inpath}'))
+                    else:
+                        self.log(crayons.yellow(f'Finished {outpath}, original file unchanged'))
                 else:
-                    self.log(f'error during transcode of {job.inpath}, .tmp file removed')
-                    os.remove(job.outpath)
+                    outpath.unlink()
+                    self.log(f' Did not complete normally: {self.ffmpeg.last_command}')
+                    self.log(f'Output can be found in {self.ffmpeg.log_path}')
+
             finally:
                 self.queue.task_done()
 
@@ -136,11 +143,11 @@ class QueueThread(Thread):
 class LocalHost:
     """Encapsulates functionality for local encoding"""
 
-    config: Dict
+    config:     Dict
     configfile: ConfigFile
-    queues: Dict[str, Queue]
-    lock: Lock
-    complete = set()              # list of completed files, shared across threads
+    queues:     Dict[str, Queue]
+    lock:       Lock
+    complete:   Set[Path] = set()            # list of completed files, shared across threads
 
     def __init__(self, configfile: ConfigFile):
         self.queues = dict()
@@ -200,10 +207,9 @@ class LocalHost:
                 continue
 
             if not os.path.isfile(path):
-                print('path not found, skipping: ' + path)
+                print(crayons.red('path not found, skipping: ' + path))
                 continue
 
-            path = os.path.abspath(path)  # convert to full path so that rule filtering can work
             if pytranscoder.verbose:
                 print('matching ' + path)
             media_info = self.ffmpeg.fetch_details(path)
@@ -212,7 +218,7 @@ class LocalHost:
                 if forced_profile is None:
                     rule = self.configfile.match_rule(media_info)
                     if rule is None:
-                        print(f'No matching profile found - skipped')
+                        print(crayons.yellow(f'No matching profile found - skipped'))
                         continue
                     if rule.is_skip():
                         print(f'Skipping due to profile rule: {rule.name}')
@@ -227,17 +233,17 @@ class LocalHost:
                     the_profile = self.configfile.get_profile(forced_profile)
                     profile_name = forced_profile
 
-                outpath = path[0:path.rfind('.')] + the_profile.extension + '.tmp'
                 qname = the_profile.queue_name
                 if qname is not None:
                     if not self.configfile.has_queue(the_profile.queue_name):
-                        print(
+                        print(crayons.red(
                             f'Profile "{profile_name}" indicated queue "{qname}" that has not been defined')
+                        )
                         sys.exit(1)
                     else:
-                        self.queues[qname].put(LocalJob(path, outpath, the_profile, media_info))
+                        self.queues[qname].put(LocalJob(path, the_profile, media_info))
                 else:
-                    self.queues['_default_'].put(LocalJob(path, outpath, the_profile, media_info))
+                    self.queues['_default_'].put(LocalJob(path, the_profile, media_info))
 
     def notify_plex(self):
         """If plex notifications enabled, tell it to refresh"""
@@ -358,6 +364,9 @@ def start():
     if 'sonarr_eventtype' in os.environ and os.environ['sonarr_eventtype'] == 'Download':
         sonarr_handler(configfile.default_queue_file)
 
+    if not configfile.colorize:
+        crayons.disable()
+
     if len(files) == 0 and queue_path is None and configfile.default_queue_file is not None:
         tmpfiles = files_from_file(configfile.default_queue_file)
         if cluster is None:
@@ -366,7 +375,7 @@ def start():
             files.extend([(f, cluster) for f in tmpfiles])
 
     if len(files) == 0:
-        print(f'Nothing to do')
+        print(crayons.yellow(f'Nothing to do'))
         exit(0)
 
     if cluster is not None:

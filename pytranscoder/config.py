@@ -1,5 +1,5 @@
 import sys
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 import yaml
 
@@ -19,8 +19,8 @@ class ConfigFile:
 
         self.profiles = dict()
         self.rules = dict()
+        yml = None
         if configuration is not None:
-            yml = None
             if isinstance(configuration, Dict):
                 yml = configuration
             else:
@@ -42,6 +42,9 @@ class ConfigFile:
             else:
                 self.queues = list()
 
+    def colorize(self) -> bool:
+        return self.settings.get('colorize', 'no').lower() == 'yes'
+
     def has_queue(self, name) -> bool:
         return name in self.queues
 
@@ -51,7 +54,7 @@ class ConfigFile:
     def get_profile(self, profile_name) -> Profile:
         return self.profiles.get(profile_name, None)
 
-    def match_rule(self, media_info: MediaInfo, restrict_profiles=None) -> Rule:
+    def match_rule(self, media_info: MediaInfo, restrict_profiles=None) -> Optional[Rule]:
         for rule in self.rules.values():
             if restrict_profiles is not None and rule.profile not in restrict_profiles:
                 continue
@@ -83,4 +86,3 @@ class ConfigFile:
 
     def add_rule(self, name, rule: Rule):
         self.rules[name] = rule
-

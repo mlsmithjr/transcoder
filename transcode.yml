@@ -46,6 +46,7 @@ config:
         status: enabled         # set to disabled to temporarily stop using
 
   plex_server: null             # optional. can be 'server:port'
+  colorize: yes                 # enable colors in terminal output
 
 
 ##

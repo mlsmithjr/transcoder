@@ -1,4 +1,4 @@
-import re
+
 import shutil
 import unittest
 import os
@@ -6,7 +6,8 @@ from typing import Dict
 
 from pytranscoder.cluster import manage_clusters, RemoteHostProperties
 from pytranscoder.config import ConfigFile
-from pytranscoder.media import MediaInfo, status_re
+from pytranscoder.ffmpeg import status_re
+from pytranscoder.media import MediaInfo
 from pytranscoder.transcode import LocalHost
 from pytranscoder.utils import files_from_file, get_local_os_type
 

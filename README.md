@@ -101,6 +101,7 @@ config:
     qsv:                1                   # sequential encodes
     cuda:               2                   # maximum of 2 encodes at a time
   plex_server:          192.168.2.61:32400  # optional, use 'address:port'
+  colorize:             yes
 ```
 
 | setting      | purpose |
@@ -110,6 +111,7 @@ config:
 | ssh                   | Full path to ssh on this host |
 | queues                | If using concurrency, define your queues here. The queue name is whatever you want. Each name specifies a maximum number of concurrent encoding jobs. If none defined, a default sequential queue is used. |
 | plex_server           | optional, if you want your Plex server notified after media is encoded. Use address:port format. |
+| colorize     | optional, defaults to "no". If "yes" terminal output will have some color added |
 
 #### profiles - Transcoding profiles (ffmpeg options)
 

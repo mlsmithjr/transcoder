@@ -121,7 +121,7 @@ config:
         os: win10               # choices are linux, macos, win10
         ip: 192.168.2.64        # address of host
         user: matt              # ssh login user
-        working_dir: 'c:/temp'  # working folder on remote host, required for streaming type
+        working_dir: 'c:\temp'  # working folder on remote host, required for streaming type
         ffmpeg:      'c:/ffmpeg/bin/ffmpeg'
         profiles:               # profiles allowed on this host
           - hevc_cuda
@@ -134,10 +134,11 @@ config:
         user: chris
         ffmpeg: /mnt/c/ffmpeg/bin/ffmpeg.exe  # using Windows ffmpeg.exe build
         path-substitutions:     # how to map media paths on source to destination mount point
-          - '/volume1/media Z:/'
+          - '/volume1/media  Z:'
+          - '/downloads/   Y:'
         profiles:               # profiles allowed on this host
           - hevc_cuda
-          - hevc_cuda_30fps
+          - hevc_cuda_10bit
         status: enabled
 ```
 
