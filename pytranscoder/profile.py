@@ -30,3 +30,7 @@ class Profile:
     @property
     def threshold(self) -> int:
         return self.profile.get('threshold', 0)
+
+    @property
+    def threshold_check(self) -> int:
+        return self.profile.get('threshold_check', 100)

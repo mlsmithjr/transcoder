@@ -9,10 +9,17 @@ from pytranscoder.config import ConfigFile
 from pytranscoder.ffmpeg import status_re
 from pytranscoder.media import MediaInfo
 from pytranscoder.transcode import LocalHost
-from pytranscoder.utils import files_from_file, get_local_os_type
+from pytranscoder.utils import files_from_file, get_local_os_type, calculate_progress
 
 
 class TranscoderTests(unittest.TestCase):
+
+    def test_progress(self):
+        info = MediaInfo(None, None, None, 1080, 90, 2300, None)
+        stats = {'size': 1225360000, 'time': 50 }
+        done, comp = calculate_progress(info, stats)
+        self.assertEqual(done, 55, 'Expected 55% done')
+        self.assertEqual(comp, 6, 'Expected 6% compression')
 
     def test_ffmpeg_status_regex(self):
         sample = 'frame=  307 fps= 86 q=-0.0 size=    3481kB time=00:00:13.03 bitrate=2187.9kbits/s speed=3.67x   \n'
@@ -181,7 +188,7 @@ class TranscoderTests(unittest.TestCase):
         shutil.copyfile(mediafile, '/tmp/pytranscode-test/test1' + mediaext)
 
         testfiles = [
-            ('/tmp/pytranscode-test/test1' + mediaext, 'cluster1')
+            ('/tmp/pytranscode-test/test1' + mediaext, 'cluster1', None)
         ]
 
         manage_clusters(testfiles, setup, False, testing=True)
@@ -200,7 +207,7 @@ class TranscoderTests(unittest.TestCase):
             os.mkdir('/tmp/pytranscode-remote', 0o777)
 
         testfiles = [
-            ('/tmp/pytranscode-test/test2' + mediaext, 'cluster2')
+            ('/tmp/pytranscode-test/test2' + mediaext, 'cluster2', None)
         ]
 
         manage_clusters(testfiles, setup, False, testing=True)

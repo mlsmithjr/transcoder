@@ -16,7 +16,7 @@ from pytranscoder.config import ConfigFile
 from pytranscoder.ffmpeg import FFmpeg
 from pytranscoder.media import MediaInfo
 from pytranscoder.profile import Profile
-from pytranscoder.utils import filter_threshold, files_from_file
+from pytranscoder.utils import filter_threshold, files_from_file, calculate_progress
 
 DEFAULT_CONFIG = os.path.expanduser('~/.transcode.yml')
 
@@ -110,8 +110,14 @@ class QueueThread(Thread):
                 basename = job.inpath.name
 
                 def log_callback(stats):
-                    pct_done = int((stats['time'] / job.info.runtime) * 100)
-                    self.log(f'{basename}: {pct_done:3}%, speed: {stats["speed"]}x')
+                    pct_done, pct_comp = calculate_progress(job.info, stats)
+                    self.log(f'{basename}: {pct_done:3}%, speed: {stats["speed"]}x, comp: {pct_comp}%')
+                    if job.profile.threshold_check < 100:
+                        if pct_done >= job.profile.threshold_check and pct_comp < job.profile.threshold:
+                            # compression goal (threshold) not met, kill the job and waste no more time...
+                            return True
+                    # continue
+                    return False
 
                 p = self.ffmpeg.run(cli, log_callback)
                 if p.returncode == 0:
@@ -355,7 +361,7 @@ def start():
                 if cluster is None:
                     files.append((sys.argv[arg], profile))
                 else:
-                    files.append((sys.argv[arg], cluster))
+                    files.append((sys.argv[arg], cluster, profile))
             arg += 1
 
     if configfile is None:
@@ -372,7 +378,7 @@ def start():
         if cluster is None:
             files.extend([(f, profile) for f in tmpfiles])
         else:
-            files.extend([(f, cluster) for f in tmpfiles])
+            files.extend([(f, cluster, profile) for f in tmpfiles])
 
     if len(files) == 0:
         print(crayons.yellow(f'Nothing to do'))
@@ -380,7 +386,7 @@ def start():
 
     if cluster is not None:
         if host_override is not None:
-            # disable all other hosts in-memory only to force encodes to the designated host
+            # disable all other hosts in-memory only - to force encodes to the designated host
             cluster_config = configfile.settings['clusters']
             for cluster in cluster_config.values():
                 for name, this_config in cluster.items():

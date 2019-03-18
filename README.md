@@ -130,6 +130,7 @@ profiles:
     output_options: -vf scale_vaapi=format=p010 -c:v hevc_vaapi -crf 20 -c:a copy -c:s copy -f matroska
     extension: '.mkv'
     threshold: 20
+    threshold_check: 60
 
   #
   # Sample nVidia transcode setup
@@ -164,6 +165,7 @@ profiles:
 | extension        | Filename extension to use for the encoded file |
 | queue           | optional. Assign encodes for this profile to a specific queue (defined in *config* section)   |
 | threshold        | optional. If provided this number represents a minimum percentage compression savings for the encoded media. If it does not meet this threshold the transcoded file is discarded, source file remains as-is, and the source job marked as complete. This is useful if a particular file doesn't compress much and you would rather just keep the original. |
+| threshold_check  | optional. If provided this is the percent done to start checking if the threshold is being met. Default is 100% (when media is finished). Use this to have threshold checks done earlier to stop a long-running transcode if not producing expected compression (threshold).
 
 #### rules - simple profile matching rules
 

@@ -7,7 +7,7 @@ import threading
 from pathlib import PurePath
 from random import randint
 from tempfile import gettempdir
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from pytranscoder.media import MediaInfo
 
@@ -69,7 +69,7 @@ class FFmpeg:
             os.remove(str(self.log_path))
             self.log_path = None
 
-    def run(self, params, event_callback) -> subprocess.Popen:
+    def run(self, params, event_callback) -> Optional[subprocess.Popen]:
 
         self.last_command = ' '.join([self.ffmpeg, *params])
         with subprocess.Popen([self.ffmpeg,
@@ -81,11 +81,13 @@ class FFmpeg:
 
             for stats in self.monitor_ffmpeg(p):
                 if event_callback is not None:
-                    event_callback(stats)
-
+                    veto = event_callback(stats)
+                    if veto:
+                        p.kill()
+                        return None
             return p
 
-    def run_remote(self, sshcli: str, user: str, ip: str, params: list, event_callback) -> subprocess.Popen:
+    def run_remote(self, sshcli: str, user: str, ip: str, params: list, event_callback) -> Optional[subprocess.Popen]:
         cli = [sshcli, user + '@' + ip, self.ffmpeg, *params]
         self.last_command = ' '.join(cli)
         with subprocess.Popen(cli,
@@ -95,5 +97,8 @@ class FFmpeg:
                               shell=False) as p:
             for stats in self.monitor_ffmpeg(p):
                 if event_callback is not None:
-                    event_callback(stats)
+                    veto = event_callback(stats)
+                    if veto:
+                        p.kill()
+                        return None
             return p

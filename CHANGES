@@ -1,6 +1,19 @@
 
 ### Version History
 
+Version 1.4.5
+=============
+
+Enhancements and new features:
+
+    * Calculate and show compression % in progress output
+    * Allow cluster mode profile override
+    * Added threshold_check to enable threshold checking to start at designated percentage done.
+
+Bugs corrected:
+
+    * Cluster mode -k option fix.
+
 Version 1.4.4
 =============
 

@@ -20,7 +20,7 @@ from pytranscoder.config import ConfigFile
 from pytranscoder.ffmpeg import FFmpeg
 from pytranscoder.media import MediaInfo
 from pytranscoder.profile import Profile
-from pytranscoder.utils import filter_threshold, get_local_os_type
+from pytranscoder.utils import filter_threshold, get_local_os_type, calculate_progress
 
 
 class RemoteHostProperties:
@@ -126,10 +126,12 @@ class RemoteJob:
     """One file to be encoded"""
     inpath:     str
     media_info: MediaInfo
+    profile_name: str
 
-    def __init__(self, inpath: str, info: MediaInfo):
+    def __init__(self, inpath: str, info: MediaInfo, profile_name: str):
         self.inpath = os.path.abspath(inpath)
         self.media_info = info
+        self.profile_name = profile_name
 
 
 class RemoteHost(Thread):
@@ -266,15 +268,16 @@ class StreamingRemoteHost(RemoteHost):
                 # Got to do the rule matching again.
                 # This time we narrow down the available profiles based on host definition
                 #
-                if pytranscoder.verbose:
-                    self.log('matching ' + inpath)
-                rule = self.configfile.match_rule(job.media_info, restrict_profiles=self.props.profiles)
-                if rule is None:
-                    self.log(crayons.yellow(
-                        f'Failed to match rule/profile for host {self.name} for file {inpath} - skipped'))
-                    continue
-                profile_name = rule.profile
-                _profile: Profile = self._manager.profiles[profile_name]
+                if job.profile_name is None:
+                    if pytranscoder.verbose:
+                        self.log('matching ' + inpath)
+                    rule = self.configfile.match_rule(job.media_info, restrict_profiles=self.props.profiles)
+                    if rule is None:
+                        self.log(crayons.yellow(
+                            f'Failed to match rule/profile for host {self.name} for file {inpath} - skipped'))
+                        continue
+                    job.profile_name = rule.profile
+                _profile: Profile = self._manager.profiles[job.profile_name]
 
                 #
                 # calculate full input and output paths
@@ -302,7 +305,7 @@ class StreamingRemoteHost(RemoteHost):
                     print('-' * 40)
                     print(f'Host     : {self.hostname} (streaming)')
                     print('Filename : ' + crayons.green(remote_inpath))
-                    print(f'Profile  : {profile_name}')
+                    print(f'Profile  : {job.profile_name}')
                     print('ssh      : ' + ' '.join(cli) + '\n')
                 finally:
                     self.lock.release()
@@ -332,8 +335,14 @@ class StreamingRemoteHost(RemoteHost):
                 basename = os.path.basename(job.inpath)
 
                 def log_callback(stats):
-                    pct_done = int((stats['time'] / job.media_info.runtime) * 100)
+                    pct_done, pct_comp = calculate_progress(job.media_info, stats)
                     self.log(f'{basename}: {pct_done:3}%, speed: {stats["speed"]}x')
+                    if _profile.threshold_check < 100:
+                        if pct_done >= _profile.threshold_check and pct_comp < _profile.threshold:
+                            # compression goal (threshold) not met, kill the job and waste no more time...
+                            return True
+                    # continue
+                    return False
 
                 #
                 # Start remote ffmpeg
@@ -425,13 +434,15 @@ class MountedRemoteHost(RemoteHost):
                 #
                 if pytranscoder.verbose:
                     self.log('matching ' + inpath)
-                rule = self.configfile.match_rule(job.media_info, restrict_profiles=self.props.profiles)
-                if rule is None:
-                    self.log(crayons.yellow(
-                        f'Failed to match rule/profile for host {self.name} for file {inpath} - skipped'))
-                    continue
-                profile_name = rule.profile
-                _profile: Profile = self._manager.profiles[profile_name]
+
+                if job.profile_name is None:
+                    rule = self.configfile.match_rule(job.media_info, restrict_profiles=self.props.profiles)
+                    if rule is None:
+                        self.log(crayons.yellow(
+                            f'Failed to match rule/profile for host {self.name} for file {inpath} - skipped'))
+                        continue
+                    job.profile_name = rule.profile
+                _profile: Profile = self._manager.profiles[job.profile_name]
 
                 #
                 # calculate paths
@@ -476,8 +487,14 @@ class MountedRemoteHost(RemoteHost):
                 basename = os.path.basename(job.inpath)
 
                 def log_callback(stats):
-                    pct_done = int((stats['time'] / job.media_info.runtime) * 100)
+                    pct_done, pct_comp = calculate_progress(job.media_info, stats)
                     self.log(f'{basename}: {pct_done:3}%, speed: {stats["speed"]}x')
+                    if _profile.threshold_check < 100:
+                        if pct_done >= _profile.threshold_check and pct_comp < _profile.threshold:
+                            # compression goal (threshold) not met, kill the job and waste no more time...
+                            return True
+                    # continue
+                    return False
 
                 #
                 # Start remote ffmpeg
@@ -547,13 +564,15 @@ class ManagerHost(RemoteHost):
                 #
                 if pytranscoder.verbose:
                     self.log('matching ' + inpath)
-                rule = self.configfile.match_rule(job.media_info, restrict_profiles=self.props.profiles)
-                if rule is None:
-                    self.log(crayons.yellow(
-                        f'Failed to match rule/profile for host {self.name} for file {inpath} - skipped'))
-                    continue
-                profile_name = rule.profile
-                _profile: Profile = self._manager.profiles[profile_name]
+
+                if job.profile_name is None:
+                    rule = self.configfile.match_rule(job.media_info, restrict_profiles=self.props.profiles)
+                    if rule is None:
+                        self.log(crayons.yellow(
+                            f'Failed to match rule/profile for host {self.name} for file {inpath} - skipped'))
+                        continue
+                    job.profile_name = rule.profile
+                _profile: Profile = self._manager.profiles[job.profile_name]
 
                 #
                 # calculate paths
@@ -591,8 +610,14 @@ class ManagerHost(RemoteHost):
                 basename = os.path.basename(job.inpath)
 
                 def log_callback(stats):
-                    pct_done = int((stats['time'] / job.media_info.runtime) * 100)
+                    pct_done, pct_comp = calculate_progress(job.media_info, stats)
                     self.log(f'{basename}: {pct_done:3}%, speed: {stats["speed"]}x')
+                    if _profile.threshold_check < 100:
+                        if pct_done >= _profile.threshold_check and pct_comp < _profile.threshold:
+                            # compression goal (threshold) not met, kill the job and waste no more time...
+                            return True
+                    # continue
+                    return False
 
                 #
                 # Start ffmpeg
@@ -688,7 +713,7 @@ class Cluster(Thread):
             if _h is not None and not _h.validate_settings():
                 sys.exit(1)
 
-    def enqueue(self, file) -> bool:
+    def enqueue(self, file, profile_name: str) -> bool:
         """Add a media file to this cluster queue.
            This is different than in local mode in that we only care about handling skips here.
            The profile will be selected once a host is assigned to the work
@@ -701,16 +726,20 @@ class Cluster(Thread):
         media_info = self.ffmpeg.fetch_details(path)
         if media_info.vcodec is not None:
 
-            rule = self.config.match_rule(media_info)
-            if rule is None:
-                print(crayons.yellow(f'No matching profile found - skipped'))
-                return False
-            if rule.is_skip():
-                print(f'Skipping due to profile rule: {rule.name}')
-                return False
+            if profile_name is None:
+                #
+                # just interested in SKIP rule matches here
+                #
+                rule = self.config.match_rule(media_info)
+                if rule is None:
+                    print(crayons.yellow(f'No matching profile found - skipped'))
+                    return False
+                if rule.is_skip():
+                    print(f'Skipping due to profile rule: {rule.name}')
+                    return False
 
             # not short circuited by a skip rule, continue
-            self.queue.put(RemoteJob(file, media_info))
+            self.queue.put(RemoteJob(file, media_info, profile_name))
             return True
 
     def testrun(self):
@@ -745,13 +774,13 @@ def manage_clusters(files, config: ConfigFile, dry_run: bool = False, testing=Fa
     clusters = dict()
     for name, this_config in cluster_config.items():
         for item in files:
-            filepath, target_cluster = item
+            filepath, target_cluster, profile_name = item
             if target_cluster != name:
                 continue
             if target_cluster not in clusters:
                 clusters[target_cluster] = Cluster(target_cluster, this_config, config, terminal_lock,
                                                    config.ssh_path, dry_run)
-            clusters[target_cluster].enqueue(filepath)
+            clusters[target_cluster].enqueue(filepath, profile_name)
 
     #
     # Start clusters, which will start hosts too

@@ -1,7 +1,9 @@
 import math
 import os
 import platform
+from typing import Dict
 
+from build.lib.pytranscoder.media import MediaInfo
 from pytranscoder.profile import Profile
 
 
@@ -34,3 +36,16 @@ def get_local_os_type():
     elif platform.system() == 'Darwin':
         return 'macos'
     return 'unknown'
+
+
+def calculate_progress(info: MediaInfo, stats: Dict) -> (int, int):
+    pct_done = int((stats['time'] / info.runtime) * 100)
+
+    # extrapolate current compression %
+
+    filesize = info.filesize_mb * 1024000
+    pct_source = int(filesize * (pct_done / 100.0))
+    pct_dest = int((stats['size'] / pct_source) * 100)
+    pct_comp = 100 - pct_dest
+
+    return pct_done, pct_comp
