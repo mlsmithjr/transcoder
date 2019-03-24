@@ -11,13 +11,13 @@ numeric_predicates = ['res_height', 'res_width', 'runtime', 'filesize_mb', 'fps'
 class Rule:
     name: str
     profile: str
-    rules: Dict
+    criteria: Dict
 
     def __init__(self, name: str, rule: Dict):
         self.name = name
         self.profile = rule['profile']
-        if 'rules' in rule:
-            self.rules = rule['rules']
+        if 'criteria' in rule:
+            self.criteria = rule['criteria']
 
     def is_skip(self):
         return self.profile.upper() == 'SKIP'
@@ -26,13 +26,13 @@ class Rule:
         if verbose:
             print(f' > evaluating "{self.name}"')
 
-        if self.rules is None:
-            # no rules section, match by default
+        if self.criteria is None:
+            # no criteria section, match by default
             if verbose:
                 print(f'  >> rule {self.name} selected by default (no criteria)')
             return self.profile, self.name
 
-        for pred, value in self.rules.items():
+        for pred, value in self.criteria.items():
             inverted = False
             if pred not in valid_predicates:
                 print(f'Invalid predicate {pred} in rule {self.name}')

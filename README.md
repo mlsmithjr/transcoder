@@ -15,7 +15,7 @@ The remainder of this document focuses on using pytranscoder in local mode.
 nVida CUDA-enabled graphics card or Intel accelerated video (QSV)
 * Encode concurrently using CUDA and QSV at the same time.
 * Configurable transcoding profiles
-* Configurable rules to auto-match a video file to a transcoding profile
+* Configurable rules and criteria to auto-match a video file to a transcoding profile
 * Transcode from a list of files (queue) or all on the command line
 * Cluster mode allows use of other machines See [Cluster.md](https://github.com/mlsmithjr/transcoder/blob/master/Cluster.md) for details.
 * On-the-fly compression monitoring and optional early job termination if not compressing as expected.
@@ -177,40 +177,40 @@ But if you encode certain media differently then having the rules system make it
 using various options depending on the media attributes.  No specific criteria is required - use the ones
 applicable to your rule.
 
-Rule evaluation is as follows: for each input media file, compare against each rule criteria. All criteria of a rule must all match
-in order for the given profile to be selected for encoding.  If any one fails, evaluation continues to the next
+Rule evaluation is as follows: for each input media file, compare against each rule criteria. All criteria of a rule must match
+in order for the given profile to be selected.  If any one fails, evaluation continues to the next
 rule. If there are no matches, the *default* rule is selected.
 
 Samples:
 ```yaml
   'for content I consider too big':  # comment and unique identifier for this rule
       profile: hevc_hd_25fps    # profile to use if the criterial below match
-      rules:
+      criteria:
         runtime:      '<180'    # less than 3 hours long
         source_size:  '>5000'   # ..and media file larger than 5 gigabytes
         fps: '>25'              # ..and framerate > 25
 
   'already best codec':
     profile: 'SKIP'     # special keyword SKIP, means anything that matches this rule won't get transcoded
-    rules:
+    criteria:
       'vcodec': 'hevc'	# if media video is encoded with hevc already
 
   'skip files that are not appropriate for hevc':
     profile: 'SKIP'
-    rules:
+    criteria:
       source_size: '<600'       # video file is less than 600mb
       runtime: '<40'          	# ..and total runtime < 40 minutes
 
   'half-hour videos':
     profile: 'x264'             # use profile called "x264"
-    rules:
+    criteria:
       source_size: '>500'       # 400mb file size or greater
       runtime: '<31'        	# 30 minutes or less runtime
       vcodec: '!hevc'	       	# NOT hevc encoded video
 
   'small enough already':       # skip if <2.5g size, between 720p and 1080p, and between 30 and 64 minutes long.
       profile: SKIP             # transcoding these will probably cause a noticeable quality loss so skip.
-      rules:
+      criteria:
         filesize_mb: '<2500'    # less than 2.5 gigabytes
         res_height: '720-1081'  # 1080p, allowing for random oddball resolutions still in the HD range
         runtime:  '35-65'       # between 35 and 65 minutes long

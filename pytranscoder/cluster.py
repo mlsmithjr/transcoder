@@ -336,7 +336,7 @@ class StreamingRemoteHost(RemoteHost):
 
                 def log_callback(stats):
                     pct_done, pct_comp = calculate_progress(job.media_info, stats)
-                    self.log(f'{basename}: {pct_done:3}%, speed: {stats["speed"]}x')
+                    self.log(f'{basename}: speed: {stats["speed"]}x, comp: {pct_comp}%, done: {pct_done:3}%')
                     if _profile.threshold_check < 100:
                         if pct_done >= _profile.threshold_check and pct_comp < _profile.threshold:
                             # compression goal (threshold) not met, kill the job and waste no more time...
@@ -488,7 +488,7 @@ class MountedRemoteHost(RemoteHost):
 
                 def log_callback(stats):
                     pct_done, pct_comp = calculate_progress(job.media_info, stats)
-                    self.log(f'{basename}: {pct_done:3}%, speed: {stats["speed"]}x')
+                    self.log(f'{basename}: speed: {stats["speed"]}x, comp: {pct_comp}%, done: {pct_done:3}%')
                     if _profile.threshold_check < 100:
                         if pct_done >= _profile.threshold_check and pct_comp < _profile.threshold:
                             # compression goal (threshold) not met, kill the job and waste no more time...
@@ -611,7 +611,7 @@ class ManagerHost(RemoteHost):
 
                 def log_callback(stats):
                     pct_done, pct_comp = calculate_progress(job.media_info, stats)
-                    self.log(f'{basename}: {pct_done:3}%, speed: {stats["speed"]}x')
+                    self.log(f'{basename}: speed: {stats["speed"]}x, comp: {pct_comp}%, done: {pct_done:3}%')
                     if _profile.threshold_check < 100:
                         if pct_done >= _profile.threshold_check and pct_comp < _profile.threshold:
                             # compression goal (threshold) not met, kill the job and waste no more time...

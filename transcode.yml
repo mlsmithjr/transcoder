@@ -3,9 +3,9 @@
 #       Copy it to customize.
 ##
 
-##
+#####################################################################################
 # global configuration
-##
+#####################################################################################
 config:
   default_queue_file: '/volume1/config/sonarr/transcode_queue.txt'
   ffmpeg:             '/usr/bin/ffmpeg'
@@ -49,9 +49,9 @@ config:
   colorize: yes                 # enable colors in terminal output
 
 
-##
+#####################################################################################
 # profile definitions.  You can model all your transcoding combinations here.
-##
+#####################################################################################
 profiles:
 
   #
@@ -133,20 +133,23 @@ profiles:
         -f mp4
       extension: '.mp4'
 
+
+#####################################################################################
+# Rules
+#####################################################################################
 #
 # Automatching happens when a profile isn't provided on the command line.  These rules are evalulated to find the
-# most appropriate profile for each video to be transcoded.
+# most appropriate profile for each video to be encoded.
 #
-# rule predicates:
+# rule criteria:
 #
-#            vcodec         Video codec of the source ('ffmpeg -codecs' to see full list), may preceed with ! for not-equal test
+#            vcodec         Video codec of the source ('ffmpeg -codecs' to see full list)
 #            res_height     Source video resolution height, operators < and > allowed
 #            res_width      Source video resolution width, operators < and > allowed
 #            filesize_mb    Size of the source file (in megabytes), operators allowed
 #            runtime        Source runtime in minutes, operators allowed
 #            fps            Framerate of the source
 #            path           Full path of the source file. Value can be a regular expression (ie. '.*/Television/.*').
-#            vcodec         Video codec used to encode the media
 #
 # Rules are evaluated in order.  First matching rule wins so order wisely.
 # Rules with a profile of "SKIP" mean to skip processing of the matched video
@@ -154,36 +157,35 @@ profiles:
 rules:
   'skip video if already encoded in hevc/h265':
       profile: SKIP
-      rules:
+      criteria:
         vcodec: 'hevc'
 
   'high frame rate':
-      profile: hevc_30fps
-      rules:
-        fps: '>30'
+      profile: hevc_30fps           # re-encode unusually high frame rate down to 30fps
+      criteria:
+        fps:         '>30'
         filesize_mb: '>500'
 
-  'skip video if resolution < 700':
+  'skip video if resolution < 700': # don't re-encode something this small - no gain in it
       profile: SKIP
-      rules:
+      criteria:
         res_height: '<700'
 
   'content just too big and framey':
       profile: hevc_hd_25fps
-      rules:
+      criteria:
         runtime:      '<180'      # less than 3 hours
-        filesize_mb:  '>6000'  # ..and larger than 6 gigabytes
-        fps: '>25'
+        filesize_mb:  '>6000'     # ..and larger than 6 gigabytes
+        res_height:   '<1081'     # regular HD (not 4k)
+        fps:          '>25'
 
-  'small enough already':   # skip if <2.5g size and higher than 720p and between 30 and 64 minutes long.
-      profile: SKIP         # transcoding these will probably cause a noticeable quality loss so skip.
-      rules:
+  'small enough already':       # skip if <2.5g size and higher than 720p and between 30 and 64 minutes long.
+      profile: SKIP             # transcoding these will probably cause a noticeable quality loss so skip.
+      criteria:
         filesize_mb: '<2500'    # less than 2.5 gigabytes
-        res_height: '720-1081'  # 1080p, allowing for random oddball resolutions still in the HD range
-        runtime:  '30-65'       # between 30 and 65 minutes long
+        res_height:  '720-1081' # 1080p, allowing for random oddball resolutions still in the HD range
+        runtime:     '30-65'    # between 30 and 65 minutes long
 
-  'default':    # this will be the DEFAULT (no rules implies a match)
+  'default':    # this will be the DEFAULT (no criteria implies a match)
       profile: hevc_cuda
-      rules:
-        vcodec: '!hevc'
 

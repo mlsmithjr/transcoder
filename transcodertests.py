@@ -154,13 +154,13 @@ class TranscoderTests(unittest.TestCase):
             "rules": {
                 'too small': {
                     'profile': 'SKIP',
-                    'rules': {
+                    'criteria': {
                         'filesize_mb': '<500'
                     }
                 },
                 'small enough already': {
                     'profile': 'SKIP',
-                    'rules': {
+                    'criteria': {
                         'filesize_mb': '<2500',
                         'res_height': '720-1081',
                         'runtime': '30-65'
@@ -168,7 +168,7 @@ class TranscoderTests(unittest.TestCase):
                 },
                 'default': {
                     'profile': 'copy',
-                    'rules': {
+                    'criteria': {
                         'vcodec': '!hevc'
                     }
                 }

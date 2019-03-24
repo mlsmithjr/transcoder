@@ -10,7 +10,7 @@ docs, README.md, because it is a more advanced feature.
 ### System Setup
 We will refer to the machine you use pytranscode on as your *cluster manager* and other machines as *hosts*.
 
-Setting up remote hosts is as follows:
+Setting up remote hosts is as follows, if not already setup for ssh access and ffmpeg:
 #### Linux
 Linux is natively supported as long as the following conditions are true:
 * Each host machine in the cluster is running an ssh server.

@@ -1,6 +1,16 @@
 
 ### Version History
 
+Version 1.4.6
+=============
+
+Enhancements and new features:
+
+    * Configuration file change: "rules" section of each rule renamed to "criteria" for clarity.
+
+Bugs corrected:
+
+
 Version 1.4.5
 =============
 
