@@ -20,6 +20,9 @@ config:
         type: local             # special case - use the pytranscoder host also in the cluster
         ffmpeg: '/usr/bin/ffmpeg'
         status: enabled
+        queues:
+          qsv: 1
+          cuda: 2
       macpro:
         os: linux               # Choices are win10, linux, macos
         type: mounted           # machine with source media and host share a filesystem (nfs, samba, etc)
@@ -43,6 +46,9 @@ config:
           - hevc_cuda           # profiles allowed on this host
           - hevc_25fps
           - hevc_30fps
+        queues:
+          qsv: 1
+          cuda: 2
         status: enabled         # set to disabled to temporarily stop using
 
   plex_server: null             # optional. can be 'server:port'

@@ -3,7 +3,7 @@ import os
 import platform
 from typing import Dict
 
-from build.lib.pytranscoder.media import MediaInfo
+from pytranscoder.media import MediaInfo
 from pytranscoder.profile import Profile
 
 

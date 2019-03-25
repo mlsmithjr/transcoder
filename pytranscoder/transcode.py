@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+import glob
 import os
 import sys
 from pathlib import Path
@@ -361,7 +362,8 @@ def start():
                 if cluster is None:
                     files.append((sys.argv[arg], profile))
                 else:
-                    files.append((sys.argv[arg], cluster, profile))
+                    for f in glob.glob(sys.argv[arg]):
+                        files.append((f, cluster, profile))
             arg += 1
 
     if configfile is None:

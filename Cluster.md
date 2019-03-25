@@ -125,6 +125,9 @@ config:
         ffmpeg:      'c:/ffmpeg/bin/ffmpeg'
         profiles:               # profiles allowed on this host
           - hevc_cuda
+        queues:
+          qsv: 1
+          cuda: 2
         status: enabled         # set to disabled to temporarily stop using
 
       family:                   # machine configured to use WSL ssh server
@@ -139,6 +142,9 @@ config:
         profiles:               # profiles allowed on this host
           - hevc_cuda
           - hevc_cuda_10bit
+        queues:
+          qsv: 1
+          cuda: 2
         status: enabled
 ```
 
@@ -152,6 +158,7 @@ config:
 | working_dir   | Indicates the temporary directory to use for encoding.  **[2]** |
 | profiles       | The allowed profiles to use for all encodes on this host. If not provided, assumes all. An encode matching a profile that is not assigned to a particular host will be run on a host that will, if any. This is how, for example, you restrict CPU-based encodings to hosts with no hardware acceleration - or vice versa. |
 | path-substitutions | Optional. Applicable only to *mounted* type hosts. Use when the server media files and host mount paths are different. |
+| queues   | Optional. You can define per-host queues to enable concurrent jobs on each host.  If not given, encoding jobs will run 1 at a time.  See README.md for further discussion of queues. |
 | status        | *enabled* or *disabled*. Disabled hosts will be skipped. Default is *enabled*.|
 
 **[1]** Required for *mounted* and *streaming* types.
@@ -187,6 +194,7 @@ Here is the configuration for the scenario above:
           - /volume1/media/ /mnt/media/
         profiles:
           - qsv
+  
       shared:
         type: streaming
         ip: 192.168.2.64

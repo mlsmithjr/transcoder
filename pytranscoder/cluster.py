@@ -1,7 +1,7 @@
 """
     Cluster support
 """
-
+import glob
 import os
 import shutil
 import subprocess
@@ -66,6 +66,10 @@ class RemoteHostProperties:
     @property
     def has_path_subst(self):
         return 'path-substitutions' in self.props
+
+    @property
+    def queues(self) -> Dict:
+        return self.props.get('queues', {'_default_': 1})
 
     def substitute_paths(self, in_path, out_path) -> (str, str):
         lst = self.props['path-substitutions']
@@ -659,7 +663,7 @@ class Cluster(Thread):
     """Thread to create host threads and wait for their completion."""
 
     hosts:          List[RemoteHost]
-    queue:          Queue
+    queues:         Dict[str, Queue]
     terminal_lock:  Lock
     config:         ConfigFile
     ssh:            str
@@ -677,7 +681,7 @@ class Cluster(Thread):
         :param dry_run:     True or False, is this a dry run.
         """
         super().__init__(name=name, group=None, daemon=True)
-        self.queue = Queue()
+        self.queues: Dict[str, Queue] = dict()
         self.terminal_lock = lock
         self.dry_run = dry_run
         self.ssh = ssh
@@ -693,25 +697,52 @@ class Cluster(Thread):
                 continue
             hosttype = hostprops.host_type
 
+            #
+            # make sure Queue exists for name
+            #
+            host_queues: Dict = hostprops.queues
+            if len(host_queues) > 0:
+                for host_queue in host_queues:
+                    if host_queue not in self.queues:
+                        self.queues[host_queue] = Queue()
+
             _h = None
             if hosttype == 'local':
                 # special case - using pytranscoder host also as cluster host
-                _h = ManagerHost(host, hostprops, self.queue, self)
-                self.hosts.append(_h)
+                for host_queue, slots in host_queues.items():
+                    #
+                    # for each queue configured for this host create a dedicated thread for each slot
+                    #
+                    for slot in range(0, slots):
+                        _h = ManagerHost(host, hostprops, self.queues[host_queue], self)
+                        if not _h.validate_settings():
+                            sys.exit(1)
+                        self.hosts.append(_h)
 
             elif hosttype == 'mounted':
-                _h = MountedRemoteHost(host, hostprops, self.queue, self)
-                self.hosts.append(_h)
+                for host_queue, slots in host_queues.items():
+                    #
+                    # for each queue configured for this host create a dedicated thread for each slot
+                    #
+                    for slot in range(0, slots):
+                        _h = MountedRemoteHost(host, hostprops, self.queues[host_queue], self)
+                        if not _h.validate_settings():
+                            sys.exit(1)
+                        self.hosts.append(_h)
 
             elif hosttype == 'streaming':
-                _h = StreamingRemoteHost(host, hostprops, self.queue, self)
-                self.hosts.append(_h)
+                for host_queue, slots in host_queues.items():
+                    #
+                    # for each queue configured for this host create a dedicated thread for each slot
+                    #
+                    for slot in range(0, slots):
+                        _h = StreamingRemoteHost(host, hostprops, self.queues[host_queue], self)
+                        if not _h.validate_settings():
+                            sys.exit(1)
+                        self.hosts.append(_h)
 
             else:
                 print(crayons.red(f'Unknown cluster host type "{hosttype}" - skipping'))
-
-            if _h is not None and not _h.validate_settings():
-                sys.exit(1)
 
     def enqueue(self, file, profile_name: str) -> bool:
         """Add a media file to this cluster queue.
@@ -728,7 +759,7 @@ class Cluster(Thread):
 
             if profile_name is None:
                 #
-                # just interested in SKIP rule matches here
+                # just interested in SKIP rule matches and queue designations here
                 #
                 rule = self.config.match_rule(media_info)
                 if rule is None:
@@ -737,9 +768,12 @@ class Cluster(Thread):
                 if rule.is_skip():
                     print(f'Skipping due to profile rule: {rule.name}')
                     return False
+                profile_name = rule.profile
 
-            # not short circuited by a skip rule, continue
-            self.queue.put(RemoteJob(file, media_info, profile_name))
+            profile = self.profiles[profile_name]
+            # not short circuited by a skip rule, add to appropriate queue
+            queue_name = profile.queue_name if profile.queue_name is not None else '_default_'
+            self.queues[queue_name].put(RemoteJob(file, media_info, profile_name))
             return True
 
     def testrun(self):
@@ -755,8 +789,13 @@ class Cluster(Thread):
 
         for host in self.hosts:
             host.start()
+
+        # all hosts running, wait for them to finish
+        for host in self.hosts:
+            host.join()
+
         # wait for queue to process
-        self.queue.join()
+        # self.queue.join()
 
     @property
     def profiles(self):

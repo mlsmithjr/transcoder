@@ -1,6 +1,18 @@
 
 ### Version History
 
+Version 1.4.7
+=============
+
+Enhancements and new features:
+
+    * Multi-queue support in cluster mode. Run multiple concurrent jobs on remote machines now.
+
+Bugs corrected:
+
+    * import error in utils.py
+    * -t option removed from ssh as it was screwing up the local terminal output
+
 Version 1.4.6
 =============
 
