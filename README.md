@@ -62,8 +62,14 @@ At this point you have a choice - either install ffmpeg for Windows [ffmpeg.exe]
 * ffmpeg.exe can be run in Windows command shell or from bash but requires special attention when configuring pytranscoder paths.
 * ffmpeg apt package can only be run from bash but is a more natural Linux path mapping.
 
-After installing you will find this document and others in **$HOME/.local/shared/doc/pytranscoder** (on Linux/MacOS)
-and in **$HOME/AppData/Python/*pythonversion*/shared/doc/pytranscoder** (on Windows). Also available [online](https://github.com/mlsmithjr/transcoder/blob/master/README.md)
+After installing you will find this document and others in $HOME/.local/shared/doc/pytranscoder (on Linux/MacOS)
+and in $HOME/AppData/Python/*pythonversion*/shared/doc/pytranscoder** (on Windows). Also available [online](https://github.com/mlsmithjr/transcoder/blob/master/README.md)
+
+#### Upgrading
+
+Whatever method above for installing works for you, just use the --upgrade option to update, ie:
+```pip3 install --upgrade pytranscoder-ffmpeg```
+
 
 #### Operation - Profiles and Rules
 
