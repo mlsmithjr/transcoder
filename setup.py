@@ -19,7 +19,7 @@ setuptools.setup(
     python_requires='>=3.6',
     author='Marshall L Smith Jr',
     author_email='marshallsmithjr@gmail.com',
-    description='A ffmpeg wrapper to better manage transcode operations',
+    description='A ffmpeg workflow manager for transcoding',
     long_description = long_description,
     long_description_content_type = 'text/markdown',
     extras_require={'with_plexapi': ['plexapi>=3.1.0']},
