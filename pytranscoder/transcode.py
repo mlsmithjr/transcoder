@@ -98,7 +98,7 @@ class QueueThread(Thread):
                 self.lock.acquire()  # used to synchronize threads so multiple threads don't create a jumble of output
                 try:
                     print('-' * 40)
-                    print('Filename : ' + crayons.green(job.inpath))
+                    print('Filename : ' + crayons.green(os.path.basename(str(job.inpath))))
                     print(f'Profile  : {job.profile.name}')
                     print('ffmpeg   : ' + ' '.join(cli) + '\n')
                 finally:
@@ -119,8 +119,8 @@ class QueueThread(Thread):
                     # continue
                     return False
 
-                p = self.ffmpeg.run(cli, log_callback)
-                if p.returncode == 0:
+                code = self.ffmpeg.run(cli, log_callback)
+                if code == 0:
                     if not filter_threshold(job.profile, str(job.inpath), outpath):
                         # oops, this transcode didn't do so well, lets keep the original and scrap this attempt
                         self.log(f'Transcoded file {job.inpath} did not meet minimum savings threshold, skipped')
@@ -227,7 +227,7 @@ class LocalHost:
                         print(crayons.yellow(f'No matching profile found - skipped'))
                         continue
                     if rule.is_skip():
-                        print(f'Skipping due to profile rule: {rule.name}')
+                        print(crayons.green(os.path.basename(path)), f'SKIPPED ({rule.name})')
                         self.complete.add(path)
                         continue
                     profile_name = rule.profile
@@ -372,6 +372,8 @@ def start():
 
     if not configfile.colorize:
         crayons.disable()
+    else:
+        crayons.enable()
 
     if len(files) == 0 and queue_path is None and configfile.default_queue_file is not None:
         tmpfiles = files_from_file(configfile.default_queue_file)

@@ -9,6 +9,7 @@ verify_ssl = true
 PlexAPI = "*"
 crayons = "*"
 pyyaml = "*"
+mock = "*"
 
 [requires]
 python_version = "3.6"

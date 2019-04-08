@@ -1,12 +1,12 @@
 
-import shutil
 import unittest
 import os
 from typing import Dict
+from unittest import mock
 
-from pytranscoder.cluster import manage_clusters, RemoteHostProperties
+from pytranscoder.cluster import RemoteHostProperties, Cluster, StreamingManagedHost
 from pytranscoder.config import ConfigFile
-from pytranscoder.ffmpeg import status_re
+from pytranscoder.ffmpeg import status_re, FFmpeg
 from pytranscoder.media import MediaInfo
 from pytranscoder.transcode import LocalHost
 from pytranscoder.utils import files_from_file, get_local_os_type, calculate_progress
@@ -15,8 +15,8 @@ from pytranscoder.utils import files_from_file, get_local_os_type, calculate_pro
 class TranscoderTests(unittest.TestCase):
 
     def test_progress(self):
-        info = MediaInfo(None, None, None, 1080, 90, 2300, None)
-        stats = {'size': 1225360000, 'time': 50 }
+        info = MediaInfo(None, None, None, 1080, 90, 2300, 25, None)
+        stats = {'size': 1225360000, 'time': 50}
         done, comp = calculate_progress(info, stats)
         self.assertEqual(done, 55, 'Expected 55% done')
         self.assertEqual(comp, 6, 'Expected 6% compression')
@@ -49,17 +49,15 @@ class TranscoderTests(unittest.TestCase):
             self.assertEqual(info.fps, 23)
             self.assertEqual(info.runtime, (2 * 60) + 9)
             self.assertEqual(info.path, '/dev/null')
+            self.assertEqual(info.colorspace, 'yuv420p')
 
     def test_default_profile(self):
-        with open('tests/ffmpeg.out', 'r') as ff:
-            info = MediaInfo.parse_details('/dev/null', ff.read())
-            info.filesize_mb = 1000
-            info.res_height = 720
-            config = ConfigFile(self.get_setup())
-            rule = config.match_rule(info)
-            self.assertIsNotNone(rule, 'expected to match a rule')
-            self.assertEqual(rule.profile, 'copy')
-            self.assertEqual(rule.name, 'default')
+        info = MediaInfo(None, None, None, 720, 45, 3000, 25, None)
+        config = ConfigFile(self.get_setup())
+        rule = config.match_rule(info)
+        self.assertIsNotNone(rule, 'expected to match a rule')
+        self.assertEqual(rule.profile, 'hevc_cuda')
+        self.assertEqual(rule.name, 'default')
 
     def test_skip_profile(self):
         with open('tests/ffmpeg.out', 'r') as ff:
@@ -71,7 +69,7 @@ class TranscoderTests(unittest.TestCase):
             self.assertTrue(rule.is_skip(), 'Expected a SKIP rule')
 
     def test_rule_match(self):
-        info = MediaInfo(None, None, None, 1080, 45, 2300, None)
+        info = MediaInfo(None, None, None, 1080, 45, 2300, None, None)
         config = ConfigFile(self.get_setup())
         rule = config.match_rule(info)
         self.assertIsNotNone(rule, 'Expected a matched profile')
@@ -112,7 +110,8 @@ class TranscoderTests(unittest.TestCase):
                                 '/v2/ /m2/',
                                 '/volume2/ /media/'
                             ],
-                            'profiles': ['copy'],
+                            'profiles': ['hevc_cuda'],
+                            'queues': {'q2': 2},
                             'status': 'enabled',
                         },
                         'workstation': {
@@ -121,9 +120,7 @@ class TranscoderTests(unittest.TestCase):
                             'ip': '192.168.2.63',
                             'ffmpeg': '/usr/bin/ffmpeg',
                             'status': 'enabled',
-                        }
-                    },
-                    'cluster2': {
+                        },
                         'm2': {
                             'type': 'streaming',
                             'ip': '127.0.0.1',
@@ -131,7 +128,8 @@ class TranscoderTests(unittest.TestCase):
                             'user': 'mark',
                             'ffmpeg': '/usr/bin/ffmpeg',
                             'working_dir': '/tmp/pytranscode-remote',
-                            'profiles': ['copy'],
+                            'profiles': ['qsv'],
+                            'queues': {'q3': 1},
                             'status': 'enabled',
                         },
                     },
@@ -143,15 +141,29 @@ class TranscoderTests(unittest.TestCase):
                     "output_options": "-threads 4 -c:v copy -c:a copy -c:s copy -f matroska",
                     "threshold": 1,
                     "extension": ".mkv",
+                    "queue": "q2",
                 },
-                "copy": {
+                "qsv": {
                     "input_options": None,
-                    "output_options": "-threads 4 -c:v copy -c:a copy -c:s copy -f matroska",
-                    "threshold": 1,
+                    "output_options": "-c:v copy -c:a copy",
                     "extension": ".mkv",
+                    "queue": "q3",
+                },
+                "vintage_tv": {
+                    "input_options": None,
+                    "output_options": "-c:v copy -c:a copy",
+                    "extension": ".mp4",
                 },
             },
             "rules": {
+                'vintage tv': {
+                    'profile': 'vintage_tv',
+                    'criteria': {
+                        'filesize_mb': '<500',
+                        'res_height': '<500',
+                        'runtime': '<60',
+                    },
+                },
                 'too small': {
                     'profile': 'SKIP',
                     'criteria': {
@@ -166,8 +178,14 @@ class TranscoderTests(unittest.TestCase):
                         'runtime': '30-65'
                     }
                 },
+                'feature-length treat better': {
+                    'profile': 'qsv',
+                    'criteria': {
+                        'runtime': '>90'
+                    },
+                },
                 'default': {
-                    'profile': 'copy',
+                    'profile': 'hevc_cuda',
                     'criteria': {
                         'vcodec': '!hevc'
                     }
@@ -176,41 +194,146 @@ class TranscoderTests(unittest.TestCase):
         }
         return setup
 
-    def test_cluster_mounted(self):
-        if 'TEST_VIDEO' not in os.environ:
-            print('cluster test not run - no video file given in TEST_VIDEO environment variable')
-            return
-        mediafile = os.environ['TEST_VIDEO']
-        mediaext = mediafile[-4:]
+    @mock.patch.object(FFmpeg, 'run_remote')
+    @mock.patch('pytranscoder.cluster.filter_threshold')
+    @mock.patch('pytranscoder.cluster.os.rename')
+    @mock.patch('pytranscoder.cluster.os.remove')
+    @mock.patch.object(MediaInfo, 'parse_details')
+    def test_cluster_match_default_rule(self, mock_info_parser, mock_os_rename, mock_os_remove,  mock_filter_threshold,
+                             mock_run_remote):
+
         setup = ConfigFile(self.get_setup())
-        if not os.path.exists('/tmp/pytranscode-test'):
-            os.mkdir('/tmp/pytranscode-test', 0o777)
-        shutil.copyfile(mediafile, '/tmp/pytranscode-test/test1' + mediaext)
 
-        testfiles = [
-            ('/tmp/pytranscode-test/test1' + mediaext, 'cluster1', None)
-        ]
+        #
+        # setup all mocks
+        #
+        mock_run_remote.return_value = 0
+        mock_filter_threshold.return_value = True
+        mock_os_rename.return_value = None
+        mock_os_remove.return_value = None
+        info = MediaInfo('/dev/null', 'x264', 1920, 1080, 45, 3200, 24, None)
+        mock_info_parser.return_value = info
 
-        manage_clusters(testfiles, setup, False, testing=True)
+        #
+        # configure the cluster, add the job, and run
+        #
+        cluster = self.setup_cluster1(setup)
+        qname, job = cluster.enqueue('/dev/null.mp4', None)
+        self.assertEqual(qname, 'q2', 'Job placed in wrong queue')
+        self.assertEqual(job.profile_name, 'hevc_cuda', 'Rule matched to wrong profile')
 
-    def test_cluster_streaming(self):
-        if 'TEST_VIDEO' not in os.environ:
-            print('cluster test not run - no video file given in TEST_VIDEO environment variable')
-            return
-        mediafile = os.environ['TEST_VIDEO']
-        mediaext = mediafile[-4:]
+        cluster.testrun()
+        for host in cluster.hosts:
+            if host.hostname == 'm1' and len(host._complete) > 0:
+                self.assertEqual('/dev/null.mp4', host._complete.pop(), 'Completed filename missing from assigned host')
+                break
+
+    @staticmethod
+    def setup_cluster1(config) -> Cluster:
+        cluster_config = config.settings['clusters']
+        cluster = Cluster('cluster1', cluster_config['cluster1'], config, config.ssh_path, False)
+        return cluster
+
+    @mock.patch.object(FFmpeg, 'run_remote')
+    @mock.patch('pytranscoder.cluster.filter_threshold')
+    @mock.patch('pytranscoder.cluster.os.rename')
+    @mock.patch('pytranscoder.cluster.os.remove')
+    @mock.patch.object(MediaInfo, 'parse_details')
+    def test_cluster_match_skip(self, mock_info_parser, mock_os_rename, mock_os_remove,  mock_filter_threshold,
+                             mock_run_remote):
+
         setup = ConfigFile(self.get_setup())
-        if not os.path.exists('/tmp/pytranscode-test'):
-            os.mkdir('/tmp/pytranscode-test', 0o777)
-        shutil.copyfile(mediafile, '/tmp/pytranscode-test/test2' + mediaext)
-        if not os.path.exists('/tmp/pytranscode-remote'):
-            os.mkdir('/tmp/pytranscode-remote', 0o777)
 
-        testfiles = [
-            ('/tmp/pytranscode-test/test2' + mediaext, 'cluster2', None)
-        ]
+        #
+        # setup all mocks
+        #
+        mock_run_remote.return_value = 0
+        mock_filter_threshold.return_value = True
+        mock_os_rename.return_value = None
+        mock_os_remove.return_value = None
+        info = MediaInfo('/dev/null', 'x264', 1920, 1080, 60, 1800, 24, None)
+        mock_info_parser.return_value = info
 
-        manage_clusters(testfiles, setup, False, testing=True)
+        #
+        # configure the cluster, add the job, and run
+        #
+        cluster = self.setup_cluster1(setup)
+        qname, job = cluster.enqueue('/dev/null.mp4', None)
+        self.assertEqual(qname, None, 'Expected to skip')
+
+    @mock.patch.object(FFmpeg, 'run_remote')
+    @mock.patch('pytranscoder.cluster.filter_threshold')
+    @mock.patch('pytranscoder.cluster.os.rename')
+    @mock.patch('pytranscoder.cluster.os.remove')
+    @mock.patch.object(MediaInfo, 'parse_details')
+    @mock.patch('pytranscoder.cluster.run')
+    @mock.patch('pytranscoder.cluster.shutil.move')
+    @mock.patch.object(StreamingManagedHost, 'run_process')
+    def test_cluster_streaming_host(self, mock_run_process, mock_move, mock_run, mock_info_parser, mock_os_rename, mock_os_remove,
+                                    mock_filter_threshold, mock_run_remote):
+
+        setup = ConfigFile(self.get_setup())
+
+        #
+        # setup all mocks
+        #
+        mock_run.return_value = 0, 'ok'
+        mock_run_remote.return_value = 0
+        mock_move.return_value = 0
+        mock_filter_threshold.return_value = True
+        mock_os_rename.return_value = None
+        mock_os_remove.return_value = None
+        info = MediaInfo('/dev/null', 'x264', 1920, 1080, 110, 3000, 24, None)
+        mock_info_parser.return_value = info
+
+        #
+        # configure the cluster, add the job, and run
+        #
+        cluster = self.setup_cluster1(setup)
+        qname, job = cluster.enqueue('/dev/null.mp4', None)
+        self.assertEqual(qname, 'q3', 'Job placed in wrong queue')
+        self.assertEqual(job.profile_name, 'qsv', 'Rule matched to wrong profile')
+
+        cluster.testrun()
+        for host in cluster.hosts:
+            if host.hostname == 'm2' and len(host._complete) > 0:
+                self.assertEqual('/dev/null.mp4', host._complete.pop(),
+                                  'Completed filename missing from assigned host')
+                break
+
+    @mock.patch.object(FFmpeg, 'run')
+    @mock.patch('pytranscoder.cluster.filter_threshold')
+    @mock.patch('pytranscoder.cluster.os.rename')
+    @mock.patch('pytranscoder.cluster.os.remove')
+    @mock.patch.object(MediaInfo, 'parse_details')
+    def test_cluster_match_default_queue(self, mock_info_parser, mock_os_rename, mock_os_remove,  mock_filter_threshold,
+                             mock_run_remote):
+
+        setup = ConfigFile(self.get_setup())
+
+        #
+        # setup all mocks
+        #
+        mock_run_remote.return_value = 0
+        mock_filter_threshold.return_value = True
+        mock_os_rename.return_value = None
+        mock_os_remove.return_value = None
+        info = MediaInfo('/dev/null', 'x264', 500, 480, 30, 420, 24, None)
+        mock_info_parser.return_value = info
+
+        #
+        # configure the cluster, add the job, and run
+        #
+        cluster = self.setup_cluster1(setup)
+        qname, job = cluster.enqueue('/dev/null.mp4', None)
+        self.assertEqual(qname, '_default', 'Job placed in wrong queue')
+        self.assertEqual(job.profile_name, 'vintage_tv', 'Rule matched to wrong profile')
+
+        cluster.testrun()
+        for host in cluster.hosts:
+            if host.hostname == 'workstation' and len(host._complete) > 0:
+                self.assertEqual('/dev/null.mp4', host._complete.pop(), 'Completed filename missing from assigned host')
+                break
 
 
 if __name__ == '__main__':

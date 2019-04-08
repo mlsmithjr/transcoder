@@ -1,7 +1,6 @@
 """
     Cluster support
 """
-import glob
 import os
 import shutil
 import subprocess
@@ -10,9 +9,10 @@ from pathlib import PureWindowsPath, PosixPath
 from queue import Queue
 from tempfile import gettempdir
 from threading import Thread, Lock
-from typing import Dict, List, Set
+from typing import Dict, List, Optional
 
 import crayons
+
 import pytranscoder
 
 from pytranscoder import verbose
@@ -20,7 +20,7 @@ from pytranscoder.config import ConfigFile
 from pytranscoder.ffmpeg import FFmpeg
 from pytranscoder.media import MediaInfo
 from pytranscoder.profile import Profile
-from pytranscoder.utils import filter_threshold, get_local_os_type, calculate_progress
+from pytranscoder.utils import filter_threshold, get_local_os_type, calculate_progress, run
 
 
 class RemoteHostProperties:
@@ -69,7 +69,7 @@ class RemoteHostProperties:
 
     @property
     def queues(self) -> Dict:
-        return self.props.get('queues', {'_default_': 1})
+        return self.props.get('queues', {'_default': 1})
 
     def substitute_paths(self, in_path, out_path) -> (str, str):
         lst = self.props['path-substitutions']
@@ -126,7 +126,7 @@ class RemoteHostProperties:
         return True
 
 
-class RemoteJob:
+class EncodeJob:
     """One file to be encoded"""
     inpath:     str
     media_info: MediaInfo
@@ -138,7 +138,7 @@ class RemoteJob:
         self.profile_name = profile_name
 
 
-class RemoteHost(Thread):
+class ManagedHost(Thread):
     """
         Base thread class for all remote host types.
     """
@@ -146,7 +146,7 @@ class RemoteHost(Thread):
     hostname: str
     props: RemoteHostProperties
     queue: Queue
-    _complete: Set
+    _complete: set
     _manager = None
 
     def __init__(self, hostname, props, queue, cluster):
@@ -172,7 +172,7 @@ class RemoteHost(Thread):
         return self._manager.lock
 
     @property
-    def configfile(self):
+    def configfile(self) -> ConfigFile:
         return self._manager.config
 
     def complete(self, source):
@@ -230,7 +230,7 @@ class RemoteHost(Thread):
         return p
 
 
-class StreamingRemoteHost(RemoteHost):
+class StreamingManagedHost(ManagedHost):
     """Implementation of a streaming host worker thread"""
 
     def __init__(self, hostname, props: RemoteHostProperties, queue: Queue, cluster):
@@ -259,7 +259,7 @@ class StreamingRemoteHost(RemoteHost):
         #
         while not self.queue.empty():
             try:
-                job: RemoteJob = self.queue.get()
+                job: EncodeJob = self.queue.get()
                 inpath = job.inpath
 
                 #
@@ -327,10 +327,9 @@ class StreamingRemoteHost(RemoteHost):
 
                 scp = ['scp', inpath, self.props.user + '@' + self.props.ip + ':' + target_dir]
                 self.log(' '.join(scp))
-                p = subprocess.Popen(scp, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
-                output = p.communicate()[0].decode('utf-8')
 
-                if p.returncode != 0:
+                code, output = run(scp)
+                if code != 0:
                     self.log(crayons.red('Unknown error copying source to remote - media skipped'))
                     if self._manager.verbose:
                         self.log(output)
@@ -351,9 +350,9 @@ class StreamingRemoteHost(RemoteHost):
                 #
                 # Start remote ffmpeg
                 #
-                p = self.ffmpeg.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, log_callback)
+                code = self.ffmpeg.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, log_callback)
 
-                if p.returncode != 0:
+                if code != 0:
                     self.log(crayons.red('Unknown error encoding on remote'))
                     if self._manager.verbose:
                         self.log(output)
@@ -365,13 +364,13 @@ class StreamingRemoteHost(RemoteHost):
                 retrieved_copy_name = os.path.join(gettempdir(), os.path.basename(remote_outpath))
                 cmd = ['scp', self.props.user + '@' + self.props.ip + ':' + remote_outpath, retrieved_copy_name]
                 self.log(' '.join(cmd))
-                with subprocess.Popen(cmd) as p:
-                    p.wait()
+
+                code, output = run(cmd)
 
                 #
                 # process completed, check results and finish
                 #
-                if p.returncode == 0:
+                if code == 0:
                     if not filter_threshold(_profile, inpath, retrieved_copy_name):
                         self.log(
                             f'Transcoded file {inpath} did not meet minimum savings threshold, skipped')
@@ -406,7 +405,7 @@ class StreamingRemoteHost(RemoteHost):
                 self.queue.task_done()
 
 
-class MountedRemoteHost(RemoteHost):
+class MountedManagedHost(ManagedHost):
     """Implementation of a mounted host worker thread"""
 
     def __init__(self, hostname, props: RemoteHostProperties, queue: Queue, cluster):
@@ -429,7 +428,7 @@ class MountedRemoteHost(RemoteHost):
 
         while not self.queue.empty():
             try:
-                job: RemoteJob = self.queue.get()
+                job: EncodeJob = self.queue.get()
                 inpath = job.inpath
 
                 #
@@ -503,12 +502,12 @@ class MountedRemoteHost(RemoteHost):
                 #
                 # Start remote ffmpeg
                 #
-                p = self.ffmpeg.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, log_callback)
+                code = self.ffmpeg.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, log_callback)
 
                 #
                 # process completed, check results and finish
                 #
-                if p.returncode == 0:
+                if code == 0:
                     if not filter_threshold(_profile, inpath, outpath):
                         self.log(
                             f'Transcoded file {inpath} did not meet minimum savings threshold, skipped')
@@ -527,7 +526,7 @@ class MountedRemoteHost(RemoteHost):
                     self.log(crayons.green(f'Finished {job.inpath}'))
                 else:
                     os.remove(outpath)
-                    self.log(f' Did not complete normally: {self.ffmpeg.last_command}')
+                    self.log(f'Did not complete normally: {self.ffmpeg.last_command}')
                     self.log(f'Output can be found in {self.ffmpeg.log_path}')
 
             except Exception as ex:
@@ -536,7 +535,7 @@ class MountedRemoteHost(RemoteHost):
                 self.queue.task_done()
 
 
-class ManagerHost(RemoteHost):
+class LocalHost(ManagedHost):
     """Implementation of a worker thread when the local machine is in the same cluster.
     Pretty much the same as the LocalHost class but without multiple dedicated queues"""
 
@@ -559,7 +558,7 @@ class ManagerHost(RemoteHost):
 
         while not self.queue.empty():
             try:
-                job: RemoteJob = self.queue.get()
+                job: EncodeJob = self.queue.get()
                 inpath = job.inpath
 
                 #
@@ -626,12 +625,12 @@ class ManagerHost(RemoteHost):
                 #
                 # Start ffmpeg
                 #
-                p = self.ffmpeg.run(cli, log_callback)
+                code = self.ffmpeg.run(cli, log_callback)
 
                 #
                 # process completed, check results and finish
                 #
-                if p.returncode == 0:
+                if code == 0:
                     if not filter_threshold(_profile, inpath, outpath):
                         self.log(
                             f'Transcoded file {inpath} did not meet minimum savings threshold, skipped')
@@ -662,34 +661,31 @@ class ManagerHost(RemoteHost):
 class Cluster(Thread):
     """Thread to create host threads and wait for their completion."""
 
-    hosts:          List[RemoteHost]
+    hosts:          List[ManagedHost]
     queues:         Dict[str, Queue]
-    terminal_lock:  Lock
+    terminal_lock:  Lock = Lock()       # class-level
     config:         ConfigFile
     ssh:            str
-    lock:           Lock
     dry_run:        bool
     verbose:        bool
 
-    def __init__(self, name, configs: Dict, config: ConfigFile, lock: Lock, ssh: str, dry_run: bool):
+    def __init__(self, name, configs: Dict, config: ConfigFile, ssh: str, dry_run: bool):
         """
         :param name:        Cluster name, used only for thread naming
         :param configs:     The "clusters" section of the global config
         :param config:      The full configuration object
-        :param lock:        Lock used to synchronize terminal output only
         :param ssh:         Path to local ssh
         :param dry_run:     True or False, is this a dry run.
         """
         super().__init__(name=name, group=None, daemon=True)
         self.queues: Dict[str, Queue] = dict()
-        self.terminal_lock = lock
         self.dry_run = dry_run
         self.ssh = ssh
-        self.lock = lock
         self.hosts = list()
         self.config = config
         self.verbose = verbose
         self.ffmpeg = FFmpeg(config.ffmpeg_path)
+        self.lock = Cluster.terminal_lock
 
         for host, props in configs.items():
             hostprops = RemoteHostProperties(host, props)
@@ -714,7 +710,7 @@ class Cluster(Thread):
                     # for each queue configured for this host create a dedicated thread for each slot
                     #
                     for slot in range(0, slots):
-                        _h = ManagerHost(host, hostprops, self.queues[host_queue], self)
+                        _h = LocalHost(host, hostprops, self.queues[host_queue], self)
                         if not _h.validate_settings():
                             sys.exit(1)
                         self.hosts.append(_h)
@@ -725,7 +721,7 @@ class Cluster(Thread):
                     # for each queue configured for this host create a dedicated thread for each slot
                     #
                     for slot in range(0, slots):
-                        _h = MountedRemoteHost(host, hostprops, self.queues[host_queue], self)
+                        _h = MountedManagedHost(host, hostprops, self.queues[host_queue], self)
                         if not _h.validate_settings():
                             sys.exit(1)
                         self.hosts.append(_h)
@@ -736,7 +732,7 @@ class Cluster(Thread):
                     # for each queue configured for this host create a dedicated thread for each slot
                     #
                     for slot in range(0, slots):
-                        _h = StreamingRemoteHost(host, hostprops, self.queues[host_queue], self)
+                        _h = StreamingManagedHost(host, hostprops, self.queues[host_queue], self)
                         if not _h.validate_settings():
                             sys.exit(1)
                         self.hosts.append(_h)
@@ -744,7 +740,7 @@ class Cluster(Thread):
             else:
                 print(crayons.red(f'Unknown cluster host type "{hosttype}" - skipping'))
 
-    def enqueue(self, file, profile_name: str) -> bool:
+    def enqueue(self, file, profile_name: Optional[str]) -> (str, Optional[EncodeJob]):
         """Add a media file to this cluster queue.
            This is different than in local mode in that we only care about handling skips here.
            The profile will be selected once a host is assigned to the work
@@ -764,17 +760,23 @@ class Cluster(Thread):
                 rule = self.config.match_rule(media_info)
                 if rule is None:
                     print(crayons.yellow(f'No matching profile found - skipped'))
-                    return False
+                    return None, None
                 if rule.is_skip():
                     print(f'Skipping due to profile rule: {rule.name}')
-                    return False
+                    return None, None
                 profile_name = rule.profile
 
             profile = self.profiles[profile_name]
             # not short circuited by a skip rule, add to appropriate queue
-            queue_name = profile.queue_name if profile.queue_name is not None else '_default_'
-            self.queues[queue_name].put(RemoteJob(file, media_info, profile_name))
-            return True
+            queue_name = profile.queue_name if profile.queue_name is not None else '_default'
+            if queue_name not in self.queues:
+                print(crayons.red('Error: ') +
+                      f'Queue "{queue_name}" referenced in profile "{profile.name}" not defined in any host')
+                exit(1)
+            job = EncodeJob(file, media_info, profile_name)
+            self.queues[queue_name].put(job)
+            return queue_name, job
+        return None, None
 
     def testrun(self):
         for host in self.hosts:
@@ -809,7 +811,6 @@ def manage_clusters(files, config: ConfigFile, dry_run: bool = False, testing=Fa
     """
 
     cluster_config = config.settings['clusters']
-    terminal_lock = Lock()
     clusters = dict()
     for name, this_config in cluster_config.items():
         for item in files:
@@ -817,7 +818,7 @@ def manage_clusters(files, config: ConfigFile, dry_run: bool = False, testing=Fa
             if target_cluster != name:
                 continue
             if target_cluster not in clusters:
-                clusters[target_cluster] = Cluster(target_cluster, this_config, config, terminal_lock,
+                clusters[target_cluster] = Cluster(target_cluster, this_config, config,
                                                    config.ssh_path, dry_run)
             clusters[target_cluster].enqueue(filepath, profile_name)
 

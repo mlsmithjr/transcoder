@@ -1,6 +1,7 @@
 import math
 import os
 import platform
+import subprocess
 from typing import Dict
 
 from pytranscoder.media import MediaInfo
@@ -49,3 +50,10 @@ def calculate_progress(info: MediaInfo, stats: Dict) -> (int, int):
     pct_comp = 100 - pct_dest
 
     return pct_done, pct_comp
+
+
+def run(cmd):
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
+    output = p.communicate()[0].decode('utf-8')
+    return p.returncode, output
+

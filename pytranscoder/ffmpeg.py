@@ -69,7 +69,7 @@ class FFmpeg:
             os.remove(str(self.log_path))
             self.log_path = None
 
-    def run(self, params, event_callback) -> Optional[subprocess.Popen]:
+    def run(self, params, event_callback) -> Optional[int]:
 
         self.last_command = ' '.join([self.ffmpeg, *params])
         with subprocess.Popen([self.ffmpeg,
@@ -85,9 +85,9 @@ class FFmpeg:
                     if veto:
                         p.kill()
                         return None
-            return p
+            return p.returncode
 
-    def run_remote(self, sshcli: str, user: str, ip: str, params: list, event_callback) -> Optional[subprocess.Popen]:
+    def run_remote(self, sshcli: str, user: str, ip: str, params: list, event_callback) -> Optional[int]:
         cli = [sshcli, user + '@' + ip, self.ffmpeg, *params]
         self.last_command = ' '.join(cli)
         with subprocess.Popen(cli,
@@ -101,4 +101,4 @@ class FFmpeg:
                     if veto:
                         p.kill()
                         return None
-            return p
+            return p.returncode

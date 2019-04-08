@@ -40,7 +40,7 @@ class ConfigFile:
             if 'queues' in self.settings:
                 self.queues = self.settings['queues']
             else:
-                self.queues = list()
+                self.queues = dict()
 
     def colorize(self) -> bool:
         return self.settings.get('colorize', 'no').lower() == 'yes'

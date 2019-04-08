@@ -10,7 +10,7 @@ config:
   default_queue_file: '/volume1/config/sonarr/transcode_queue.txt'
   ffmpeg:             '/usr/bin/ffmpeg'
   ssh:                '/usr/bin/ssh'    # used only in cluster mode
-  queues:                       # define your queues here
+  queues:                       # define your queues here (non-clustered use only)
     qsv: 1                      # max 1 job at a time for QSV transcode
     cuda: 2                     # max 2 jobs at a time for nVidia CUDA transcodes
                                 # everything else defaults to 1 (sequential transcode)
