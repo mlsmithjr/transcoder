@@ -1,6 +1,22 @@
 
 ### Version History
 
+Version 1.5.0
+=============
+
+Enhancements and new features:
+
+    * Tightened up the output
+
+Bugs corrected:
+
+    * Fixed color output
+
+Other:
+
+    * Better test coverage with mocking.
+
+
 Version 1.4.7
 =============
 
