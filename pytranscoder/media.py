@@ -6,8 +6,10 @@ from pathlib import Path
 from pytranscoder import verbose
 from pytranscoder.profile import Profile
 
-video_re = re.compile(r'^.*Duration: (\d+):(\d+):.* Stream .*: Video: (\w+).*, (\w+)[(,].* (\d+)x(\d+).* (\d+)(\.\d.)? fps,.*$',
-                      re.DOTALL)
+#video_re = re.compile(r'^.*Duration: (\d+):(\d+):.* Stream .*: Video: (\w+).*, (\w+)[(,].* (\d+)x(\d+).* (\d+)(\.\d.)? fps,.*$',
+#                      re.DOTALL)
+video_re1 = re.compile(r".*Duration: (\d+):(\d+):", re.DOTALL)
+video_re2 = re.compile(r'.*Stream .+: Video: (\w+).*, (yuv\w+)[(,].* (\d+)x(\d+).* (\d+)(\.\d.)? fps', re.DOTALL)
 
 
 class MediaInfo:
@@ -55,15 +57,20 @@ class MediaInfo:
 
     @staticmethod
     def parse_details(_path, output):
-        match = video_re.match(output)
-        if match is None or len(match.groups()) < 6:
+        match1 = video_re1.match(output)
+        if match1 is None or len(match1.groups()) < 2:
             print(f'>>>> regex match on video stream data failed: ffmpeg -i {_path}')
             return MediaInfo(_path, None, 0, 0, 0, 0, 0, None)
-        else:
-            _dur_hrs, _dur_mins, _codec, _colorspace, _res_width, _res_height, fps = match.group(1, 2, 3, 4, 5, 6, 7)
-            filesize = os.path.getsize(_path) / (1024 * 1024)
-            return MediaInfo(_path, _codec, int(_res_width), int(_res_height), (int(_dur_hrs) * 60) + int(_dur_mins),
-                             filesize, int(fps), _colorspace)
+        match2 = video_re2.match(output)
+        if match2 is None or len(match2.groups()) < 4:
+            print(f'>>>> regex match on video stream data failed: ffmpeg -i {_path}')
+            return MediaInfo(_path, None, 0, 0, 0, 0, 0, None)
+
+        _dur_hrs, _dur_mins = match1.group(1, 2)
+        _codec, _colorspace, _res_width, _res_height, fps = match2.group(1, 2, 3, 4, 5)
+        filesize = os.path.getsize(_path) / (1024 * 1024)
+        return MediaInfo(_path, _codec, int(_res_width), int(_res_height), (int(_dur_hrs) * 60) + int(_dur_mins),
+                         filesize, int(fps), _colorspace)
 
     def log_stats(self, profile: Profile):
         try:

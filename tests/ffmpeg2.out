@@ -1,0 +1,40 @@
+ffmpeg version 3.4.4-0ubuntu0.18.04.1 Copyright (c) 2000-2018 the FFmpeg developers
+  built with gcc 7 (Ubuntu 7.3.0-16ubuntu3)
+  configuration: --prefix=/usr --extra-version=0ubuntu0.18.04.1 --toolchain=hardened --libdir=/usr/lib/x86_64-linux-gnu --incdir=/usr/include/x86_64-linux-gnu --enable-gpl --disable-stripping --enable-avresample --enable-avisynth --enable-gnutls --enable-ladspa --enable-libass --enable-libbluray --enable-libbs2b --enable-libcaca --enable-libcdio --enable-libflite --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libgme --enable-libgsm --enable-libmp3lame --enable-libmysofa --enable-libopenjpeg --enable-libopenmpt --enable-libopus --enable-libpulse --enable-librubberband --enable-librsvg --enable-libshine --enable-libsnappy --enable-libsoxr --enable-libspeex --enable-libssh --enable-libtheora --enable-libtwolame --enable-libvorbis --enable-libvpx --enable-libwavpack --enable-libwebp --enable-libx265 --enable-libxml2 --enable-libxvid --enable-libzmq --enable-libzvbi --enable-omx --enable-openal --enable-opengl --enable-sdl2 --enable-libdc1394 --enable-libdrm --enable-libiec61883 --enable-chromaprint --enable-frei0r --enable-libopencv --enable-libx264 --enable-shared
+  libavutil      55. 78.100 / 55. 78.100
+  libavcodec     57.107.100 / 57.107.100
+  libavformat    57. 83.100 / 57. 83.100
+  libavdevice    57. 10.100 / 57. 10.100
+  libavfilter     6.107.100 /  6.107.100
+  libavresample   3.  7.  0 /  3.  7.  0
+  libswscale      4.  8.100 /  4.  8.100
+  libswresample   2.  9.100 /  2.  9.100
+  libpostproc    54.  7.100 / 54.  7.100
+Input #0, mov,mp4,m4a,3gp,3g2,mj2, from '/downloads/s02e09.mov':
+  Metadata:
+    major_brand     : qt  
+    minor_version   : 0
+    compatible_brands: qt  
+    creation_time   : 2019-04-13T01:40:05.000000Z
+    com.apple.quicktime.keywords: 4-12-19
+    com.apple.quicktime.description: This video is about s02e09
+    com.apple.quicktime.author: Mark Smith
+    com.apple.quicktime.displayname: s02e09
+    com.apple.quicktime.title: s02e09
+  Duration: 00:52:49.13, start: 0.000000, bitrate: 12351 kb/s
+    Stream #0:0(und): Audio: aac (LC) (mp4a / 0x6134706D), 48000 Hz, stereo, fltp, 124 kb/s (default)
+    Metadata:
+      creation_time   : 2019-04-13T01:40:05.000000Z
+      handler_name    : Core Media Data Handler
+    Stream #0:1(und): Video: h264 (High) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 1920x1080 [SAR 1:1 DAR 16:9], 12180 kb/s, 24 fps, 24 tbr, 2400 tbn, 4800 tbc (default)
+    Metadata:
+      creation_time   : 2019-04-13T01:40:05.000000Z
+      handler_name    : Core Media Data Handler
+      encoder         : H.264
+      timecode        : 00:00:00:00
+    Stream #0:2(und): Data: none (tmcd / 0x64636D74) (default)
+    Metadata:
+      creation_time   : 2019-04-13T01:40:05.000000Z
+      handler_name    : Core Media Data Handler
+      timecode        : 00:00:00:00
+
