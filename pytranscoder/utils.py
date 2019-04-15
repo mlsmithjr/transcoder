@@ -46,6 +46,8 @@ def calculate_progress(info: MediaInfo, stats: Dict) -> (int, int):
 
     filesize = info.filesize_mb * 1024000
     pct_source = int(filesize * (pct_done / 100.0))
+    if pct_source <= 0:
+        return 0, 0
     pct_dest = int((stats['size'] / pct_source) * 100)
     pct_comp = 100 - pct_dest
 
