@@ -1,6 +1,18 @@
 
 ### Version History
 
+Version 1.5.1
+=============
+
+Enhancements and new features:
+
+
+Bugs corrected:
+
+    * Fixed media info parsing problem with file generated from Final Cut Pro X
+    * Fixed regex problem matching pathname in a rule
+
+
 Version 1.5.0
 =============
 
