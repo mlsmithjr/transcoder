@@ -174,6 +174,8 @@ profiles:
 | threshold        | optional. If provided this number represents a minimum percentage compression savings for the encoded media. If it does not meet this threshold the transcoded file is discarded, source file remains as-is, and the source job marked as complete. This is useful if a particular file doesn't compress much and you would rather just keep the original. |
 | threshold_check  | optional. If provided this is the percent done to start checking if the threshold is being met. Default is 100% (when media is finished). Use this to have threshold checks done earlier to stop a long-running transcode if not producing expected compression (threshold).
 
+> CPU Note: When transcoding from h264 on an Intel chip, _ffmpeg_ will use detected extensions to basically perform hardware decoding for you. So if you configured hardware encoding you'll see low CPU use. On AMD there is no chip assistance on decoding.  So even if hardware encoding, the decoding process will load down your CPU. To fix this simply enable hardware decoding as an **input option**.
+
 #### rules - simple profile matching rules
 
 Simple expressions to match video files with the appropriate profile. They are evaluated top-down so
