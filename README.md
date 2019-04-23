@@ -34,6 +34,7 @@ nVida CUDA-enabled graphics card or Intel accelerated video (QSV)
 #### Support
 Please log issues or questions via the github home page for now.
 
+Video Tutorials: [Part 1 - Linux Setups](https://www.youtube.com/watch?v=LHhC_w34Kd0&t=5s)
 
 #### Installation
 
