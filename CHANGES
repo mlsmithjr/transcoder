@@ -1,6 +1,17 @@
 
 ### Version History
 
+Version 1.5.3
+=============
+
+Enhancements and new features:
+
+Bugs corrected:
+
+    * Removed requirement for queue configuration if not using queues.
+    * Documentation and Pipfile tweaks.
+
+
 Version 1.5.2
 =============
 

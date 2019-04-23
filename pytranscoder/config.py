@@ -27,10 +27,6 @@ class ConfigFile:
                 with open(configuration, 'r') as f:
                     yml = yaml.load(f, Loader=yaml.FullLoader)
             self.settings = yml['config']
-            if 'queues' not in self.settings:
-                print('"queues" definition missing from transcode.yml configuration file')
-                sys.exit(1)
-
             for name, profile in yml['profiles'].items():
                 self.profiles[name] = Profile(name, profile)
 
