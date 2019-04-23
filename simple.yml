@@ -64,7 +64,7 @@ rules:
         runtime:  '30-65'       # between 30 and 65 minutes long
 
   'default':                    # this will be the DEFAULT (no criteria implies a match)
-      profile: h264
+      profile: hevc_cuda
       criteria:
         vcodec: '!hevc'
 

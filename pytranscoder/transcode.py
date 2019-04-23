@@ -20,9 +20,6 @@ from pytranscoder.utils import filter_threshold, files_from_file, calculate_prog
 
 DEFAULT_CONFIG = os.path.expanduser('~/.transcode.yml')
 
-single_mode = False
-dry_run = False
-
 
 class LocalJob:
     """One file with matched profile to be encoded"""
@@ -76,7 +73,6 @@ class QueueThread(Thread):
         self.lock.release()
 
     def go(self):
-        global dry_run
 
         while not self.queue.empty():
             try:
@@ -86,10 +82,6 @@ class QueueThread(Thread):
 
                 outpath = job.inpath.with_suffix(job.profile.extension + '.tmp')
 
-#                if single_mode and sys.stdout.isatty():
-#                    quiet = ''
-#                else:
-#                    quiet = ['-nostats', '-loglevel', 'quiet']
                 cli = ['-y', *oinput, '-i', str(job.inpath), *ooutput, str(outpath)]
 
                 #
@@ -104,7 +96,7 @@ class QueueThread(Thread):
                 finally:
                     self.lock.release()
 
-                if dry_run:
+                if pytranscoder.dry_run:
                     continue
 
                 basename = job.inpath.name
@@ -138,10 +130,12 @@ class QueueThread(Thread):
                     else:
                         self.log(crayons.yellow(f'Finished {outpath}, original file unchanged'))
                 else:
-                    outpath.unlink()
                     self.log(f' Did not complete normally: {self.ffmpeg.last_command}')
                     self.log(f'Output can be found in {self.ffmpeg.log_path}')
-
+                    try:
+                        outpath.unlink()
+                    except:
+                        pass
             finally:
                 self.queue.task_done()
 
@@ -254,7 +248,7 @@ class LocalHost:
     def notify_plex(self):
         """If plex notifications enabled, tell it to refresh"""
 
-        if self.configfile.plex_server is not None and not dry_run:
+        if self.configfile.plex_server is not None and not pytranscoder.dry_run:
             plex_server = self.configfile.plex_server
             try:
                 from plexapi.server import PlexServer
@@ -296,7 +290,6 @@ def main():
 
 
 def start():
-    global single_mode, keep_source, dry_run
 
     if len(sys.argv) == 2 and sys.argv[1] == '-h':
         print(f'pytrancoder (ver {__version__})')
@@ -343,12 +336,10 @@ def start():
             elif sys.argv[arg] == '-y':                 # specify yaml config file
                 arg += 1
                 configfile = ConfigFile(sys.argv[arg])
-            elif sys.argv[arg] == '-s':                 # force single threading/sequential
-                single_mode = True
             elif sys.argv[arg] == '-k':                 # keep original
-                keep_source = True
+                pytranscoder.keep_source = True
             elif sys.argv[arg] == '--dry-run':
-                dry_run = True
+                pytranscoder.dry_run = True
             elif sys.argv[arg] == '--host':             # run all cluster encodes on specific host
                 host_override = sys.argv[arg + 1]
                 arg += 1
@@ -394,11 +385,8 @@ def start():
                 for name, this_config in cluster.items():
                     if name != host_override:
                         this_config['status'] = 'disabled'
-        manage_clusters(files, configfile, dry_run)
+        manage_clusters(files, configfile)
         sys.exit(0)
-
-    if len(files) == 1:
-        single_mode = True
 
     host = LocalHost(configfile)
     host.enqueue_files(files)
@@ -407,7 +395,7 @@ def start():
     #
     host.start()
 
-    if not dry_run and queue_path is not None:
+    if not pytranscoder.dry_run and queue_path is not None:
         # pick up any newly added files
         files = set(files_from_file(queue_path))
         # subtract out the ones we've completed

@@ -242,7 +242,7 @@ class TranscoderTests(unittest.TestCase):
     @staticmethod
     def setup_cluster1(config) -> Cluster:
         cluster_config = config.settings['clusters']
-        cluster = Cluster('cluster1', cluster_config['cluster1'], config, config.ssh_path, False)
+        cluster = Cluster('cluster1', cluster_config['cluster1'], config, config.ssh_path)
         return cluster
 
     @mock.patch.object(FFmpeg, 'run_remote')
@@ -318,7 +318,7 @@ class TranscoderTests(unittest.TestCase):
     @mock.patch('pytranscoder.cluster.os.remove')
     @mock.patch.object(MediaInfo, 'parse_details')
     def test_cluster_match_default_queue(self, mock_info_parser, mock_os_rename, mock_os_remove,  mock_filter_threshold,
-                             mock_run_remote):
+                                mock_run_remote):
 
         setup = ConfigFile(self.get_setup())
 

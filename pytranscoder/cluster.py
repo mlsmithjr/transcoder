@@ -314,7 +314,7 @@ class StreamingManagedHost(ManagedHost):
                 finally:
                     self.lock.release()
 
-                if self._manager.dry_run:
+                if pytranscoder.dry_run:
                     continue
 
                 #
@@ -484,7 +484,7 @@ class MountedManagedHost(ManagedHost):
                 finally:
                     self.lock.release()
 
-                if self._manager.dry_run:
+                if pytranscoder.dry_run:
                     continue
 
                 basename = os.path.basename(job.inpath)
@@ -525,9 +525,12 @@ class MountedManagedHost(ManagedHost):
                         self.complete(inpath)
                     self.log(crayons.green(f'Finished {job.inpath}'))
                 else:
-                    os.remove(outpath)
                     self.log(f'Did not complete normally: {self.ffmpeg.last_command}')
                     self.log(f'Output can be found in {self.ffmpeg.log_path}')
+                    try:
+                        os.remove(outpath)
+                    except:
+                        pass
 
             except Exception as ex:
                 self.log(ex)
@@ -603,11 +606,11 @@ class LocalHost(ManagedHost):
                     print(f'Host     : {self.hostname} (local)')
                     print('Filename : ' + crayons.green(remote_inpath))
                     print(f'Profile  : {_profile.name}')
-                    print('ssh      : ' + ' '.join(cli) + '\n')
+                    print('ffmpeg   : ' + ' '.join(cli) + '\n')
                 finally:
                     self.lock.release()
 
-                if self._manager.dry_run:
+                if pytranscoder.dry_run:
                     continue
 
                 basename = os.path.basename(job.inpath)
@@ -648,9 +651,12 @@ class LocalHost(ManagedHost):
                         self.complete(inpath)
                     self.log(crayons.green(f'Finished {job.inpath}'))
                 else:
-                    os.remove(outpath)
                     self.log(f' Did not complete normally: {self.ffmpeg.last_command}')
                     self.log(f'Output can be found in {self.ffmpeg.log_path}')
+                    try:
+                        os.remove(outpath)
+                    except:
+                        pass
 
             except Exception as ex:
                 self.log(ex)
@@ -662,24 +668,17 @@ class Cluster(Thread):
     """Thread to create host threads and wait for their completion."""
 
     hosts:          List[ManagedHost]
-    queues:         Dict[str, Queue]
     terminal_lock:  Lock = Lock()       # class-level
-    config:         ConfigFile
-    ssh:            str
-    dry_run:        bool
-    verbose:        bool
 
-    def __init__(self, name, configs: Dict, config: ConfigFile, ssh: str, dry_run: bool):
+    def __init__(self, name, configs: Dict, config: ConfigFile, ssh: str):
         """
         :param name:        Cluster name, used only for thread naming
         :param configs:     The "clusters" section of the global config
         :param config:      The full configuration object
         :param ssh:         Path to local ssh
-        :param dry_run:     True or False, is this a dry run.
         """
         super().__init__(name=name, group=None, daemon=True)
         self.queues: Dict[str, Queue] = dict()
-        self.dry_run = dry_run
         self.ssh = ssh
         self.hosts = list()
         self.config = config
@@ -804,13 +803,16 @@ class Cluster(Thread):
         return self.config.profiles
 
 
-def manage_clusters(files, config: ConfigFile, dry_run: bool = False, testing=False):
+def manage_clusters(files, config: ConfigFile, testing=False):
     """Main entry point for setup and execution of all clusters
 
         There is one thread per cluster, and each cluster manages multiple hosts, each having their own thread.
     """
 
-    cluster_config = config.settings['clusters']
+    cluster_config = config.settings.get('clusters', None)
+    if cluster_config is None:
+        print('Error: no clusters defined')
+        return
     clusters = dict()
     for name, this_config in cluster_config.items():
         for item in files:
@@ -819,7 +821,7 @@ def manage_clusters(files, config: ConfigFile, dry_run: bool = False, testing=Fa
                 continue
             if target_cluster not in clusters:
                 clusters[target_cluster] = Cluster(target_cluster, this_config, config,
-                                                   config.ssh_path, dry_run)
+                                                   config.ssh_path)
             clusters[target_cluster].enqueue(filepath, profile_name)
 
     #

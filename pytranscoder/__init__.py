@@ -1,4 +1,4 @@
-__version__ = '1.5.3'
+__version__ = '1.5.4'
 __author__ = 'Marshall L Smith Jr <marshallsmithjr@gmail.com>'
 __license__ = 'GPLv3'
 
@@ -8,3 +8,4 @@ __license__ = 'GPLv3'
 #
 verbose = False
 keep_source = False
+dry_run = False
