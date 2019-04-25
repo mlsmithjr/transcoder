@@ -343,6 +343,7 @@ class StreamingManagedHost(ManagedHost):
                     if _profile.threshold_check < 100:
                         if pct_done >= _profile.threshold_check and pct_comp < _profile.threshold:
                             # compression goal (threshold) not met, kill the job and waste no more time...
+                            self.log('Encoding of {basename} cancelled and skipped due to threshold not met')
                             return True
                     # continue
                     return False
@@ -386,7 +387,7 @@ class StreamingManagedHost(ManagedHost):
                             self.log(f'moving media to {inpath}')
                         shutil.move(retrieved_copy_name, inpath)
                     self.log(crayons.green(f'Finished {inpath}'))
-                else:
+                elif code is not None:
                     self.log(crayons.red(f'error during remote transcode of {inpath}'))
                     self.log(f' Did not complete normally: {self.ffmpeg.last_command}')
                     self.log(f'Output can be found in {self.ffmpeg.log_path}')
@@ -495,6 +496,7 @@ class MountedManagedHost(ManagedHost):
                     if _profile.threshold_check < 100:
                         if pct_done >= _profile.threshold_check and pct_comp < _profile.threshold:
                             # compression goal (threshold) not met, kill the job and waste no more time...
+                            self.log('Encoding of {basename} cancelled and skipped due to threshold not met')
                             return True
                     # continue
                     return False
@@ -524,7 +526,7 @@ class MountedManagedHost(ManagedHost):
                         os.rename(outpath, outpath[0:-4])
                         self.complete(inpath)
                     self.log(crayons.green(f'Finished {job.inpath}'))
-                else:
+                elif code is not None:
                     self.log(f'Did not complete normally: {self.ffmpeg.last_command}')
                     self.log(f'Output can be found in {self.ffmpeg.log_path}')
                     try:
@@ -621,6 +623,7 @@ class LocalHost(ManagedHost):
                     if _profile.threshold_check < 100:
                         if pct_done >= _profile.threshold_check and pct_comp < _profile.threshold:
                             # compression goal (threshold) not met, kill the job and waste no more time...
+                            self.log('Encoding of {basename} cancelled and skipped due to threshold not met')
                             return True
                     # continue
                     return False
@@ -650,7 +653,7 @@ class LocalHost(ManagedHost):
                         os.rename(outpath, outpath[0:-4])
                         self.complete(inpath)
                     self.log(crayons.green(f'Finished {job.inpath}'))
-                else:
+                elif code is not None:
                     self.log(f' Did not complete normally: {self.ffmpeg.last_command}')
                     self.log(f'Output can be found in {self.ffmpeg.log_path}')
                     try:

@@ -1,6 +1,18 @@
 
 ### Version History
 
+Version 1.5.5
+=============
+
+Bugs corrected:
+
+    * Threshold check termination resulted in a misleading error message.
+
+Other:
+
+    * Doc link to video series part 2.
+    * Cluster documentation revised and corrected.
+
 Version 1.5.4
 =============
 
