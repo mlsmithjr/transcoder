@@ -14,6 +14,7 @@ from pytranscoder import __version__
 from pytranscoder.cluster import manage_clusters
 from pytranscoder.config import ConfigFile
 from pytranscoder.ffmpeg import FFmpeg
+from pytranscoder.gui import start_gui
 from pytranscoder.media import MediaInfo
 from pytranscoder.profile import Profile
 from pytranscoder.utils import filter_threshold, files_from_file, calculate_progress
@@ -290,6 +291,7 @@ def main():
 
 
 def start():
+    start_gui()
 
     if len(sys.argv) == 2 and sys.argv[1] == '-h':
         print(f'pytrancoder (ver {__version__})')
