@@ -351,7 +351,10 @@ def start():
                 cluster = sys.argv[arg + 1]
                 arg += 1
             else:
-                expanded_files: List = glob.glob(sys.argv[arg])     # handle wildcards in Windows
+                if os.name == "nt":
+                    expanded_files: List = glob.glob(sys.argv[arg])     # handle wildcards in Windows
+                else:
+                    expanded_files = [sys.argv[arg]]
                 for f in expanded_files:
                     if cluster is None:
                         files.append((f, profile))
