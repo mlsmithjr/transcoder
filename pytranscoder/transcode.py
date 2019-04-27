@@ -1,8 +1,9 @@
 #!/usr/bin/python3
+import glob
 import os
 import sys
 from pathlib import Path
-from typing import Dict, Set
+from typing import Dict, Set, List
 
 from queue import Queue
 from threading import Thread, Lock
@@ -350,10 +351,12 @@ def start():
                 cluster = sys.argv[arg + 1]
                 arg += 1
             else:
-                if cluster is None:
-                    files.append((sys.argv[arg], profile))
-                else:
-                    files.append((sys.argv[arg], cluster, profile))
+                expanded_files: List = glob.glob(sys.argv[arg])     # handle wildcards in Windows
+                for f in expanded_files:
+                    if cluster is None:
+                        files.append((f, profile))
+                    else:
+                        files.append((f, cluster, profile))
             arg += 1
 
     if configfile is None:

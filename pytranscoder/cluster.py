@@ -143,12 +143,6 @@ class ManagedHost(Thread):
         Base thread class for all remote host types.
     """
 
-    hostname: str
-    props: RemoteHostProperties
-    queue: Queue
-    _complete: set
-    _manager = None
-
     def __init__(self, hostname, props, queue, cluster):
         """
         :param hostname:    name of host from config/clusters
@@ -201,7 +195,10 @@ class ManagedHost(Thread):
 
     def ping_test_ok(self):
         addr = self.props.ip
-        ping = ['ping', '-c', '1', '-W', '5', addr]
+        if os.name == "nt":
+            ping = [r'C:\WINDOWS\system32\ping.exe', '-n', '1', '-w', '5', addr]
+        else:
+            ping = ['ping', '-c', '1', '-W', '5', addr]
         p = subprocess.Popen(ping, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
         p.communicate()
         if p.returncode != 0:

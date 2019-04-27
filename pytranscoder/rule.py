@@ -18,6 +18,8 @@ class Rule:
         self.profile = rule['profile']
         if 'criteria' in rule:
             self.criteria = rule['criteria']
+        else:
+            self.criteria = None
 
     def is_skip(self):
         return self.profile.upper() == 'SKIP'
