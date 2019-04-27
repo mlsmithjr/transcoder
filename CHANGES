@@ -1,6 +1,20 @@
 
 ### Version History
 
+
+Version 1.5.6
+=============
+
+Bugs corrected:
+
+    * Threshold check termination resulted in a misleading error message.
+    * Windows wildcard expansion fixed.
+
+Other:
+
+    * Changed rule criteria for range matching to be inclusive. So 30-60 now mean between 30 and 60 inclusively.
+
+
 Version 1.5.5
 =============
 

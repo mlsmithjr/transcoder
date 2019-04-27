@@ -37,7 +37,7 @@ class MediaInfo:
                 print(f'Error: Rule "{rulename}" bad range expression: {value} ')
                 raise ValueError(value)
             rangelow, rangehigh = parts
-            expr = f'{rangelow} < {attr} < {rangehigh}'
+            expr = f'{rangelow} <= {attr} <= {rangehigh}'
         elif value.isnumeric():
             # simple numeric equality test
             expr = f'{attr} == {value}'
