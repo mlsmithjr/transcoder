@@ -25,7 +25,7 @@ class ConfigFile:
                 yml = configuration
             else:
                 with open(configuration, 'r') as f:
-                    yml = yaml.load(f, Loader=yaml.FullLoader)
+                    yml = yaml.load(f, Loader=yaml.Loader)
             self.settings = yml['config']
             for name, profile in yml['profiles'].items():
                 self.profiles[name] = Profile(name, profile)

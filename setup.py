@@ -26,7 +26,7 @@ setuptools.setup(
     url='https://github.com/mlsmithjr/transcoder',
     data_files=[('share/doc/pytranscoder', ['README.md', 'Cluster.md', 'transcode.yml', 'simple.yml'])],
     packages=['pytranscoder'],
-    install_requires=['pyyaml', 'crayons'],
+    install_requires=['pyyaml >= 5.1', 'crayons'],
     entry_points={"console_scripts": ["pytranscoder=pytranscoder.transcode:main"]},
     classifiers=[
       'Programming Language :: Python :: 3',

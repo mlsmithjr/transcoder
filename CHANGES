@@ -1,211 +1,90 @@
 
 ### Version History
 
+Version 1.5.8
+    * Updated yaml loader to support latest pyyaml library.
 
 Version 1.5.7
-=============
-
-Bugs corrected:
-
     * Threshold check termination resulted in a misleading error message.
     * Windows wildcard expansion fixed.
-
-Other:
-
     * Changed rule criteria for range matching to be inclusive. So 30-60 now mean between 30 and 60 inclusively.
 
-
 Version 1.5.5
-=============
-
-Bugs corrected:
-
     * Threshold check termination resulted in a misleading error message.
-
-Other:
-
     * Doc link to video series part 2.
     * Cluster documentation revised and corrected.
 
 Version 1.5.4
-=============
-
-Bugs corrected:
-
     * Fixed bug that suppressed certain ffmpeg error condition messages.
     * -k flag ignored under certain situations.
-
-Other:
-
     * Doc link to video series part 1.
     * Fixed some code inconsistencies regarding global flags
 
-
 Version 1.5.3
-=============
-
-Bugs corrected:
-
     * Removed requirement for queue configuration if not using queues.
     * Documentation and Pipfile tweaks.
 
-
 Version 1.5.2
-=============
-
-Bugs corrected:
-
     * Fixed media info parsing problem with file generated from Final Cut Pro X
     * Fixed regex problem matching pathname in a rule
     * Fixed divide by zero error on status output when not using hardware acceleration
 
-
-Version 1.5.0
-=============
-
-Enhancements and new features:
-
     * Tightened up the output
-
-Bugs corrected:
-
     * Fixed color output
-
-Other:
-
     * Better test coverage with mocking.
 
-
 Version 1.4.7
-=============
-
-Enhancements and new features:
-
     * Multi-queue support in cluster mode. Run multiple concurrent jobs on remote machines now.
-
-Bugs corrected:
-
     * import error in utils.py
     * -t option removed from ssh as it was screwing up the local terminal output
 
 Version 1.4.6
-=============
-
-Enhancements and new features:
-
     * Configuration file change: "rules" section of each rule renamed to "criteria" for clarity.
 
-Bugs corrected:
-
-
 Version 1.4.5
-=============
-
-Enhancements and new features:
-
     * Calculate and show compression % in progress output
     * Allow cluster mode profile override
     * Added threshold_check to enable threshold checking to start at designated percentage done.
-
-Bugs corrected:
-
     * Cluster mode -k option fix.
 
 Version 1.4.4
-=============
-
-Enhancements and new features:
-
     * Optional colorized terminal output.
     * Encode runs are logged for inspection if something goes wrong.
-
-
-Enhancements and new features:
-
-Bugs corrected:
-
     * Cluster mode not honoring default queue file.
     * Cluster mode --host override fixed.
 
-Others:
-
-
 Version 1.4.1
-=============
-
-Enhancements and new features:
-
-Bugs corrected:
-
     * Regex problem monitoring ffmpeg output.
-
-Others:
-
     * Refactored ffmpeg control into a class
 
 Version 1.3
-===========
-
-Enhancements and new features:
-
     * Added support for local host in the cluster so that the same host managing work also does work.
     * Monitoring of ffmpeg jobs and progress reporting.
     * Support for multiple allowed profiles for a host.
     * New --host commandline option to force cluster encodes on a designated host only
-
-Others:
-
     * Large code refactoring.
 
-
 Version 1.2.2
-=============
-Enhancements and new features:
-
     * Path to ssh is now configurable.
 
 Version 1.2.1
-=============
-Enhancements and new features:
-
     * Multiple queue definitions, allowing for more fine threading control.
     * New cluster mode to allow for agent-less, multi-machine encode offloading.
     * Cluster host definitions support Linux, MacOS, and Windows.
     * Support for running on Windows 10.
     * Rule criteria now allows for range testing with numeric types.
-
-Others:
-
     * Continue to improve unit testing suite.
     * Documentation revisions.
 
 Version 1.1.0
-=============
-
-Bugs corrected:
-
     * Fixed bug that would not allow empty input options in profile definition.
 
-
 Version 1.0.1
-=============
-
-Enhancements and new features:
-
     * Added support for use as a Sonarr connection custom script.
-
-Bugs corrected:
-
     * Fixed broken unit test.
-
-Others:
-
     * Install sample transcode.yml file in /usr/share/pytranscoder folder.
     * Revised some details in README.md
     * Started this CHANGES file.
 
-
 Version 1.0.0
-=============
-
     * Initial Release to pypi.org
