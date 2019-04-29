@@ -215,6 +215,9 @@ class LocalHost:
             if pytranscoder.verbose:
                 print('matching ' + path)
             media_info = self.ffmpeg.fetch_details(path)
+            if media_info is None:
+                print(crayons.red(f'File not found: {path}'))
+                continue
             if media_info.vcodec is not None:
 
                 if forced_profile is None:

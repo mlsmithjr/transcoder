@@ -1,6 +1,9 @@
 
 ### Version History
 
+Version 1.5.9
+    * Fixed error message when input file not found.
+
 Version 1.5.8
     * Updated yaml loader to support latest pyyaml library.
 
@@ -28,7 +31,6 @@ Version 1.5.2
     * Fixed media info parsing problem with file generated from Final Cut Pro X
     * Fixed regex problem matching pathname in a rule
     * Fixed divide by zero error on status output when not using hardware acceleration
-
     * Tightened up the output
     * Fixed color output
     * Better test coverage with mocking.

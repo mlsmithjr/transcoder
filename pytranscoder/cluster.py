@@ -750,6 +750,9 @@ class Cluster(Thread):
             print('matching ' + path)
 
         media_info = self.ffmpeg.fetch_details(path)
+        if media_info is None:
+            print(crayons.red(f'File not found: {path}'))
+            return None, None
         if media_info.vcodec is not None:
 
             if profile_name is None:
