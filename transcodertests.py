@@ -148,7 +148,7 @@ class TranscoderTests(unittest.TestCase):
             },
             "profiles": {
                 "hq": {
-                    "output_options": ["-c:v copy", "-c:a copy", "-c:s copy", "-f matroska"],
+                    "output_options": ["-c:v", "copy", "-c:a", "copy", "-c:s", "copy", "-f", "matroska"],
                     "threshold": 1,
                     "extension": ".mkv",
                 },

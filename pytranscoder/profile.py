@@ -9,18 +9,26 @@ class Profile:
         self.profile = profile
         self.name = name
 
+    @staticmethod
+    def level_options(opts: List) -> List:
+        z = []
+        for o in opts:
+            for t in o.split():
+                z.append(t)
+        return z
+
     @property
     def input_options(self) -> [str]:
         if 'input_options' in self.profile and self.profile['input_options'] is not None:
             if isinstance(self.profile['input_options'], List):
-                return self.profile['input_options']
+                return Profile.level_options(self.profile['input_options'])
             return self.profile['input_options'].split()
         return []
 
     @property
     def output_options(self) -> [str]:
         if isinstance(self.profile['output_options'], List):
-            return self.profile['output_options']
+            return Profile.level_options(self.profile['output_options'])
         return self.profile['output_options'].split()
 
     @property
@@ -48,7 +56,7 @@ class Profile:
 
     def include(self, parent):
         # overlay this profile settings on top of parent profile to make a new one
-        p = parent.profile
+        p = dict(parent.profile)
         for k, v in self.profile.items():
             if k in p:
                 if isinstance(p[k], List):
