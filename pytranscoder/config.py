@@ -29,6 +29,12 @@ class ConfigFile:
             self.settings = yml['config']
             for name, profile in yml['profiles'].items():
                 self.profiles[name] = Profile(name, profile)
+                parent_names = self.profiles[name].include_profiles
+                for parent_name in parent_names:
+                    if parent_name not in self.profiles:
+                        print(f'Profile error ({name}: included "{parent_name}" not defined')
+                        exit(1)
+                    self.profiles[name].include(self.profiles[parent_name])
 
             for name, rule in yml['rules'].items():
                 self.rules[name] = Rule(name, rule)

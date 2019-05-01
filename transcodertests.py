@@ -147,10 +147,15 @@ class TranscoderTests(unittest.TestCase):
                 },
             },
             "profiles": {
-                "hevc_cuda": {
-                    "input_options": None,
-                    "output_options": "-threads 4 -c:v copy -c:a copy -c:s copy -f matroska",
+                "hq": {
+                    "output_options": ["-c:v copy", "-c:a copy", "-c:s copy", "-f matroska"],
                     "threshold": 1,
+                    "extension": ".mkv",
+                },
+                "hevc_cuda": {
+                    "include": "hq",
+                    "input_options": None,
+                    "output_options": ["-threads 4"],
                     "extension": ".mkv",
                     "queue": "q2",
                 },

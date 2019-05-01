@@ -352,8 +352,6 @@ class StreamingManagedHost(ManagedHost):
 
                 if code != 0:
                     self.log(crayons.red('Unknown error encoding on remote'))
-                    if self._manager.verbose:
-                        self.log(output)
                     continue
 
                 #

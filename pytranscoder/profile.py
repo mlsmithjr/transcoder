@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List
 
 
 class Profile:
@@ -12,11 +12,15 @@ class Profile:
     @property
     def input_options(self) -> [str]:
         if 'input_options' in self.profile and self.profile['input_options'] is not None:
+            if isinstance(self.profile['input_options'], List):
+                return self.profile['input_options']
             return self.profile['input_options'].split()
         return []
 
     @property
     def output_options(self) -> [str]:
+        if isinstance(self.profile['output_options'], List):
+            return self.profile['output_options']
         return self.profile['output_options'].split()
 
     @property
@@ -34,3 +38,30 @@ class Profile:
     @property
     def threshold_check(self) -> int:
         return self.profile.get('threshold_check', 100)
+
+    @property
+    def include_profiles(self) -> List[str]:
+        alist = self.profile.get('include', None)
+        if alist is None:
+            return []
+        return alist.split(' ')
+
+    def include(self, parent):
+        # overlay this profile settings on top of parent profile to make a new one
+        p = parent.profile
+        for k, v in self.profile.items():
+            if k in p:
+                if isinstance(p[k], List):
+                    if isinstance(v, List):
+                        # merge existing key values
+                        p[k] = p[k] + v
+                    else:
+                        # replace
+                        p[k] = v
+                else:
+                    # keep child value
+                    p[k] = v
+            else:
+                p[k] = v
+
+        self.profile = p

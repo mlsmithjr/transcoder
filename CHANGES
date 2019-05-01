@@ -2,6 +2,7 @@
 ### Version History
 
 Version 1.5.9
+    * Added new optional "include" directive in profiles to help reduce profile repetition.
     * Fixed error message when input file not found.
 
 Version 1.5.8
