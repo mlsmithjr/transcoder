@@ -20,7 +20,7 @@ Linux is natively supported as long as the following conditions are true:
 #### MacOS
 MacOS, being based on BSD, is also natively supported.  See Linux section. Check your MacOS version of ffmpeg for what hardware acceleration support is available, if any. At the time of this writing there was nothing available of appreciable quality, only VAAPI and the quality was dismal.
 #### Windows 10
-**Windows is only supported as a cluster host - not the cluster manager.**
+**Windows is only supported as a cluster manager if installed and run under WSL**
 
 There are 2 ways to enable SSH access for Windows. Each method is further complicated depending on which ffmpeg you use.  These instructions assume a certain level of proficiency with Windows and optionally WSL.
 
