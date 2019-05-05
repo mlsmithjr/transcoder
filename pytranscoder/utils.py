@@ -14,8 +14,8 @@ def filter_threshold(profile: Profile, inpath, outpath):
         pct_threshold = profile.threshold
         orig_size = os.path.getsize(inpath)
         new_size = os.path.getsize(outpath)
-        size_threshold = pct_threshold * orig_size
-        if new_size > size_threshold:
+        pct_savings = 100 - math.floor((new_size * 100) / orig_size)
+        if pct_savings < pct_threshold:
             return False
         return True
 
@@ -40,10 +40,7 @@ def get_local_os_type():
 
 
 def calculate_progress(info: MediaInfo, stats: Dict) -> (int, int):
-    if info.runtime <= 0:
-        pct_done = 0
-    else:
-        pct_done = int((stats['time'] / info.runtime) * 100)
+    pct_done = int((stats['time'] / info.runtime) * 100)
 
     # extrapolate current compression %
 
