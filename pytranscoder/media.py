@@ -8,7 +8,7 @@ from pytranscoder.profile import Profile
 
 #video_re = re.compile(r'^.*Duration: (\d+):(\d+):.* Stream .*: Video: (\w+).*, (\w+)[(,].* (\d+)x(\d+).* (\d+)(\.\d.)? fps,.*$',
 #                      re.DOTALL)
-video_re1 = re.compile(r".*Duration: (\d+):(\d+):", re.DOTALL)
+video_re1 = re.compile(r".*Duration: (\d+):(\d+):(\d+)", re.DOTALL)
 video_re2 = re.compile(r'.*Stream .+: Video: (\w+).*, (yuv\w+)[(,].* (\d+)x(\d+).* (\d+)(\.\d.)? fps', re.DOTALL)
 
 
@@ -59,7 +59,7 @@ class MediaInfo:
     @staticmethod
     def parse_details(_path, output):
         match1 = video_re1.match(output)
-        if match1 is None or len(match1.groups()) < 2:
+        if match1 is None or len(match1.groups()) < 3:
             print(f'>>>> regex match on video stream data failed: ffmpeg -i {_path}')
             return MediaInfo(_path, None, 0, 0, 0, 0, 0, None)
         match2 = video_re2.match(output)
@@ -67,20 +67,9 @@ class MediaInfo:
             print(f'>>>> regex match on video stream data failed: ffmpeg -i {_path}')
             return MediaInfo(_path, None, 0, 0, 0, 0, 0, None)
 
-        _dur_hrs, _dur_mins = match1.group(1, 2)
+        _dur_hrs, _dur_mins, _dur_secs = match1.group(1, 2, 3)
         _codec, _colorspace, _res_width, _res_height, fps = match2.group(1, 2, 3, 4, 5)
         filesize = os.path.getsize(_path) / (1024 * 1024)
-        return MediaInfo(_path, _codec, int(_res_width), int(_res_height), (int(_dur_hrs) * 60) + int(_dur_mins),
+        return MediaInfo(_path, _codec, int(_res_width), int(_res_height),
+                         (int(_dur_hrs) * 3600) + (int(_dur_mins) * 60) + int(_dur_secs),
                          filesize, int(fps), _colorspace)
-
-    def log_stats(self, profile: Profile):
-        try:
-            name = Path.home() / '.pytranscoder-ml.csv'
-            with open(str(name), 'a+') as statsfile:
-                csv_file = csv.writer(statsfile, quoting=csv.QUOTE_NONNUMERIC)
-                new_filesize = os.path.getsize(self.path) / (1024 * 1024)
-                row = [self.path, self.vcodec, self.res_height, self.runtime, self.filesize_mb,
-                       new_filesize, self.fps, self.colorspace, profile.name]
-                csv_file.writerow(row)
-        except Exception:
-            print('Unable to write to ~/.pytranscoder-ml.csv')
