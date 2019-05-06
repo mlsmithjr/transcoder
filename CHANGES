@@ -4,6 +4,7 @@
 Version 1.5.9
     * Added new optional "include" directive in profiles to help reduce profile repetition.
     * Fixed error message when input file not found.
+    * Fixed divide-by-zero error when video runtime < 1 minute
 
 Version 1.5.8
     * Updated yaml loader to support latest pyyaml library.

@@ -13,6 +13,7 @@ video_re2 = re.compile(r'.*Stream .+: Video: (\w+).*, (yuv\w+)[(,].* (\d+)x(\d+)
 
 
 class MediaInfo:
+    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, path, vcodec, res_width, res_height, runtime, source_size, fps, colorspace):
         self.path = path

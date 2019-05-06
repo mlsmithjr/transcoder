@@ -17,7 +17,7 @@ def filter_threshold(profile: Profile, inpath, outpath):
         pct_savings = 100 - math.floor((new_size * 100) / orig_size)
         if pct_savings < pct_threshold:
             return False
-        return True
+    return True
 
 
 def files_from_file(queuepath) -> list:
@@ -30,17 +30,15 @@ def files_from_file(queuepath) -> list:
 
 
 def get_local_os_type():
-    if platform.system() == 'Windows':
-        return 'win10'
-    elif platform.system() == 'Linux':
-        return 'linux'
-    elif platform.system() == 'Darwin':
-        return 'macos'
-    return 'unknown'
+    return {'Windows': 'win10', 'Linux': 'linux', 'Darwin': 'macos'}.get(platform.system(), 'unknown')
 
 
 def calculate_progress(info: MediaInfo, stats: Dict) -> (int, int):
-    pct_done = int((stats['time'] / info.runtime) * 100)
+    # pct done calculation only works if video duration >= 1 minute
+    if info.runtime > 0:
+        pct_done = int((stats['time'] / info.runtime) * 100)
+    else:
+        pct_done = 0
 
     # extrapolate current compression %
 

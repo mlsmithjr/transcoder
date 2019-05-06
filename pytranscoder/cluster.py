@@ -305,7 +305,7 @@ class StreamingManagedHost(ManagedHost):
                 try:
                     print('-' * 40)
                     print(f'Host     : {self.hostname} (streaming)')
-                    print('Filename : ' + crayons.green(remote_inpath))
+                    print('Filename : ' + crayons.green(os.path.basename(remote_inpath)))
                     print(f'Profile  : {job.profile_name}')
                     print('ssh      : ' + ' '.join(cli) + '\n')
                 finally:
@@ -474,7 +474,7 @@ class MountedManagedHost(ManagedHost):
                 try:
                     print('-' * 40)
                     print(f'Host     : {self.hostname} (mounted)')
-                    print('Filename : ' + crayons.green(remote_inpath))
+                    print('Filename : ' + crayons.green(os.path.basename(remote_inpath)))
                     print(f'Profile  : {_profile.name}')
                     print('ffmeg    : ' + ' '.join(cmd) + '\n')
                 finally:
@@ -601,7 +601,7 @@ class LocalHost(ManagedHost):
                 try:
                     print('-' * 40)
                     print(f'Host     : {self.hostname} (local)')
-                    print('Filename : ' + crayons.green(remote_inpath))
+                    print('Filename : ' + crayons.green(os.path.basename(remote_inpath)))
                     print(f'Profile  : {_profile.name}')
                     print('ffmpeg   : ' + ' '.join(cli) + '\n')
                 finally:

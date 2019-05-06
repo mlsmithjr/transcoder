@@ -48,8 +48,8 @@ class Rule:
                 break
             if pred == 'path':
                 try:
-                    m = re.match(value, media_info.path)
-                    if m is None:
+                    match = re.match(value, media_info.path)
+                    if match is None:
                         if verbose:
                             print(f'  >> predicate path ("{value}") did not match {media_info.path}')
                         break
@@ -70,4 +70,3 @@ class Rule:
         else:
             # didn't bail out on any predicates, have a match
             return self.profile, self.name
-
