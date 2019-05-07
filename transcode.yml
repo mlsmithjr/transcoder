@@ -77,7 +77,7 @@ profiles:
     output_options:
         - "-f matroska"
         - "-c:a copy"
-        - "-s:a copy"
+        - "-c:s copy"
 
 
   #
@@ -92,7 +92,7 @@ profiles:
         - "-crf 20"
 
   #
-  # Sample Intel QSV transcode setup, uses 'qsv' queue defined above (optional)
+  # Sample Intel QSV transcode setup, uses 'qsv' queue defined above
   #
   hevc_qsv:
     include: common
@@ -104,7 +104,7 @@ profiles:
     queue: qsv
 
   #
-  # Sample nVidia transcode setup, uses 'cuda' queue defined above (optional)
+  # Sample nVidia transcode setup, uses 'cuda' queue defined above
   #
   hevc_cuda:
       include: common
