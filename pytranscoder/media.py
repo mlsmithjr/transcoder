@@ -38,13 +38,26 @@ class MediaInfo:
                 print(f'Error: Rule "{rulename}" bad range expression: {value} ')
                 raise ValueError(value)
             rangelow, rangehigh = parts
+
+            if pred == 'runtime':
+                rangelow = str(int(rangelow) * 60)
+                rangehigh = str(int(rangehigh) * 60)
+
             expr = f'{rangelow} <= {attr} <= {rangehigh}'
         elif value.isnumeric():
             # simple numeric equality test
+
+            if pred == 'runtime':
+                value = str(int(value) * 60)
+
             expr = f'{attr} == {value}'
         elif value[0] in '<>':
             op = value[0]
             value = value[1:]
+
+            if pred == 'runtime':
+                value = str(int(value) * 60)
+
             expr = f'{attr} {op} {value}'
         else:
             print(f'Error: Rule "{rulename}" valid value: {value}')

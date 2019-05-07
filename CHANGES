@@ -1,6 +1,10 @@
 
 ### Version History
 
+Version 1.5.10
+    * Fixed broken unit tests from previous release
+    * Fixed rule predicates matching on runtime after conversion to seconds-level detail.
+
 Version 1.5.9
     * Added new optional "include" directive in profiles to help reduce profile repetition.
     * Fixed error message when input file not found.

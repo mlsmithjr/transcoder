@@ -15,8 +15,8 @@ from pytranscoder.utils import files_from_file, get_local_os_type, calculate_pro
 class TranscoderTests(unittest.TestCase):
 
     def test_progress(self):
-        info = MediaInfo(None, None, None, 1080, 90, 2300, 25, None)
-        stats = {'size': 1225360000, 'time': 50}
+        info = MediaInfo(None, None, None, 1080, 90 * 60, 2300, 25, None)
+        stats = {'size': 1225360000, 'time': 50 * 60}
         done, comp = calculate_progress(info, stats)
         self.assertEqual(done, 55, 'Expected 55% done')
         self.assertEqual(comp, 6, 'Expected 6% compression')
@@ -47,7 +47,7 @@ class TranscoderTests(unittest.TestCase):
             self.assertEqual(info.vcodec, 'h264')
             self.assertEqual(info.res_width, 1280)
             self.assertEqual(info.fps, 23)
-            self.assertEqual(info.runtime, (2 * 60) + 9)
+            self.assertEqual(info.runtime, (2 * 3600) + (9 * 60) + 38)
             self.assertEqual(info.path, '/dev/null')
             self.assertEqual(info.colorspace, 'yuv420p')
 
@@ -58,7 +58,7 @@ class TranscoderTests(unittest.TestCase):
             self.assertEqual(info.vcodec, 'h264')
             self.assertEqual(info.res_width, 1920)
             self.assertEqual(info.fps, 24)
-            self.assertEqual(info.runtime, 52)
+            self.assertEqual(info.runtime, (52 * 60) + 49)
             self.assertEqual(info.path, '/dev/null')
             self.assertEqual(info.colorspace, 'yuv420p')
 
@@ -227,7 +227,7 @@ class TranscoderTests(unittest.TestCase):
         mock_filter_threshold.return_value = True
         mock_os_rename.return_value = None
         mock_os_remove.return_value = None
-        info = MediaInfo('/dev/null', 'x264', 1920, 1080, 45, 3200, 24, None)
+        info = MediaInfo('/dev/null', 'x264', 1920, 1080, 45 * 60, 3200, 24, None)
         mock_info_parser.return_value = info
 
         #
@@ -267,7 +267,7 @@ class TranscoderTests(unittest.TestCase):
         mock_filter_threshold.return_value = True
         mock_os_rename.return_value = None
         mock_os_remove.return_value = None
-        info = MediaInfo('/dev/null', 'x264', 1920, 1080, 60, 1800, 24, None)
+        info = MediaInfo('/dev/null', 'x264', 1920, 1080, 60 * 60, 1800, 24, None)
         mock_info_parser.return_value = info
 
         #
@@ -299,7 +299,7 @@ class TranscoderTests(unittest.TestCase):
         mock_filter_threshold.return_value = True
         mock_os_rename.return_value = None
         mock_os_remove.return_value = None
-        info = MediaInfo('/dev/null', 'x264', 1920, 1080, 110, 3000, 24, None)
+        info = MediaInfo('/dev/null', 'x264', 1920, 1080, 110 * 60, 3000, 24, None)
         mock_info_parser.return_value = info
 
         #
@@ -334,7 +334,7 @@ class TranscoderTests(unittest.TestCase):
         mock_filter_threshold.return_value = True
         mock_os_rename.return_value = None
         mock_os_remove.return_value = None
-        info = MediaInfo('/dev/null', 'x264', 500, 480, 30, 420, 24, None)
+        info = MediaInfo('/dev/null', 'x264', 500, 480, 30 * 60, 420, 24, None)
         mock_info_parser.return_value = info
 
         #
