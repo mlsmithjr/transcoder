@@ -78,13 +78,13 @@ class Profile:
         audio_section = self.profile.get('audio')
         if audio_section is None:
             return []
-        return audio_section.get('excluded_languages', [])
+        return audio_section.get('exclude_languages', [])
 
     def excluded_subtitles(self) -> list:
         subtitle_section = self.profile.get('subtitle')
         if subtitle_section is None:
             return []
-        return subtitle_section.get('excluded_languages', [])
+        return subtitle_section.get('exclude_languages', [])
 
     def default_audio(self) -> Optional[str]:
         audio_section = self.profile.get('audio')

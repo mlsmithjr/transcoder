@@ -14,6 +14,7 @@ The remainder of this document focuses on using pytranscoder in local mode.
 * Concurrent mode allows you to make maximum use of your 
 nVida CUDA-enabled graphics card or Intel accelerated video (QSV)
 * Encode concurrently using CUDA and QSV at the same time.
+* Preserves all streams but allows for filtering by audio and subtitle language.
 * Configurable transcoding profiles
 * Configurable rules and criteria to auto-match a video file to a transcoding profile
 * Transcode from a list of files (queue) or all on the command line
@@ -120,7 +121,6 @@ config:
 | queues                | If using concurrency, define your queues here. The queue name is whatever you want. Each name specifies a maximum number of concurrent encoding jobs. If none defined, a default sequential queue is used. |
 | plex_server           | optional, if you want your Plex server notified after media is encoded. Use address:port format. |
 | colorize     | optional, defaults to "no". If "yes" terminal output will have some color added |
-| automap | optional, defaults to "yes". Automatically adds ffmpeg -map options to preserve all audio and subtitle tracks, not just those marked as (default). May be disabled at the profile level too. |
 
 #### profiles - Transcoding profiles (ffmpeg options)
 
@@ -131,41 +131,75 @@ to select the appropriate one for your needs. Alternatively, you can define rule
 Sample:
 ```yaml
 profiles:
+
+  # some common, reusable settings to keep things tidy
+  common:
+    output_options:
+      - "-crf 20"
+      - "-c:a copy"
+      - "-c:s copy"
+       - "-f matroska"
+    extension: '.mkv'
+    threshold: 20
+    threshold_check: 60
+
   #
   # Sample Intel QSV transcode setup (note to customize -hwaccel_device param for your environment)
   #
   hevc_qsv:
+    include: common
     input_options: -hwaccel vaapi -hwaccel_device /dev/dri/renderD129 -hwaccel_output_format vaapi
-    output_options: -vf scale_vaapi=format=p010 -c:v hevc_vaapi -crf 20 -c:a copy -c:s copy -f matroska
-    extension: '.mkv'
-    threshold: 20
-    threshold_check: 60
+    output_options: 
+      - "-vf scale_vaapi=format=p010"
+      - " -c:v hevc_vaapi"
 
   #
   # Sample nVidia transcode setup
   #
 
   hevc_cuda:                  # profile name
+      include: common
       input_options: |        # ffmpeg input options
         -hwaccel cuvid        # REQUIRED for CUDA
         -c:v h264_cuvid       # hardware decoding too
       output_options: |       # ffmpeg output options
-        -c:v hevc_nvenc       # REQUIRED for CUDA
-        -profile:v main
-        -preset medium
-        -crf 20
-        -c:a copy             # copy audio without transcoding
-        -c:s copy             # copy subtitles
-        -f matroska
-      extension: '.mkv'
+        - "-c:v hevc_nvenc"     # REQUIRED for CUDA
+        - "-profile:v main"
+        - "-preset medium"
       queue: cuda		# manage this encode in the 'cuda' queue defined globally
-      threshold: 20            # minimum file size reduction %, otherwise keep original
+      
+      # optionally you can filter out audio/subtitle tracks you don't need
+      audio:
+         exclude_languages:
+             - "chi"
+             - "spa"
+             - "fre"
+             - "ger"
+         default_language: eng
+ 
+      subtitle:
+         exclude_languages:
+             - "chi"
+             - "spa"
+             - "fre"
+             - "por"
+             - "ger"
+             - "jpn"
+         default_language: eng
 
-  # alternate style of option formatting
   x264:                            # profile name
+      include: common
       input_options: 
-      output_options: '-crf 20 -c:a copy -c:s copy -f matroska'
-      extension: '.mkv'
+      output_options:
+        - "-c:v x264"
+        
+h264_cuda_anime:
+    include: common
+    input_options:
+    output_options:
+      - "-c:v h264_nvenc"
+      - "-tune animation"
+ 
 ```
 
 | setting          | purpose |
@@ -177,7 +211,8 @@ profiles:
 | threshold        | optional. If provided this number represents a minimum percentage compression savings for the encoded media. If it does not meet this threshold the transcoded file is discarded, source file remains as-is, and the source job marked as complete. This is useful if a particular file doesn't compress much and you would rather just keep the original. |
 | threshold_check  | optional. If provided this is the percent done to start checking if the threshold is being met. Default is 100% (when media is finished). Use this to have threshold checks done earlier to stop a long-running transcode if not producing expected compression (threshold).|
 | include | optional. Include options from one or more previously defined profiles. (see section on includes). |
-| automap | optional, defaults to "yes". Automatically adds ffmpeg -map options to preserve all audio and subtitle tracks, not just those marked as (default). May be disabled at the global level too. |
+| audio | Audio track handling options. Include a list of **exclude_languages** to automatically remove tracks. If any track being removed is a _default_, a new default will be set based on the **default_language**. |
+| subtitle | See _audio_ above. |
 
 > CPU Note: When transcoding from h264 on an Intel I5/I7 6th+ gen chip, _ffmpeg_ will use detected extensions to basically perform hardware decoding for you. So if you configured hardware encoding you'll see low CPU use. On AMD there is no chip assistance on decoding.  So even if hardware encoding, the decoding process will load down your CPU. To fix this simply enable hardware decoding as an **input option**.
 
@@ -214,6 +249,13 @@ Samples:
       source_size: '<600'       # video file is less than 600mb
       runtime: '<40'          	# ..and total runtime < 40 minutes
 
+  'anime to h264 using tuning':
+    profile: h264_cuda_anime
+    criteria:
+      source_size: '>2500'   # larger than 2.5g
+      vcodec: '!hevc'            # not encoded with hevc 
+      path: '/media/anime/.*'  # in a anime folder (regex)
+ 
   'half-hour videos':
     profile: 'x264'             # use profile called "x264"
     criteria:

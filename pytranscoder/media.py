@@ -49,7 +49,7 @@ class MediaInfo:
             mapped.append(s)
             seq = s['stream']
             seq_list.append('-map')
-            seq_list.append(f'0.{seq}')
+            seq_list.append(f'0:{seq}')
 
         if default_reassign:
             if defl is None:
@@ -67,9 +67,15 @@ class MediaInfo:
             excl_audio = []
         if excl_subtitle is None:
             excl_subtitle = []
+        #
+        # if no exclusions just map everything
+        #
+        if len(excl_audio) == 0 and len(excl_subtitle) == 0:
+            return ['-map', '0']
+
         seq_list = list()
         seq_list.append('-map')
-        seq_list.append(f'0.{self.stream}')
+        seq_list.append(f'0:{self.stream}')
         audio_streams = self._map_streams("a", self.audio, excl_audio, defl_audio)
         subtitle_streams = self._map_streams("s", self.subtitle, excl_subtitle, defl_subtitle)
         return seq_list + audio_streams + subtitle_streams
