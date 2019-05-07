@@ -35,8 +35,20 @@ class TranscoderTests(unittest.TestCase):
     def test_stream_map(self):
         with open('tests/ffmpeg3.out', 'r') as ff:
             info = MediaInfo.parse_details('/dev/null', ff.read())
-            streams = info.ffmpeg_streams()
+            streams = info.ffmpeg_streams([], None, [], None)
             self.assertEqual(len(streams), 14, 'expected 7 streams (14 elements)')
+
+    def test_stream_exclude(self):
+        with open('tests/ffmpeg3.out', 'r') as ff:
+            info = MediaInfo.parse_details('/dev/null', ff.read())
+            streams = info.ffmpeg_streams([], None, ['spa'], 'eng')
+            self.assertEqual(len(streams), 12, 'expected 6 streams (12 elements)')
+
+    def test_stream_reassign_default(self):
+        with open('tests/ffmpeg4.out', 'r') as ff:
+            info = MediaInfo.parse_details('/dev/null', ff.read())
+            streams = info.ffmpeg_streams(['eng'], 'chi', [], None)
+            self.assertEqual(len(streams), 8, 'expected 4 streams (8 elements)')
 
     def test_progress(self):
         info = TranscoderTests.make_media(None, None, None, 1080, 90 * 60, 2300, 25, None, [], [])

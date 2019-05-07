@@ -1,0 +1,55 @@
+ffprobe version 3.4.6-0ubuntu0.18.04.1 Copyright (c) 2007-2019 the FFmpeg developers
+  built with gcc 7 (Ubuntu 7.3.0-16ubuntu3)
+  configuration: --prefix=/usr --extra-version=0ubuntu0.18.04.1 --toolchain=hardened --libdir=/usr/lib/x86_64-linux-gnu --incdir=/usr/include/x86_64-linux-gnu --enable-gpl --disable-stripping --enable-avresample --enable-avisynth --enable-gnutls --enable-ladspa --enable-libass --enable-libbluray --enable-libbs2b --enable-libcaca --enable-libcdio --enable-libflite --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libgme --enable-libgsm --enable-libmp3lame --enable-libmysofa --enable-libopenjpeg --enable-libopenmpt --enable-libopus --enable-libpulse --enable-librubberband --enable-librsvg --enable-libshine --enable-libsnappy --enable-libsoxr --enable-libspeex --enable-libssh --enable-libtheora --enable-libtwolame --enable-libvorbis --enable-libvpx --enable-libwavpack --enable-libwebp --enable-libx265 --enable-libxml2 --enable-libxvid --enable-libzmq --enable-libzvbi --enable-omx --enable-openal --enable-opengl --enable-sdl2 --enable-libdc1394 --enable-libdrm --enable-libiec61883 --enable-chromaprint --enable-frei0r --enable-libopencv --enable-libx264 --enable-shared
+  libavutil      55. 78.100 / 55. 78.100
+  libavcodec     57.107.100 / 57.107.100
+  libavformat    57. 83.100 / 57. 83.100
+  libavdevice    57. 10.100 / 57. 10.100
+  libavfilter     6.107.100 /  6.107.100
+  libavresample   3.  7.  0 /  3.  7.  0
+  libswscale      4.  8.100 /  4.  8.100
+  libswresample   2.  9.100 /  2.  9.100
+  libpostproc    54.  7.100 / 54.  7.100
+Input #0, matroska,webm, from '/downloads/mmm.nnn.ooo.ppp.mkv':
+  Metadata:
+    creation_time   : 2019-05-07T01:43:53.000000Z
+    ENCODER         : Lavf58.20.100
+  Duration: 02:05:28.71, start: 0.000000, bitrate: 3647 kb/s
+    Stream #0:0: Video: h264 (High), yuv420p(tv, bt709, progressive), 1920x750 [SAR 1:1 DAR 64:25], 24 fps, 24 tbr, 1k tbn, 180k tbc (default)
+    Metadata:
+      BPS-eng         : 2877420
+      DURATION-eng    : 02:05:28.625000000
+      NUMBER_OF_FRAMES-eng: 180687
+      NUMBER_OF_BYTES-eng: 2707877307
+      _STATISTICS_WRITING_APP-eng: mkvmerge v33.1.0 ('Primrose') 64-bit
+      _STATISTICS_WRITING_DATE_UTC-eng: 2019-05-07 01:43:53
+      _STATISTICS_TAGS-eng: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES
+    Stream #0:1(chi): Audio: ac3, 48000 Hz, 5.1(side), fltp, 384 kb/s
+    Metadata:
+      title           : Surround
+      BPS-eng         : 384000
+      DURATION-eng    : 02:05:28.672000000
+      NUMBER_OF_FRAMES-eng: 235271
+      NUMBER_OF_BYTES-eng: 361376256
+      _STATISTICS_WRITING_APP-eng: mkvmerge v33.1.0 ('Primrose') 64-bit
+      _STATISTICS_WRITING_DATE_UTC-eng: 2019-05-07 01:43:53
+      _STATISTICS_TAGS-eng: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES
+    Stream #0:2(eng): Audio: ac3, 48000 Hz, 5.1(side), fltp, 384 kb/s (default)
+    Metadata:
+      title           : Surround
+      BPS-eng         : 384000
+      DURATION-eng    : 02:05:28.640000000
+      NUMBER_OF_FRAMES-eng: 235270
+      NUMBER_OF_BYTES-eng: 361374720
+      _STATISTICS_WRITING_APP-eng: mkvmerge v33.1.0 ('Primrose') 64-bit
+      _STATISTICS_WRITING_DATE_UTC-eng: 2019-05-07 01:43:53
+      _STATISTICS_TAGS-eng: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES
+    Stream #0:3: Subtitle: ass
+    Metadata:
+      BPS-eng         : 135
+      DURATION-eng    : 02:00:02.083000000
+      NUMBER_OF_FRAMES-eng: 2245
+      NUMBER_OF_BYTES-eng: 121742
+      _STATISTICS_WRITING_APP-eng: mkvmerge v33.1.0 ('Primrose') 64-bit
+      _STATISTICS_WRITING_DATE_UTC-eng: 2019-05-07 01:43:53
+      _STATISTICS_TAGS-eng: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES

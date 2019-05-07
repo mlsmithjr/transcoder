@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 
 class Profile:
@@ -24,10 +24,6 @@ class Profile:
                 return Profile.level_options(self.profile['input_options'])
             return self.profile['input_options'].split()
         return []
-
-    @property
-    def automap(self) -> bool:
-        return self.profile.get('automap', 'yes').tolower() == 'yes'
 
     @property
     def output_options(self) -> [str]:
@@ -77,3 +73,27 @@ class Profile:
                 p[k] = v
 
         self.profile = p
+
+    def excluded_audio(self) -> list:
+        audio_section = self.profile.get('audio')
+        if audio_section is None:
+            return []
+        return audio_section.get('excluded_languages', [])
+
+    def excluded_subtitles(self) -> list:
+        subtitle_section = self.profile.get('subtitle')
+        if subtitle_section is None:
+            return []
+        return subtitle_section.get('excluded_languages', [])
+
+    def default_audio(self) -> Optional[str]:
+        audio_section = self.profile.get('audio')
+        if audio_section is None:
+            return None
+        return audio_section.get('default_language', [])
+
+    def default_subtitle(self) -> Optional[str]:
+        subtitle_section = self.profile.get('subtitle')
+        if subtitle_section is None:
+            return None
+        return subtitle_section.get('default_language', [])

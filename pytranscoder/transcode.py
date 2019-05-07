@@ -76,8 +76,15 @@ class QueueThread(Thread):
 
                 outpath = job.inpath.with_suffix(job.profile.extension + '.tmp')
 
-                if job.info.is_multistream() and self.config.automap and job.profile.automap:
-                    ooutput = ooutput + job.info.ffmpeg_streams()
+                #
+                # check if we need to exclude any streams
+                #
+                if job.info.is_multistream():
+                    ooutput = ooutput + job.info.ffmpeg_streams(job.profile.excluded_audio(),
+                                                                job.profile.default_audio(),
+                                                                job.profile.excluded_subtitles(),
+                                                                job.profile.default_subtitle())
+
                 cli = ['-y', *oinput, '-i', str(job.inpath), *ooutput, str(outpath)]
 
                 #
