@@ -120,6 +120,7 @@ config:
 | queues                | If using concurrency, define your queues here. The queue name is whatever you want. Each name specifies a maximum number of concurrent encoding jobs. If none defined, a default sequential queue is used. |
 | plex_server           | optional, if you want your Plex server notified after media is encoded. Use address:port format. |
 | colorize     | optional, defaults to "no". If "yes" terminal output will have some color added |
+| automap | optional, defaults to "yes". Automatically adds ffmpeg -map options to preserve all audio and subtitle tracks, not just those marked as (default). May be disabled at the profile level too. |
 
 #### profiles - Transcoding profiles (ffmpeg options)
 
@@ -176,6 +177,7 @@ profiles:
 | threshold        | optional. If provided this number represents a minimum percentage compression savings for the encoded media. If it does not meet this threshold the transcoded file is discarded, source file remains as-is, and the source job marked as complete. This is useful if a particular file doesn't compress much and you would rather just keep the original. |
 | threshold_check  | optional. If provided this is the percent done to start checking if the threshold is being met. Default is 100% (when media is finished). Use this to have threshold checks done earlier to stop a long-running transcode if not producing expected compression (threshold).|
 | include | optional. Include options from one or more previously defined profiles. (see section on includes). |
+| automap | optional, defaults to "yes". Automatically adds ffmpeg -map options to preserve all audio and subtitle tracks, not just those marked as (default). May be disabled at the global level too. |
 
 > CPU Note: When transcoding from h264 on an Intel I5/I7 6th+ gen chip, _ffmpeg_ will use detected extensions to basically perform hardware decoding for you. So if you configured hardware encoding you'll see low CPU use. On AMD there is no chip assistance on decoding.  So even if hardware encoding, the decoding process will load down your CPU. To fix this simply enable hardware decoding as an **input option**.
 
@@ -411,7 +413,7 @@ To run in cluster mode (see Cluster documentation):
 ```
 
 #### Using includes
-This feature requires a deeper familiarity with the YAML format. Essentially, you can define a partial profile or a full one and later "include" it into another profile. This facilitates reuse of definitions an simpler profiles.
+This feature requires a deeper familiarity with the YAML format. Essentially, you can define a partial profile or a full one and later "include" it into another profile. This facilitates reuse of definitions and simpler profiles.
 
 ```yaml
 #

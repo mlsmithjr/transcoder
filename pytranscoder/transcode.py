@@ -3,7 +3,7 @@ import glob
 import os
 import sys
 from pathlib import Path
-from typing import Dict, Set, List
+from typing import Set, List, Optional
 
 from queue import Queue
 from threading import Thread, Lock
@@ -24,9 +24,6 @@ DEFAULT_CONFIG = os.path.expanduser('~/.transcode.yml')
 
 class LocalJob:
     """One file with matched profile to be encoded"""
-    inpath: Path
-    profile: Profile
-    info: MediaInfo
 
     def __init__(self, inpath: str, profile: Profile, info: MediaInfo):
         self.inpath = Path(os.path.abspath(inpath))
@@ -36,10 +33,6 @@ class LocalJob:
 
 class QueueThread(Thread):
     """One transcoding thread associated to a queue"""
-
-    queue: Queue
-    config: ConfigFile
-    _manager = None
 
     def __init__(self, queuename, queue: Queue, configfile: ConfigFile, manager):
         """
@@ -83,6 +76,8 @@ class QueueThread(Thread):
 
                 outpath = job.inpath.with_suffix(job.profile.extension + '.tmp')
 
+                if job.info.is_multistream() and self.config.automap and job.profile.automap:
+                    ooutput = ooutput + job.info.ffmpeg_streams()
                 cli = ['-y', *oinput, '-i', str(job.inpath), *ooutput, str(outpath)]
 
                 #
@@ -145,10 +140,7 @@ class QueueThread(Thread):
 class LocalHost:
     """Encapsulates functionality for local encoding"""
 
-    config:     Dict
-    configfile: ConfigFile
-    queues:     Dict[str, Queue]
-    lock:       Lock
+    lock:       Lock = Lock()
     complete:   Set[Path] = set()            # list of completed files, shared across threads
 
     def __init__(self, configfile: ConfigFile):
@@ -167,7 +159,6 @@ class LocalHost:
         #
         # all files are listed in the queues so start the threads
         #
-        self.lock = Lock()
         jobs = list()
         for name, queue in self.queues.items():
 
@@ -218,7 +209,7 @@ class LocalHost:
             if media_info is None:
                 print(crayons.red(f'File not found: {path}'))
                 continue
-            if media_info.vcodec is not None:
+            if media_info.valid:
 
                 if forced_profile is None:
                     rule = self.configfile.match_rule(media_info)
@@ -321,7 +312,7 @@ def start():
     profile = None
     queue_path = None
     cluster = None
-    configfile: ConfigFile = None
+    configfile: Optional[ConfigFile] = None
     host_override = None
     if len(sys.argv) > 1:
         files = []

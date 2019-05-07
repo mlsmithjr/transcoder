@@ -294,6 +294,9 @@ class StreamingManagedHost(ManagedHost):
                 ooutput = _profile.output_options
 #                quiet = ['-nostats', '-hide_banner']
 
+                if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
+                    ooutput = ooutput + job.media_info.ffmpeg_streams()
+
                 cmd = ['-y', *oinput, '-i', self.converted_path(remote_inpath),
                        *ooutput, self.converted_path(remote_outpath)]
                 cli = [*ssh_cmd, *cmd]
@@ -465,6 +468,8 @@ class MountedManagedHost(ManagedHost):
                 remote_inpath = self.converted_path(remote_inpath)
                 remote_outpath = self.converted_path(remote_outpath)
 
+                if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
+                    ooutput = ooutput + job.media_info.ffmpeg_streams()
                 cmd = ['-y', *oinput, '-i', f'"{remote_inpath}"', *ooutput, f'"{remote_outpath}"']
 
                 #
@@ -592,6 +597,8 @@ class LocalHost(ManagedHost):
                 remote_inpath = self.converted_path(inpath)
                 remote_outpath = self.converted_path(outpath)
 
+                if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
+                    ooutput = ooutput + job.media_info.ffmpeg_streams()
                 cli = ['-y', *oinput, '-i', remote_inpath, *ooutput, remote_outpath]
 
                 #
@@ -751,7 +758,7 @@ class Cluster(Thread):
         if media_info is None:
             print(crayons.red(f'File not found: {path}'))
             return None, None
-        if media_info.vcodec is not None:
+        if media_info.valid:
 
             if profile_name is None:
                 #

@@ -44,6 +44,10 @@ class ConfigFile:
             else:
                 self.queues = dict()
 
+    @property
+    def automap(self) -> bool:
+        return self.settings.get('automap', 'yes').lower() == 'yes'
+
     def colorize(self) -> bool:
         return self.settings.get('colorize', 'no').lower() == 'yes'
 

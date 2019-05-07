@@ -26,6 +26,10 @@ class Profile:
         return []
 
     @property
+    def automap(self) -> bool:
+        return self.profile.get('automap', 'yes').tolower() == 'yes'
+
+    @property
     def output_options(self) -> [str]:
         if isinstance(self.profile['output_options'], List):
             return Profile.level_options(self.profile['output_options'])
