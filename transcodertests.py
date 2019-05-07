@@ -36,7 +36,7 @@ class TranscoderTests(unittest.TestCase):
         with open('tests/ffmpeg3.out', 'r') as ff:
             info = MediaInfo.parse_details('/dev/null', ff.read())
             streams = info.ffmpeg_streams([], None, [], None)
-            self.assertEqual(len(streams), 14, 'expected 7 streams (14 elements)')
+            self.assertEqual(len(streams), 2, 'expected -map 0')
 
     def test_stream_exclude(self):
         with open('tests/ffmpeg3.out', 'r') as ff:
