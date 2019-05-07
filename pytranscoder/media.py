@@ -8,8 +8,9 @@ from pytranscoder.profile import Profile
 
 #video_re = re.compile(r'^.*Duration: (\d+):(\d+):.* Stream .*: Video: (\w+).*, (\w+)[(,].* (\d+)x(\d+).* (\d+)(\.\d.)? fps,.*$',
 #                      re.DOTALL)
-video_re1 = re.compile(r".*Duration: (\d+):(\d+):(\d+)", re.DOTALL)
-video_re2 = re.compile(r'.*Stream .+: Video: (\w+).*, (yuv\w+)[(,].* (\d+)x(\d+).* (\d+)(\.\d.)? fps', re.DOTALL)
+video_dur = re.compile(r".*Duration: (\d+):(\d+):(\d+)", re.DOTALL)
+video_info = re.compile(r'.*Stream .+: Video: (\w+).*, (yuv\w+)[(,].* (\d+)x(\d+).* (\d+)(\.\d.)? fps', re.DOTALL)
+audio_info = re.compile(r'.*Stream #0:(?P<id>\d+)(\((?P<lang>\w+)\))?: Audio: (?P<format>\w+)')
 
 
 class MediaInfo:
@@ -71,14 +72,17 @@ class MediaInfo:
 
     @staticmethod
     def parse_details(_path, output):
-        match1 = video_re1.match(output)
+        match1 = video_dur.match(output)
         if match1 is None or len(match1.groups()) < 3:
             print(f'>>>> regex match on video stream data failed: ffmpeg -i {_path}')
             return MediaInfo(_path, None, 0, 0, 0, 0, 0, None)
-        match2 = video_re2.match(output)
+        match2 = video_info.match(output)
         if match2 is None or len(match2.groups()) < 4:
             print(f'>>>> regex match on video stream data failed: ffmpeg -i {_path}')
             return MediaInfo(_path, None, 0, 0, 0, 0, 0, None)
+
+        for match3 in audio_info.finditer(output):
+            info = match3.groupdict()
 
         _dur_hrs, _dur_mins, _dur_secs = match1.group(1, 2, 3)
         _codec, _colorspace, _res_width, _res_height, fps = match2.group(1, 2, 3, 4, 5)

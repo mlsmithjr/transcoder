@@ -62,6 +62,17 @@ class TranscoderTests(unittest.TestCase):
             self.assertEqual(info.path, '/dev/null')
             self.assertEqual(info.colorspace, 'yuv420p')
 
+    def test_mediainfo3(self):
+        with open('tests/ffmpeg3.out', 'r') as ff:
+            info = MediaInfo.parse_details('/dev/null', ff.read())
+            self.assertIsNotNone(info)
+            self.assertEqual(info.vcodec, 'hevc')
+            self.assertEqual(info.res_width, 3840)
+            self.assertEqual(info.fps, 23)
+            self.assertEqual(info.runtime, (2 * 3600) + (5 * 60) + 53)
+            self.assertEqual(info.path, '/dev/null')
+            self.assertEqual(info.colorspace, 'yuv420p10le')
+
     def test_default_profile(self):
         info = MediaInfo(None, None, None, 720, 45, 3000, 25, None)
         config = ConfigFile(self.get_setup())

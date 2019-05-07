@@ -1,0 +1,145 @@
+ffmpeg version 3.4.6-0ubuntu0.18.04.1 Copyright (c) 2000-2019 the FFmpeg developers
+  built with gcc 7 (Ubuntu 7.3.0-16ubuntu3)
+  configuration: --prefix=/usr --extra-version=0ubuntu0.18.04.1 --toolchain=hardened --libdir=/usr/lib/x86_64-linux-gnu --incdir=/usr/include/x86_64-linux-gnu --enable-gpl --disable-stripping --enable-avresample --enable-avisynth --enable-gnutls --enable-ladspa --enable-libass --enable-libbluray --enable-libbs2b --enable-libcaca --enable-libcdio --enable-libflite --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libgme --enable-libgsm --enable-libmp3lame --enable-libmysofa --enable-libopenjpeg --enable-libopenmpt --enable-libopus --enable-libpulse --enable-librubberband --enable-librsvg --enable-libshine --enable-libsnappy --enable-libsoxr --enable-libspeex --enable-libssh --enable-libtheora --enable-libtwolame --enable-libvorbis --enable-libvpx --enable-libwavpack --enable-libwebp --enable-libx265 --enable-libxml2 --enable-libxvid --enable-libzmq --enable-libzvbi --enable-omx --enable-openal --enable-opengl --enable-sdl2 --enable-libdc1394 --enable-libdrm --enable-libiec61883 --enable-chromaprint --enable-frei0r --enable-libopencv --enable-libx264 --enable-shared
+  libavutil      55. 78.100 / 55. 78.100
+  libavcodec     57.107.100 / 57.107.100
+  libavformat    57. 83.100 / 57. 83.100
+  libavdevice    57. 10.100 / 57. 10.100
+  libavfilter     6.107.100 /  6.107.100
+  libavresample   3.  7.  0 /  3.  7.  0
+  libswscale      4.  8.100 /  4.  8.100
+  libswresample   2.  9.100 /  2.  9.100
+  libpostproc    54.  7.100 / 54.  7.100
+[matroska,webm @ 0x55d20d78b820] Could not find codec parameters for stream 3 (Subtitle: hdmv_pgs_subtitle (pgssub)): unspecified size
+Consider increasing the value for the 'analyzeduration' and 'probesize' options
+[matroska,webm @ 0x55d20d78b820] Could not find codec parameters for stream 4 (Subtitle: hdmv_pgs_subtitle (pgssub)): unspecified size
+Consider increasing the value for the 'analyzeduration' and 'probesize' options
+[matroska,webm @ 0x55d20d78b820] Could not find codec parameters for stream 5 (Subtitle: hdmv_pgs_subtitle (pgssub)): unspecified size
+Consider increasing the value for the 'analyzeduration' and 'probesize' options
+[matroska,webm @ 0x55d20d78b820] Could not find codec parameters for stream 6 (Subtitle: hdmv_pgs_subtitle (pgssub)): unspecified size
+Consider increasing the value for the 'analyzeduration' and 'probesize' options
+Input #0, matroska,webm, from '/volume2/Video/4k/aaa.bbb.ccc.ddd.eee.fff.mkv':
+  Metadata:
+    title           : aaa.bbb.ccc.ddd.eee
+    encoder         : libebml v1.3.5 + libmatroska v1.4.8
+    creation_time   : 2017-10-25T01:37:57.000000Z
+  Duration: 02:05:53.57, start: 0.000000, bitrate: 57716 kb/s
+    Stream #0:0: Video: hevc (Main 10), yuv420p10le(tv, bt2020nc/bt2020/smpte2084), 3840x2160 [SAR 1:1 DAR 16:9], 23.98 fps, 23.98 tbr, 1k tbn, 23.98 tbc (default)
+    Metadata:
+      BPS             : 51226126
+      BPS-eng         : 51226126
+      DURATION        : 02:05:53.546000000
+      DURATION-eng    : 02:05:53.546000000
+      NUMBER_OF_FRAMES: 181104
+      NUMBER_OF_FRAMES-eng: 181104
+      NUMBER_OF_BYTES : 48367363200
+      NUMBER_OF_BYTES-eng: 48367363200
+      _STATISTICS_WRITING_APP: mkvmerge v17.0.0 ('Be Ur Friend') 64-bit
+      _STATISTICS_WRITING_APP-eng: mkvmerge v17.0.0 ('Be Ur Friend') 64-bit
+      _STATISTICS_WRITING_DATE_UTC: 2017-10-25 01:37:57
+      _STATISTICS_WRITING_DATE_UTC-eng: 2017-10-25 01:37:57
+      _STATISTICS_TAGS: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES
+      _STATISTICS_TAGS-eng: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES
+    Stream #0:1(eng): Audio: truehd, 48000 Hz, 7.1, s32 (24 bit) (default)
+    Metadata:
+      title           : TrueHD Atmos 7.1
+      BPS             : 5665701
+      BPS-eng         : 5665701
+      DURATION        : 02:05:53.547000000
+      DURATION-eng    : 02:05:53.547000000
+      NUMBER_OF_FRAMES: 9064256
+      NUMBER_OF_FRAMES-eng: 9064256
+      NUMBER_OF_BYTES : 5349518238
+      NUMBER_OF_BYTES-eng: 5349518238
+      _STATISTICS_WRITING_APP: mkvmerge v17.0.0 ('Be Ur Friend') 64-bit
+      _STATISTICS_WRITING_APP-eng: mkvmerge v17.0.0 ('Be Ur Friend') 64-bit
+      _STATISTICS_WRITING_DATE_UTC: 2017-10-25 01:37:57
+      _STATISTICS_WRITING_DATE_UTC-eng: 2017-10-25 01:37:57
+      _STATISTICS_TAGS: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES
+      _STATISTICS_TAGS-eng: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES
+    Stream #0:2: Audio: ac3, 48000 Hz, 5.1(side), fltp, 640 kb/s
+    Metadata:
+      title           : AC3 5.1
+      BPS             : 640000
+      BPS-eng         : 640000
+      DURATION        : 02:05:53.568000000
+      DURATION-eng    : 02:05:53.568000000
+      NUMBER_OF_FRAMES: 236049
+      NUMBER_OF_FRAMES-eng: 236049
+      NUMBER_OF_BYTES : 604285440
+      NUMBER_OF_BYTES-eng: 604285440
+      _STATISTICS_WRITING_APP: mkvmerge v17.0.0 ('Be Ur Friend') 64-bit
+      _STATISTICS_WRITING_APP-eng: mkvmerge v17.0.0 ('Be Ur Friend') 64-bit
+      _STATISTICS_WRITING_DATE_UTC: 2017-10-25 01:37:57
+      _STATISTICS_WRITING_DATE_UTC-eng: 2017-10-25 01:37:57
+      _STATISTICS_TAGS: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES
+      _STATISTICS_TAGS-eng: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES
+    Stream #0:3(eng): Subtitle: hdmv_pgs_subtitle
+    Metadata:
+      title           : English
+      BPS             : 32257
+      BPS-eng         : 32257
+      DURATION        : 01:58:25.056000000
+      DURATION-eng    : 01:58:25.056000000
+      NUMBER_OF_FRAMES: 2943
+      NUMBER_OF_FRAMES-eng: 2943
+      NUMBER_OF_BYTES : 28648500
+      NUMBER_OF_BYTES-eng: 28648500
+      _STATISTICS_WRITING_APP: mkvmerge v17.0.0 ('Be Ur Friend') 64-bit
+      _STATISTICS_WRITING_APP-eng: mkvmerge v17.0.0 ('Be Ur Friend') 64-bit
+      _STATISTICS_WRITING_DATE_UTC: 2017-10-25 01:37:57
+      _STATISTICS_WRITING_DATE_UTC-eng: 2017-10-25 01:37:57
+      _STATISTICS_TAGS: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES
+      _STATISTICS_TAGS-eng: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES
+    Stream #0:4: Subtitle: hdmv_pgs_subtitle
+    Metadata:
+      title           : English (SDH)
+      BPS             : 36368
+      BPS-eng         : 36368
+      DURATION        : 02:05:23.683000000
+      DURATION-eng    : 02:05:23.683000000
+      NUMBER_OF_FRAMES: 3661
+      NUMBER_OF_FRAMES-eng: 3661
+      NUMBER_OF_BYTES : 34202813
+      NUMBER_OF_BYTES-eng: 34202813
+      _STATISTICS_WRITING_APP: mkvmerge v17.0.0 ('Be Ur Friend') 64-bit
+      _STATISTICS_WRITING_APP-eng: mkvmerge v17.0.0 ('Be Ur Friend') 64-bit
+      _STATISTICS_WRITING_DATE_UTC: 2017-10-25 01:37:57
+      _STATISTICS_WRITING_DATE_UTC-eng: 2017-10-25 01:37:57
+      _STATISTICS_TAGS: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES
+      _STATISTICS_TAGS-eng: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES
+    Stream #0:5(fre): Subtitle: hdmv_pgs_subtitle
+    Metadata:
+      title           : French
+      BPS             : 21238
+      BPS-eng         : 21238
+      DURATION        : 02:02:30.927000000
+      DURATION-eng    : 02:02:30.927000000
+      NUMBER_OF_FRAMES: 2422
+      NUMBER_OF_FRAMES-eng: 2422
+      NUMBER_OF_BYTES : 19515700
+      NUMBER_OF_BYTES-eng: 19515700
+      _STATISTICS_WRITING_APP: mkvmerge v17.0.0 ('Be Ur Friend') 64-bit
+      _STATISTICS_WRITING_APP-eng: mkvmerge v17.0.0 ('Be Ur Friend') 64-bit
+      _STATISTICS_WRITING_DATE_UTC: 2017-10-25 01:37:57
+      _STATISTICS_WRITING_DATE_UTC-eng: 2017-10-25 01:37:57
+      _STATISTICS_TAGS: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES
+      _STATISTICS_TAGS-eng: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES
+    Stream #0:6(spa): Subtitle: hdmv_pgs_subtitle
+    Metadata:
+      title           : Spanish (Latin American)
+      BPS             : 28795
+      BPS-eng         : 28795
+      DURATION        : 01:59:58.066000000
+      DURATION-eng    : 01:59:58.066000000
+      NUMBER_OF_FRAMES: 2862
+      NUMBER_OF_FRAMES-eng: 2862
+      NUMBER_OF_BYTES : 25908699
+      NUMBER_OF_BYTES-eng: 25908699
+      _STATISTICS_WRITING_APP: mkvmerge v17.0.0 ('Be Ur Friend') 64-bit
+      _STATISTICS_WRITING_APP-eng: mkvmerge v17.0.0 ('Be Ur Friend') 64-bit
+      _STATISTICS_WRITING_DATE_UTC: 2017-10-25 01:37:57
+      _STATISTICS_WRITING_DATE_UTC-eng: 2017-10-25 01:37:57
+      _STATISTICS_TAGS: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES
+      _STATISTICS_TAGS-eng: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES
+At least one output file must be specified
