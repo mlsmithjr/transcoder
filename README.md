@@ -2,10 +2,10 @@
 
 Python wrapper for ffmpeg for batch, concurrent, or clustered transcoding
 
-This script is intended to help automate transcoding for people running a media server or encoding lots of video.
+This script is intended to help automate transcoding for people encoding lots of video.
 It is more than a wrapper - it is a workflow and job manager.
 
-There are 2 modes: local and clustered.  Local mode is the most common usage and is for running this script on the same machine where it is installed.  Cluster mode turns pytranscoder into a remote encoding manager.  In this mode it does no transcoding on the local machine but instead delegates and manages encode jobs running on other hosts.  This requires more advanced configuration and is documented separately in [Cluster.md](https://github.com/mlsmithjr/transcoder/blob/master/Cluster.md)
+There are 2 modes: **local** and **clustered**.  Local mode is the most common usage and is for running this script on the same machine where it is installed.  Cluster mode turns pytranscoder into a remote encoding manager.  In this mode it delegates and manages encode jobs running on multiple hosts.  This requires more advanced configuration and is documented separately in [Cluster.md](https://github.com/mlsmithjr/transcoder/blob/master/Cluster.md)
 
 The remainder of this document focuses on using pytranscoder in local mode.
 
@@ -13,7 +13,6 @@ The remainder of this document focuses on using pytranscoder in local mode.
 * Sequential or concurrent transcoding. 
 * Concurrent mode allows you to make maximum use of your 
 nVida CUDA-enabled graphics card or Intel accelerated video (QSV)
-* Encode concurrently using CUDA and QSV at the same time.
 * Preserves all streams but allows for filtering by audio and subtitle language.
 * Configurable transcoding profiles
 * Configurable rules and criteria to auto-match a video file to a transcoding profile
@@ -149,7 +148,7 @@ profiles:
   hevc_qsv:
     include: common
     input_options: -hwaccel vaapi -hwaccel_device /dev/dri/renderD129 -hwaccel_output_format vaapi
-    output_options: 
+    output_options: 				# in addition to those included from 'common'
       - "-vf scale_vaapi=format=p010"
       - " -c:v hevc_vaapi"
 
@@ -162,7 +161,7 @@ profiles:
       input_options: |        # ffmpeg input options
         -hwaccel cuvid        # REQUIRED for CUDA
         -c:v h264_cuvid       # hardware decoding too
-      output_options: |       # ffmpeg output options
+      output_options:         # in addition to included from 'common'
         - "-c:v hevc_nvenc"     # REQUIRED for CUDA
         - "-profile:v main"
         - "-preset medium"
