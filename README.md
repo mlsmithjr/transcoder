@@ -234,7 +234,7 @@ Samples:
       profile: hevc_hd_25fps    # profile to use if the criterial below match
       criteria:
         runtime:      '<180'    # less than 3 hours long
-        source_size:  '>5000'   # ..and media file larger than 5 gigabytes
+        filesize_mb:  '>5000'   # ..and media file larger than 5 gigabytes
         fps: '>25'              # ..and framerate > 25
 
   'already best codec':
@@ -245,7 +245,7 @@ Samples:
   'skip files that are not appropriate for hevc':
     profile: 'SKIP'
     criteria:
-      source_size: '<600'       # video file is less than 600mb
+      filesize_mb: '<600'       # video file is less than 600mb
       runtime: '<40'          	# ..and total runtime < 40 minutes
 
   'anime to h264 using tuning':

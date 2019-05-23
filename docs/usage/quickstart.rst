@@ -2,6 +2,13 @@
 Quick Start
 ===============
 
+For simple commandline help
+
+.. code-block:: bash
+
+    pytranscoder -h
+
+
 To get started right away without wading through the volumes of documentation, start with this configuration:
 
 .. code-block:: yaml
@@ -81,7 +88,7 @@ To get started right away without wading through the volumes of documentation, s
                 vcodec: '!hevc'
 
 
-Copy this file and save as $HOME/.transcoder.yml, the default location pytranscoder will look for its configuration.
+Copy this file and save as **$HOME/.transcode.yml**, the default location pytranscoder will look for its configuration.
 Pick a video file to test with. Let's refer to it as "myvideo.mp4".
 
 .. code-block:: bash
@@ -119,7 +126,7 @@ Use the **--dry-run** flag whenever you change your configuration to test that t
 **Speed** is how fast your machine is encoding video, **comp** is the compression percentage, and **done** how much has been processed.
 Your original myvideo.mkv will be replaced with a new version.
 
-.. note::
+.. tip::
     Should you wish to do test encodes without destroying the original, use the **-k** (keep) flag. The encode job will leave behind *myvideo.mkv.tmp*, for example.
 
 Now you are ready to tweak your configuration with profiles and rules to suit your needs.

@@ -27,6 +27,8 @@ Features
    usage/installation
    usage/quickstart
    usage/configuration
+   usage/concurrency
+   usage/cluster
 
 Indices and tables
 
@@ -35,5 +37,4 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-
 
