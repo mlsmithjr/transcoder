@@ -175,7 +175,8 @@ class ManagedHost(Thread):
     def log(self, *args):
         self.lock.acquire()
         try:
-            msg = crayons.blue(f'[{self._manager.name}]') + crayons.white(f'({self.hostname}): ')
+            #msg = crayons.blue(f'[{self._manager.name}]') + crayons.white(f'({self.hostname}): ')
+            msg = crayons.blue(f'({self.hostname}): ')
             print(msg, *args)
             sys.stdout.flush()
         finally:

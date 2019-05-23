@@ -1,6 +1,11 @@
 
 ### Version History
 
+Version 1.5.12
+    * Merging of input_options and output_options supported at the option level. For example, if the included
+      profiles has "-c:a copy" and the including profile has "-c:a libmp3lame", the including profile option will
+      take precedence.
+
 Version 1.5.11
     * Default behavior is to now auto-map all audio and subtitle streams during transcode.
         May be disabled at the global or profile level with  automap: no

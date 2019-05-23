@@ -12,7 +12,7 @@ The remainder of this document focuses on using pytranscoder in local mode.
 #### Features:
 * Sequential or concurrent transcoding. 
 * Concurrent mode allows you to make maximum use of your 
-nVida CUDA-enabled graphics card or Intel accelerated video (QSV)
+nVidia CUDA-enabled graphics card or Intel accelerated video (QSV)
 * Preserves all streams but allows for filtering by audio and subtitle language.
 * Configurable transcoding profiles
 * Configurable rules and criteria to auto-match a video file to a transcoding profile
@@ -150,7 +150,7 @@ profiles:
     input_options: -hwaccel vaapi -hwaccel_device /dev/dri/renderD129 -hwaccel_output_format vaapi
     output_options: 				# in addition to those included from 'common'
       - "-vf scale_vaapi=format=p010"
-      - " -c:v hevc_vaapi"
+      - "-c:v hevc_vaapi"
 
   #
   # Sample nVidia transcode setup
@@ -251,14 +251,14 @@ Samples:
   'anime to h264 using tuning':
     profile: h264_cuda_anime
     criteria:
-      source_size: '>2500'   # larger than 2.5g
+      filesize_mb: '>2500'   # larger than 2.5g
       vcodec: '!hevc'            # not encoded with hevc 
       path: '/media/anime/.*'  # in a anime folder (regex)
  
   'half-hour videos':
     profile: 'x264'             # use profile called "x264"
     criteria:
-      source_size: '>500'       # 400mb file size or greater
+      filesize_mb: '>500'       # 400mb file size or greater
       runtime: '<31'        	# 30 minutes or less runtime
       vcodec: '!hevc'	       	# NOT hevc encoded video
 
