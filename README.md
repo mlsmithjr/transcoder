@@ -1,5 +1,9 @@
 ## pytranscoder
 
+**New!**  [Read The Docs](
+New, better documentation taking shape at https://pytranscoder.readthedocs.io/en/latest/)
+
+
 Python wrapper for ffmpeg for batch, concurrent, or clustered transcoding
 
 This script is intended to help automate transcoding for people encoding lots of video.
