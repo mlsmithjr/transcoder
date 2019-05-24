@@ -5,16 +5,101 @@ Cluster Configuration
 Watching multiple machines doing your bidding is a beautiful thing.  Watching each of them doing concurrent bidding is even more beautiful.
 With a well-thought-out configuration this is easy to do.
 
+------------
+Linux Setup
+------------
+
+We will refer to the machine you use pytranscode on as your *cluster manager* and other machines as *hosts*.
+
+Setting up remote hosts is as follows, if not already setup for ssh access and ffmpeg:
+Linux is natively supported as long as the following conditions are true:
+* Each host machine in the cluster is running an *ssh* server.
+* Each host has *ffmpeg* installed.
+* If using hardware encoding, your machine (and *ffmpeg*) have been setup and tested to make sure it is working. Setup of hardware encoding is
+beyond the scope of this document.
+* The *cluster manager* machine must be able to *ssh* to each host without a password prompt (see `man ssh-copy-id`).
+
+-----------
+MacOS Setup
+-----------
+
+MacOS, being based on BSD, is also natively supported.  See Linux section. 
+Check your MacOS version of ffmpeg for what hardware acceleration support is available, if any. 
+At the time of this writing there was nothing available of appreciable quality, only VAAPI and the quality was dismal.
+
+----------------
+Windows 10 Setup
+----------------
+Setting up Windows 10 as a cluster host is a bear. Enter at your own risk.
+
+There are 2 ways to enable SSH access for Windows. Each method is further complicated depending on which ffmpeg you use.  These instructions assume a certain level of proficiency with Windows and optionally WSL.
+
+###########################
+Microsoft OpenSSH
+###########################
+This method will only allow streaming cluster support due to Windows OpenSSH not being able to access network shares or drives consistently. Avoid if you can.
+
+* Install OpenSSH server
+* Set server to auto-start (delayed)
+* Start server
+* Copy RSA key from *cluster manager* 
+
+Install openssh server via `Settings > Apps > manage optional features > Add a Feature > OpenSSH Server > Install`
+
+You cannot use `ssh-copy-id` to authenticate to openssh on Windows. Instead, in the home folder of the user account create
+a directory called **.ssh**.  Then from your *cluster manager* copy your $HOME/.ssh/id_rsa.pub to c:/Users/*username*/.ssh/authorized_keys on Windows.
+
+In the search bar type **services* and click on **Services Desktop App**.  Scroll down to OpenSSH Server and
+right-click to select Properties. Change the startup type to *Automatic* then OK. Now right-click
+again and select *Start*. The service is now running and set to start automatically after each reboot.
+
+Finally, if you have a supported nVidia card download the nVidia CUDA drivers and install if you plan on using CUDA encoding.
+It's a large download. Choose Custom install and deselect all the documentation and other things you don't need if you want to
+minimize space usage.
+
+###########################
+WSL (Ubuntu) OpenSSH:
+###########################
+This is the better method but requires more fiddling around at the shell. By installing Windows Subsystem for Linux you enable
+a more standard bash experience and can use **mount** on network share drive mappings and enable *mounted* mode (faster).  
+I will cover the highlights but the details are yours to research. 
+Some helpful details `here <https://www.reddit.com/r/bashonubuntuonwindows/comments/5gh4c8/ssh_to_bash_on_wsl/>`_.
+
+* From the Windows Store search for and install Ubuntu.
+* On the search bar search for "Enable Features" and click on *Turn Windows features on and off*. Scroll down to Windows Subsystem for Linux and enable.
+* Launch Ubuntu and create your new user as prompted.
+* From *bash* you must uninstall and reinstall openssh-server (to fix a problem with the Microsoft-provided distribution):
+    * `sudo apt remove --purge openssh-server`
+    * `sudo rm -rf /etc/ssh`
+    * `sudo apt install openssh-server`
+* Try to *ssh* to your Windows machine now.
+* From your *cluster manager* host, use `ssh-copy-id` to setup password-less *ssh* to your Windows host.
+* Back on Windows, map a drive letter to your network media share (ex. *Z:*).
+* This is where it gets more confusing:
+    * (easiest) If installing the Windows `ffmpeg package <https://www.ffmpeg.org/>`_
+       * Download and install now.
+       * NOTE that your path mappings for pytranscoder will use *Z:* since the *ffmpeg* you are running is still a Windows program and expects commandline parameters to be Windows-like.
+    * If installing the Ubuntu ffmpeg package
+       * In *bash*: `sudo apt install ffmpeg`
+       * Create a folder under /mnt representing your media folder mount point.
+       * Now test mount your mapped drive (ie. `sudo mount -t drvfs 'z:' /mnt/media`)
+       * If /mnt/media is mounted to your shared media server you are good to proceed.
+       * Finally, make the mount permanent by adding it to /etc/fstab:
+           `z: /mnt/media drvfs defaults 0 0`
+       * NOTE that your path mappings for pytranscoder will use */mnt/media/*, not *Z:* as with the Windows-specific *ffmpeg*.
+
+
+
+------------------
+Cluster Definition
+------------------
+
 First, a word about queues.  The *queues:* definition in the Global section only applies when running pytranscoder on 
 a single host.  These queues are not used when running in cluster mode. This is because you can define queues for each host doing work.
 So whatever queues you have defined there, just ignore for the purposes of cluster setup.
 
 Setting up your clusters is as it sounds - you must define some information about each host participating in the cluster, even
 including the one your are running pytranscoder from, if applicable.
-
-.. important::
-    Each host participating in the cluster must be configured with **ssh** and a user set up for password-less connecting.
-    ie. `ssh-copy-id` on Linux
 
 
 *Sample, 4-host configuration*:

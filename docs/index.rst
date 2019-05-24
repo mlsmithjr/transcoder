@@ -24,11 +24,13 @@ Features
    :maxdepth: 2
    :caption: Contents:
 
-   usage/installation
-   usage/quickstart
-   usage/configuration
-   usage/concurrency
-   usage/cluster
+   configuration/installation
+   configuration/quickstart
+   configuration/configuration
+   configuration/concurrency
+   configuration/cluster
+   usage/running-local.rst
+   usage/running-clustered.rst
 
 Indices and tables
 
