@@ -1,9 +1,25 @@
 
 ### Version History
 
+Version 1.5.12
+    * Merging of input_options and output_options supported at the option level. For example, if the included
+      profiles has "-c:a copy" and the including profile has "-c:a libmp3lame", the including profile option will
+      take precedence.
+
+Version 1.5.11
+    * Default behavior is to now auto-map all audio and subtitle streams during transcode.
+        May be disabled at the global or profile level with  automap: no
+    * More unit test fixes and improvements.
+    * Updated sample transcode.yml for better feature reference
+
+Version 1.5.10
+    * Fixed broken unit tests from previous release
+    * Fixed rule predicates matching on runtime after conversion to seconds-level detail.
+
 Version 1.5.9
     * Added new optional "include" directive in profiles to help reduce profile repetition.
     * Fixed error message when input file not found.
+    * Fixed divide-by-zero error when video runtime < 1 minute. Calculations how include seconds rather than just whole minutes
 
 Version 1.5.8
     * Updated yaml loader to support latest pyyaml library.

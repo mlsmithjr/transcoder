@@ -61,7 +61,8 @@ class FFmpeg:
 
                         info['size'] = int(info['size'].strip()) * 1024
                         hh, mm, ss = info['time'].split(':')
-                        info['time'] = (int(hh) * 60) + int(mm)
+                        ss = ss.split('.')[0]
+                        info['time'] = (int(hh) * 3600) + (int(mm) * 60) + int(ss)
                         yield info
 
         if proc.returncode == 0:

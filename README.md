@@ -1,19 +1,23 @@
 ## pytranscoder
 
+**New!**  [Read The Docs](
+New, better documentation taking shape at https://pytranscoder.readthedocs.io/en/latest/)
+
+
 Python wrapper for ffmpeg for batch, concurrent, or clustered transcoding
 
-This script is intended to help automate transcoding for people running a media server or encoding lots of video.
+This script is intended to help automate transcoding for people encoding lots of video.
 It is more than a wrapper - it is a workflow and job manager.
 
-There are 2 modes: local and clustered.  Local mode is the most common usage and is for running this script on the same machine where it is installed.  Cluster mode turns pytranscoder into a remote encoding manager.  In this mode it does no transcoding on the local machine but instead delegates and manages encode jobs running on other hosts.  This requires more advanced configuration and is documented separately in [Cluster.md](https://github.com/mlsmithjr/transcoder/blob/master/Cluster.md)
+There are 2 modes: **local** and **clustered**.  Local mode is the most common usage and is for running this script on the same machine where it is installed.  Cluster mode turns pytranscoder into a remote encoding manager.  In this mode it delegates and manages encode jobs running on multiple hosts.  This requires more advanced configuration and is documented separately in [Cluster.md](https://github.com/mlsmithjr/transcoder/blob/master/Cluster.md)
 
 The remainder of this document focuses on using pytranscoder in local mode.
 
 #### Features:
 * Sequential or concurrent transcoding. 
 * Concurrent mode allows you to make maximum use of your 
-nVida CUDA-enabled graphics card or Intel accelerated video (QSV)
-* Encode concurrently using CUDA and QSV at the same time.
+nVidia CUDA-enabled graphics card or Intel accelerated video (QSV)
+* Preserves all streams but allows for filtering by audio and subtitle language.
 * Configurable transcoding profiles
 * Configurable rules and criteria to auto-match a video file to a transcoding profile
 * Transcode from a list of files (queue) or all on the command line
@@ -130,41 +134,75 @@ to select the appropriate one for your needs. Alternatively, you can define rule
 Sample:
 ```yaml
 profiles:
+
+  # some common, reusable settings to keep things tidy
+  common:
+    output_options:
+      - "-crf 20"
+      - "-c:a copy"
+      - "-c:s copy"
+       - "-f matroska"
+    extension: '.mkv'
+    threshold: 20
+    threshold_check: 60
+
   #
   # Sample Intel QSV transcode setup (note to customize -hwaccel_device param for your environment)
   #
   hevc_qsv:
+    include: common
     input_options: -hwaccel vaapi -hwaccel_device /dev/dri/renderD129 -hwaccel_output_format vaapi
-    output_options: -vf scale_vaapi=format=p010 -c:v hevc_vaapi -crf 20 -c:a copy -c:s copy -f matroska
-    extension: '.mkv'
-    threshold: 20
-    threshold_check: 60
+    output_options: 				# in addition to those included from 'common'
+      - "-vf scale_vaapi=format=p010"
+      - "-c:v hevc_vaapi"
 
   #
   # Sample nVidia transcode setup
   #
 
   hevc_cuda:                  # profile name
+      include: common
       input_options: |        # ffmpeg input options
         -hwaccel cuvid        # REQUIRED for CUDA
         -c:v h264_cuvid       # hardware decoding too
-      output_options: |       # ffmpeg output options
-        -c:v hevc_nvenc       # REQUIRED for CUDA
-        -profile:v main
-        -preset medium
-        -crf 20
-        -c:a copy             # copy audio without transcoding
-        -c:s copy             # copy subtitles
-        -f matroska
-      extension: '.mkv'
+      output_options:         # in addition to included from 'common'
+        - "-c:v hevc_nvenc"     # REQUIRED for CUDA
+        - "-profile:v main"
+        - "-preset medium"
       queue: cuda		# manage this encode in the 'cuda' queue defined globally
-      threshold: 20            # minimum file size reduction %, otherwise keep original
+      
+      # optionally you can filter out audio/subtitle tracks you don't need
+      audio:
+         exclude_languages:
+             - "chi"
+             - "spa"
+             - "fre"
+             - "ger"
+         default_language: eng
+ 
+      subtitle:
+         exclude_languages:
+             - "chi"
+             - "spa"
+             - "fre"
+             - "por"
+             - "ger"
+             - "jpn"
+         default_language: eng
 
-  # alternate style of option formatting
   x264:                            # profile name
+      include: common
       input_options: 
-      output_options: '-crf 20 -c:a copy -c:s copy -f matroska'
-      extension: '.mkv'
+      output_options:
+        - "-c:v x264"
+        
+h264_cuda_anime:
+    include: common
+    input_options:
+    output_options:
+      - "-c:v h264_nvenc"
+      - "-tune animation"
+ 
 ```
 
 | setting          | purpose |
@@ -176,6 +214,8 @@ profiles:
 | threshold        | optional. If provided this number represents a minimum percentage compression savings for the encoded media. If it does not meet this threshold the transcoded file is discarded, source file remains as-is, and the source job marked as complete. This is useful if a particular file doesn't compress much and you would rather just keep the original. |
 | threshold_check  | optional. If provided this is the percent done to start checking if the threshold is being met. Default is 100% (when media is finished). Use this to have threshold checks done earlier to stop a long-running transcode if not producing expected compression (threshold).|
 | include | optional. Include options from one or more previously defined profiles. (see section on includes). |
+| audio | Audio track handling options. Include a list of **exclude_languages** to automatically remove tracks. If any track being removed is a _default_, a new default will be set based on the **default_language**. |
+| subtitle | See _audio_ above. |
 
 > CPU Note: When transcoding from h264 on an Intel I5/I7 6th+ gen chip, _ffmpeg_ will use detected extensions to basically perform hardware decoding for you. So if you configured hardware encoding you'll see low CPU use. On AMD there is no chip assistance on decoding.  So even if hardware encoding, the decoding process will load down your CPU. To fix this simply enable hardware decoding as an **input option**.
 
@@ -198,7 +238,7 @@ Samples:
       profile: hevc_hd_25fps    # profile to use if the criterial below match
       criteria:
         runtime:      '<180'    # less than 3 hours long
-        source_size:  '>5000'   # ..and media file larger than 5 gigabytes
+        filesize_mb:  '>5000'   # ..and media file larger than 5 gigabytes
         fps: '>25'              # ..and framerate > 25
 
   'already best codec':
@@ -209,13 +249,20 @@ Samples:
   'skip files that are not appropriate for hevc':
     profile: 'SKIP'
     criteria:
-      source_size: '<600'       # video file is less than 600mb
+      filesize_mb: '<600'       # video file is less than 600mb
       runtime: '<40'          	# ..and total runtime < 40 minutes
 
+  'anime to h264 using tuning':
+    profile: h264_cuda_anime
+    criteria:
+      filesize_mb: '>2500'   # larger than 2.5g
+      vcodec: '!hevc'            # not encoded with hevc 
+      path: '/media/anime/.*'  # in a anime folder (regex)
+ 
   'half-hour videos':
     profile: 'x264'             # use profile called "x264"
     criteria:
-      source_size: '>500'       # 400mb file size or greater
+      filesize_mb: '>500'       # 400mb file size or greater
       runtime: '<31'        	# 30 minutes or less runtime
       vcodec: '!hevc'	       	# NOT hevc encoded video
 
@@ -411,7 +458,7 @@ To run in cluster mode (see Cluster documentation):
 ```
 
 #### Using includes
-This feature requires a deeper familiarity with the YAML format. Essentially, you can define a partial profile or a full one and later "include" it into another profile. This facilitates reuse of definitions an simpler profiles.
+This feature requires a deeper familiarity with the YAML format. Essentially, you can define a partial profile or a full one and later "include" it into another profile. This facilitates reuse of definitions and simpler profiles.
 
 ```yaml
 #

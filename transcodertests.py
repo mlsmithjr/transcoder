@@ -14,9 +14,45 @@ from pytranscoder.utils import files_from_file, get_local_os_type, calculate_pro
 
 class TranscoderTests(unittest.TestCase):
 
+    @staticmethod
+    def make_media(path, vcodec, res_width, res_height, runtime, source_size, fps, colorspace,
+                   audio, subtitle) -> MediaInfo:
+        info = {
+            'path': path,
+            'vcodec': vcodec,
+            'stream': 0,
+            'res_width': res_width,
+            'res_height': res_height,
+            'runtime': runtime,
+            'filesize_mb': source_size,
+            'fps': fps,
+            'colorspace': colorspace,
+            'audio': audio,
+            'subtitle': subtitle
+        }
+        return MediaInfo(info)
+
+    def test_stream_map(self):
+        with open('tests/ffmpeg3.out', 'r') as ff:
+            info = MediaInfo.parse_details('/dev/null', ff.read())
+            streams = info.ffmpeg_streams([], None, [], None)
+            self.assertEqual(len(streams), 2, 'expected -map 0')
+
+    def test_stream_exclude(self):
+        with open('tests/ffmpeg3.out', 'r') as ff:
+            info = MediaInfo.parse_details('/dev/null', ff.read())
+            streams = info.ffmpeg_streams([], None, ['spa'], 'eng')
+            self.assertEqual(len(streams), 12, 'expected 6 streams (12 elements)')
+
+    def test_stream_reassign_default(self):
+        with open('tests/ffmpeg4.out', 'r') as ff:
+            info = MediaInfo.parse_details('/dev/null', ff.read())
+            streams = info.ffmpeg_streams(['eng'], 'chi', [], None)
+            self.assertEqual(len(streams), 8, 'expected 4 streams (8 elements)')
+
     def test_progress(self):
-        info = MediaInfo(None, None, None, 1080, 90, 2300, 25, None)
-        stats = {'size': 1225360000, 'time': 50}
+        info = TranscoderTests.make_media(None, None, None, 1080, 90 * 60, 2300, 25, None, [], [])
+        stats = {'size': 1225360000, 'time': 50 * 60}
         done, comp = calculate_progress(info, stats)
         self.assertEqual(done, 55, 'Expected 55% done')
         self.assertEqual(comp, 6, 'Expected 6% compression')
@@ -47,7 +83,7 @@ class TranscoderTests(unittest.TestCase):
             self.assertEqual(info.vcodec, 'h264')
             self.assertEqual(info.res_width, 1280)
             self.assertEqual(info.fps, 23)
-            self.assertEqual(info.runtime, (2 * 60) + 9)
+            self.assertEqual(info.runtime, (2 * 3600) + (9 * 60) + 38)
             self.assertEqual(info.path, '/dev/null')
             self.assertEqual(info.colorspace, 'yuv420p')
 
@@ -58,12 +94,23 @@ class TranscoderTests(unittest.TestCase):
             self.assertEqual(info.vcodec, 'h264')
             self.assertEqual(info.res_width, 1920)
             self.assertEqual(info.fps, 24)
-            self.assertEqual(info.runtime, 52)
+            self.assertEqual(info.runtime, (52 * 60) + 49)
             self.assertEqual(info.path, '/dev/null')
             self.assertEqual(info.colorspace, 'yuv420p')
 
+    def test_mediainfo3(self):
+        with open('tests/ffmpeg3.out', 'r') as ff:
+            info = MediaInfo.parse_details('/dev/null', ff.read())
+            self.assertIsNotNone(info)
+            self.assertEqual(info.vcodec, 'hevc')
+            self.assertEqual(info.res_width, 3840)
+            self.assertEqual(info.fps, 23)
+            self.assertEqual(info.runtime, (2 * 3600) + (5 * 60) + 53)
+            self.assertEqual(info.path, '/dev/null')
+            self.assertEqual(info.colorspace, 'yuv420p10le')
+
     def test_default_profile(self):
-        info = MediaInfo(None, None, None, 720, 45, 3000, 25, None)
+        info = TranscoderTests.make_media(None, None, None, 720, 45, 3000, 25, None, [], [])
         config = ConfigFile(self.get_setup())
         rule = config.match_rule(info)
         self.assertIsNotNone(rule, 'expected to match a rule')
@@ -80,7 +127,7 @@ class TranscoderTests(unittest.TestCase):
             self.assertTrue(rule.is_skip(), 'Expected a SKIP rule')
 
     def test_rule_match(self):
-        info = MediaInfo(None, None, None, 1080, 45, 2300, None, None)
+        info = TranscoderTests.make_media(None, None, None, 1080, 45, 2300, None, None, [], [])
         config = ConfigFile(self.get_setup())
         rule = config.match_rule(info)
         self.assertIsNotNone(rule, 'Expected a matched profile')
@@ -214,9 +261,9 @@ class TranscoderTests(unittest.TestCase):
     @mock.patch('pytranscoder.cluster.filter_threshold')
     @mock.patch('pytranscoder.cluster.os.rename')
     @mock.patch('pytranscoder.cluster.os.remove')
-    @mock.patch.object(MediaInfo, 'parse_details')
-    def test_cluster_match_default_rule(self, mock_info_parser, mock_os_rename, mock_os_remove,  mock_filter_threshold,
-                             mock_run_remote):
+    @mock.patch.object(FFmpeg, 'fetch_details')
+    def test_cluster_match_default_rule(self, mock_ffmpeg_details, mock_os_rename, mock_os_remove,
+                                        mock_filter_threshold, mock_run_remote):
 
         setup = ConfigFile(self.get_setup())
 
@@ -227,8 +274,8 @@ class TranscoderTests(unittest.TestCase):
         mock_filter_threshold.return_value = True
         mock_os_rename.return_value = None
         mock_os_remove.return_value = None
-        info = MediaInfo('/dev/null', 'x264', 1920, 1080, 45, 3200, 24, None)
-        mock_info_parser.return_value = info
+        info = TranscoderTests.make_media('/dev/null', 'x264', 1920, 1080, 45 * 60, 3200, 24, None, [], [])
+        mock_ffmpeg_details.return_value = info
 
         #
         # configure the cluster, add the job, and run
@@ -254,9 +301,9 @@ class TranscoderTests(unittest.TestCase):
     @mock.patch('pytranscoder.cluster.filter_threshold')
     @mock.patch('pytranscoder.cluster.os.rename')
     @mock.patch('pytranscoder.cluster.os.remove')
-    @mock.patch.object(MediaInfo, 'parse_details')
-    def test_cluster_match_skip(self, mock_info_parser, mock_os_rename, mock_os_remove,  mock_filter_threshold,
-                             mock_run_remote):
+    @mock.patch.object(FFmpeg, 'fetch_details')
+    def test_cluster_match_skip(self, mock_ffmpeg_details, mock_os_rename, mock_os_remove,
+                                mock_filter_threshold, mock_run_remote):
 
         setup = ConfigFile(self.get_setup())
 
@@ -267,8 +314,8 @@ class TranscoderTests(unittest.TestCase):
         mock_filter_threshold.return_value = True
         mock_os_rename.return_value = None
         mock_os_remove.return_value = None
-        info = MediaInfo('/dev/null', 'x264', 1920, 1080, 60, 1800, 24, None)
-        mock_info_parser.return_value = info
+        info = TranscoderTests.make_media('/dev/null', 'x264', 1920, 1080, 60 * 60, 1800, 24, None, [], [])
+        mock_ffmpeg_details.return_value = info
 
         #
         # configure the cluster, add the job, and run
@@ -284,8 +331,10 @@ class TranscoderTests(unittest.TestCase):
     @mock.patch.object(MediaInfo, 'parse_details')
     @mock.patch('pytranscoder.cluster.run')
     @mock.patch('pytranscoder.cluster.shutil.move')
+    @mock.patch.object(FFmpeg, 'fetch_details')
     @mock.patch.object(StreamingManagedHost, 'run_process')
-    def test_cluster_streaming_host(self, mock_run_process, mock_move, mock_run, mock_info_parser, mock_os_rename, mock_os_remove,
+    def test_cluster_streaming_host(self, mock_run_proc, mock_ffmpeg_fetch, mock_move, mock_run, mock_info_parser,
+                                    mock_os_rename, mock_os_remove,
                                     mock_filter_threshold, mock_run_remote):
 
         setup = ConfigFile(self.get_setup())
@@ -299,9 +348,9 @@ class TranscoderTests(unittest.TestCase):
         mock_filter_threshold.return_value = True
         mock_os_rename.return_value = None
         mock_os_remove.return_value = None
-        info = MediaInfo('/dev/null', 'x264', 1920, 1080, 110, 3000, 24, None)
+        info = TranscoderTests.make_media('/dev/null', 'x264', 1920, 1080, 110 * 60, 3000, 24, None, [], [])
         mock_info_parser.return_value = info
-
+        mock_ffmpeg_fetch.return_value = info
         #
         # configure the cluster, add the job, and run
         #
@@ -322,8 +371,9 @@ class TranscoderTests(unittest.TestCase):
     @mock.patch('pytranscoder.cluster.os.rename')
     @mock.patch('pytranscoder.cluster.os.remove')
     @mock.patch.object(MediaInfo, 'parse_details')
-    def test_cluster_match_default_queue(self, mock_info_parser, mock_os_rename, mock_os_remove,  mock_filter_threshold,
-                                mock_run_remote):
+    @mock.patch.object(FFmpeg, 'fetch_details')
+    def test_cluster_match_default_queue(self, mock_ffmpeg_details, mock_info_parser, mock_os_rename, mock_os_remove,
+                                         mock_filter_threshold, mock_run_remote):
 
         setup = ConfigFile(self.get_setup())
 
@@ -334,8 +384,9 @@ class TranscoderTests(unittest.TestCase):
         mock_filter_threshold.return_value = True
         mock_os_rename.return_value = None
         mock_os_remove.return_value = None
-        info = MediaInfo('/dev/null', 'x264', 500, 480, 30, 420, 24, None)
+        info = TranscoderTests.make_media('/dev/null', 'x264', 500, 480, 30 * 60, 420, 24, None, [], [])
         mock_info_parser.return_value = info
+        mock_ffmpeg_details.return_value = info
 
         #
         # configure the cluster, add the job, and run

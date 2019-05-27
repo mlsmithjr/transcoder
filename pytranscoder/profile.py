@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 
 class Profile:
@@ -52,7 +52,35 @@ class Profile:
         alist = self.profile.get('include', None)
         if alist is None:
             return []
-        return alist.split(' ')
+        return alist.split()
+
+    @staticmethod
+    def option_merge(parent: List, child: List) -> List:
+        pdict = {}
+        # prep the parent list for easy search/replace
+        for p in parent:
+            tmp = p.split()
+            if len(tmp) == 2:
+                pdict[tmp[0]] = tmp[1]
+            else:
+                pdict[p] = None
+
+        # check child options against parent, replacing as needed
+        for child_opt in child:
+            tmp = child_opt.split()
+            if len(tmp) == 2:
+                if tmp[1]:
+                    pdict[tmp[0]] = tmp[1]
+            else:
+                pdict[tmp] = None
+
+        newopts = []
+        for k, v in pdict.items():
+            if v:
+                newopts.append(k + ' ' + v)
+            else:
+                newopts.append(k)
+        return newopts
 
     def include(self, parent):
         # overlay this profile settings on top of parent profile to make a new one
@@ -62,7 +90,8 @@ class Profile:
                 if isinstance(p[k], List):
                     if isinstance(v, List):
                         # merge existing key values
-                        p[k] = p[k] + v
+                        #p[k] = p[k] + v
+                        p[k] = self.option_merge(p[k], v)
                     else:
                         # replace
                         p[k] = v
@@ -73,3 +102,27 @@ class Profile:
                 p[k] = v
 
         self.profile = p
+
+    def excluded_audio(self) -> list:
+        audio_section = self.profile.get('audio')
+        if audio_section is None:
+            return []
+        return audio_section.get('exclude_languages', [])
+
+    def excluded_subtitles(self) -> list:
+        subtitle_section = self.profile.get('subtitle')
+        if subtitle_section is None:
+            return []
+        return subtitle_section.get('exclude_languages', [])
+
+    def default_audio(self) -> Optional[str]:
+        audio_section = self.profile.get('audio')
+        if audio_section is None:
+            return None
+        return audio_section.get('default_language', [])
+
+    def default_subtitle(self) -> Optional[str]:
+        subtitle_section = self.profile.get('subtitle')
+        if subtitle_section is None:
+            return None
+        return subtitle_section.get('default_language', [])
