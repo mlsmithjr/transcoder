@@ -418,7 +418,8 @@ def start():
                     if name != host_override:
                         this_config['status'] = 'disabled'
         completed: Set = manage_clusters(files, configfile)
-        cleanup_queuefile(queue_path, completed)
+        qpath = queue_path if queue_path is not None else configfile.default_queue_file
+        cleanup_queuefile(qpath, completed)
         sys.exit(0)
 
     host = LocalHost(configfile)

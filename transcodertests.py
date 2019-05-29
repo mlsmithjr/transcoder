@@ -32,22 +32,28 @@ class TranscoderTests(unittest.TestCase):
         }
         return MediaInfo(info)
 
-    def test_stream_map(self):
+    def test_stream_map_all(self):
         with open('tests/ffmpeg3.out', 'r') as ff:
             info = MediaInfo.parse_details('/dev/null', ff.read())
-            streams = info.ffmpeg_streams([], None, [], None)
+            setup = ConfigFile(self.get_setup())
+            p = setup.get_profile('qsv')
+            streams = info.ffmpeg_streams(p)
             self.assertEqual(len(streams), 2, 'expected -map 0')
 
     def test_stream_exclude(self):
         with open('tests/ffmpeg3.out', 'r') as ff:
             info = MediaInfo.parse_details('/dev/null', ff.read())
-            streams = info.ffmpeg_streams([], None, ['spa'], 'eng')
+            setup = ConfigFile(self.get_setup())
+            p = setup.get_profile('excl_test_1')
+            streams = info.ffmpeg_streams(p)
             self.assertEqual(len(streams), 12, 'expected 6 streams (12 elements)')
 
     def test_stream_reassign_default(self):
         with open('tests/ffmpeg4.out', 'r') as ff:
             info = MediaInfo.parse_details('/dev/null', ff.read())
-            streams = info.ffmpeg_streams(['eng'], 'chi', [], None)
+            setup = ConfigFile(self.get_setup())
+            p = setup.get_profile('excl_test_2')
+            streams = info.ffmpeg_streams(p)
             self.assertEqual(len(streams), 8, 'expected 4 streams (8 elements)')
 
     def test_progress(self):
@@ -108,6 +114,15 @@ class TranscoderTests(unittest.TestCase):
             self.assertEqual(info.runtime, (2 * 3600) + (5 * 60) + 53)
             self.assertEqual(info.path, '/dev/null')
             self.assertEqual(info.colorspace, 'yuv420p10le')
+
+    def test_automap_include(self):
+        info = TranscoderTests.make_media(None, None, None, 720, 45, 3000, 25, None,
+                                          [{'lang': 'eng', 'stream': '1'},
+                                           {'lang': 'ger', 'stream': '2', 'default': True}], [])
+        setup = ConfigFile(self.get_setup())
+        p = setup.get_profile('hevc_cuda')
+        options = info.ffmpeg_streams(p)
+        self.assertEqual(options, ['-map', '0:0', '-map', '0:1', '-disposition:a:0', 'default'])
 
     def test_default_profile(self):
         info = TranscoderTests.make_media(None, None, None, 720, 45, 3000, 25, None, [], [])
@@ -205,6 +220,44 @@ class TranscoderTests(unittest.TestCase):
                     "output_options": ["-threads 4"],
                     "extension": ".mkv",
                     "queue": "q2",
+                    "audio": {
+                        "include_languages": ["eng"],
+                        "default_language": "eng",
+                    },
+                    "subtitle": {
+                        "include_languages": ["eng"],
+                        "default_language": "eng",
+                    }
+                },
+                "excl_test_1": {
+                    "include": "hq",
+                    "input_options": None,
+                    "output_options": ["-threads 4"],
+                    "extension": ".mkv",
+                    "queue": "q2",
+                    "audio": {
+                        "exclude_languages": ["spa"],
+                        "default_language": "eng",
+                    },
+                    "subtitle": {
+                        "exclude_languages": ["spa"],
+                        "default_language": "eng",
+                    }
+                },
+                "excl_test_2": {
+                    "include": "hq",
+                    "input_options": None,
+                    "output_options": ["-threads 4"],
+                    "extension": ".mkv",
+                    "queue": "q2",
+                    "audio": {
+                        "exclude_languages": ["eng"],
+                        "default_language": "chi",
+                    },
+                    "subtitle": {
+                        "exclude_languages": ["eng"],
+                        "default_language": "chi",
+                    }
                 },
                 "qsv": {
                     "input_options": None,

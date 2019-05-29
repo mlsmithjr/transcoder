@@ -1,7 +1,7 @@
 
 ### Version History
 
-Version 2.0.0
+Version 2.0.1
     * Added "automap" setting to Global and Profile sections to expressly enable or disable mapping (default is ENABLED).
     * Added include_languages to "audio" and "subtitle" profile sections.  Use Include or Exclude, not both.  If you
       use both then Includes will take precedence.
