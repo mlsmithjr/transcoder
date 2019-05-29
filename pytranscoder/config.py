@@ -88,3 +88,7 @@ class ConfigFile:
 
     def add_rule(self, name, rule: Rule):
         self.rules[name] = rule
+
+    @property
+    def automap(self) -> bool:
+        return self.settings.get('automap', True)

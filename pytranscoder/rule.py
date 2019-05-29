@@ -42,9 +42,13 @@ class Rule:
             if isinstance(value, str) and len(value) > 1 and value[0] == '!':
                 inverted = True
                 value = value[1:]
-            if pred == 'vcodec' and media_info.vcodec != value and not inverted:
+            if pred == 'vcodec' and not inverted and media_info.vcodec != value:
                 if verbose:
                     print(f'  >> predicate vcodec ("{value}") did not match {media_info.vcodec}')
+                break
+            if pred == 'vcodec' and inverted and media_info.vcodec == value:
+                if verbose:
+                    print(f'  >> predicate vcodec ("{value}") matched {media_info.vcodec}')
                 break
             if pred == 'path':
                 try:

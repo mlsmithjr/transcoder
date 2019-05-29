@@ -28,6 +28,7 @@ These options apply globally to pytranscoder.
             cuda:               2                   # maximum of 2 encodes at a time
         plex_server:          192.168.2.61:32400  # optional, use 'address:port'
         colorize:             yes
+        automap:              no
 
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | Setting               | Purpose                                                                                                                                                                                                                                   |
@@ -43,6 +44,8 @@ These options apply globally to pytranscoder.
 | plex_server           | optional, if you want your Plex server notified after media is encoded. Use address:port format.                                                                                                                                          |
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | colorize              | optional, defaults to "no". If "yes" terminal output will have some color added                                                                                                                                                           |
++-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| automap               | optional, defaults to "yes". If "yes" then auto calculate and insert *ffmpeg* **-map** options to preserve all audio and subtitle tracks                                                                                                  |
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 
@@ -70,6 +73,16 @@ to select the appropriate one for your needs. Alternatively, you can define rule
             extension: '.mkv'
             threshold: 20
             threshold_check: 60
+            automap: yes
+            audio:
+                include_languages:
+                    - "eng"
+                default_language: eng
+
+            subtitle:
+                include_languages:
+                    - "eng"
+                default_language: eng
 
         #
         # Sample Intel QSV transcode setup (note to customize -hwaccel_device param for your environment)
@@ -97,23 +110,7 @@ to select the appropriate one for your needs. Alternatively, you can define rule
             
             # optionally you can filter out audio/subtitle tracks you don't need.
             # these can also be moved to the "common" profile.
-            audio:
-                exclude_languages:
-                    - "chi"
-                    - "spa"
-                    - "fre"
-                    - "ger"
-                default_language: eng
-        
-            subtitle:
-                exclude_languages:
-                    - "chi"
-                    - "spa"
-                    - "fre"
-                    - "por"
-                    - "ger"
-                    - "jpn"
-                default_language: eng
+
 
         x264:                        # simple h264
             include: common
@@ -127,6 +124,11 @@ to select the appropriate one for your needs. Alternatively, you can define rule
             output_options:
                 - "-c:v h264_nvenc"
                 - "-tune animation"
+            audio:
+                include_languages:
+                    - "eng"
+                    - "jpn"
+
 
 Take a look over this sample.  Most of what you need is here.  Of special note is the **include** directive, which literally includes
 one or more other profiles to create a new, combined one. Use this to isolate common flags to keep new profile definitions simpler.
@@ -150,10 +152,13 @@ one or more other profiles to create a new, combined one. Use this to isolate co
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | include               | optional. Include options from one or more previously defined profiles. (see section on includes).                                                                            |
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| audio                 | Audio track handling options. Include a list of **exclude_languages** to automatically remove tracks. If any track being removed is a _default_,                              |
-|                       | a new default will be set based on the **default_language**.                                                                                                                  |
+| audio                 | Audio track handling options. Include a list of **exclude_languages** to automatically remove tracks, or **include_languages** to only include them.                          |
+|                       | Removed default selections will be replaced with the given **default_language**.                                                                                              |
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | subtitle              | See _audio_ above.                                                                                                                                                            |
++-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| automap               | optional, defaults to "yes". If "yes" then auto calculate and insert *ffmpeg* **-map** options to preserve all audio and subtitle tracks.                                     |
+|                       | Overrides the Global setting, if any.                                                                                                                                         |
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 .. note::

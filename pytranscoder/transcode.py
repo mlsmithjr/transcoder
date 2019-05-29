@@ -80,11 +80,7 @@ class QueueThread(Thread):
                 # check if we need to exclude any streams
                 #
                 if job.info.is_multistream():
-                    ooutput = ooutput + job.info.ffmpeg_streams(job.profile.excluded_audio(),
-                                                                job.profile.default_audio(),
-                                                                job.profile.excluded_subtitles(),
-                                                                job.profile.default_subtitle())
-
+                    ooutput = ooutput + job.info.ffmpeg_streams(job.profile)
                 cli = ['-y', *oinput, '-i', str(job.inpath), *ooutput, str(outpath)]
 
                 #
@@ -288,6 +284,33 @@ def sonarr_handler(qfilename: str):
     sys.exit(0)
 
 
+def cleanup_queuefile(queue_path: str, completed: Set):
+    if not pytranscoder.dry_run and queue_path is not None:
+        # pick up any newly added files
+        files = set(files_from_file(queue_path))
+        # subtract out the ones we've completed
+        files = files - completed
+        if len(files) > 0:
+            # rewrite the queue file with just the pending ones
+            with open(queue_path, 'w') as f:
+                for path in files:
+                    f.write(path + '\n')
+        else:
+            # processed them all, just remove the file
+            os.remove(queue_path)
+
+
+def install_sigint_handler():
+    import signal
+    import sys
+
+    def signal_handler(signal, frame):
+        print('Process terminated')
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+
+
 def main():
     start()
 
@@ -315,6 +338,7 @@ def start():
         print('  -p         profile to use. If used with --from-file, applies to all listed media in <filename>')
         sys.exit(0)
 
+    install_sigint_handler()
     files = list()
     profile = None
     queue_path = None
@@ -393,7 +417,8 @@ def start():
                 for name, this_config in cluster.items():
                     if name != host_override:
                         this_config['status'] = 'disabled'
-        manage_clusters(files, configfile)
+        completed: Set = manage_clusters(files, configfile)
+        cleanup_queuefile(queue_path, completed)
         sys.exit(0)
 
     host = LocalHost(configfile)
@@ -402,20 +427,7 @@ def start():
     # start all threads and wait for work to complete
     #
     host.start()
-
-    if not pytranscoder.dry_run and queue_path is not None:
-        # pick up any newly added files
-        files = set(files_from_file(queue_path))
-        # subtract out the ones we've completed
-        files = files - host.complete
-        if len(files) > 0:
-            # rewrite the queue file with just the pending ones
-            with open(queue_path, 'w') as f:
-                for path in files:
-                    f.write(path + '\n')
-        else:
-            # processed them all, just remove the file
-            os.remove(queue_path)
+    cleanup_queuefile(queue_path, host.complete)
 
     host.notify_plex()
     os.system("stty sane")

@@ -1,12 +1,14 @@
-import csv
+
 import os
 import re
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 from pytranscoder import verbose
 
 #video_re = re.compile(r'^.*Duration: (\d+):(\d+):.* Stream .*: Video: (\w+).*, (\w+)[(,].* (\d+)x(\d+).* (\d+)(\.\d.)? fps,.*$',
 #                      re.DOTALL)
+from pytranscoder.profile import Profile
+
 video_dur = re.compile(r".*Duration: (\d+):(\d+):(\d+)", re.DOTALL)
 video_info = re.compile(r'.*Stream #0:(\d+)(?:\(\w+\))?: Video: (\w+).*, (yuv\w+)[(,].* (\d+)x(\d+).* (\d+)(\.\d.)? fps', re.DOTALL)
 audio_info = re.compile(r'^\s+Stream #0:(?P<stream>\d+)(\((?P<lang>\w+)\))?: Audio: (?P<format>\w+).*?(?P<default>\(default\))?$', re.MULTILINE)
@@ -35,17 +37,30 @@ class MediaInfo:
     def is_multistream(self) -> bool:
         return len(self.audio) > 1 or len(self.subtitle) > 1
 
-    def _map_streams(self, stream_type: str, stream: Dict, excludes: list, defl: str) -> list:
+    def _map_streams(self, stream_type: str, streams: List, excludes: list, includes: list, defl: str) -> list:
         if excludes is None:
             excludes = []
+        if not includes:
+            includes = None
         seq_list = list()
         mapped = list()
         default_reassign = False
-        for s in stream:
-            if s.get('lang', 'none') in excludes:
+        for s in streams:
+            stream_lang = s.get('lang', 'none')
+            #
+            # includes take precedence over excludes
+            #
+            if includes is not None and stream_lang not in includes:
                 if s.get('default', None) is not None:
                     default_reassign = True
                 continue
+
+            if stream_lang in excludes:
+                if s.get('default', None) is not None:
+                    default_reassign = True
+                continue
+
+            # if we got here, map the stream
             mapped.append(s)
             seq = s['stream']
             seq_list.append('-map')
@@ -61,23 +76,30 @@ class MediaInfo:
                         seq_list.append('default')
         return seq_list
 
-    def ffmpeg_streams(self, excl_audio: list, defl_audio: str, excl_subtitle: list,
-                       defl_subtitle: str) -> list:
+    def ffmpeg_streams(self, profile: Profile) -> list:
+        excl_audio = profile.excluded_audio()
+        excl_subtitle = profile.excluded_subtitles()
+        incl_audio = profile.included_audio()
+        incl_subtitle = profile.included_subtitles()
+
+        defl_audio = profile.default_audio()
+        defl_subtitle = profile.default_subtitle()
+
         if excl_audio is None:
             excl_audio = []
         if excl_subtitle is None:
             excl_subtitle = []
         #
-        # if no exclusions just map everything
+        # if no inclusions or exclusions just map everything
         #
-        if len(excl_audio) == 0 and len(excl_subtitle) == 0:
+        if len(incl_audio) == 0 and len(excl_audio) == 0 and len(incl_subtitle) == 0 and len(excl_subtitle) == 0:
             return ['-map', '0']
 
         seq_list = list()
         seq_list.append('-map')
         seq_list.append(f'0:{self.stream}')
-        audio_streams = self._map_streams("a", self.audio, excl_audio, defl_audio)
-        subtitle_streams = self._map_streams("s", self.subtitle, excl_subtitle, defl_subtitle)
+        audio_streams = self._map_streams("a", self.audio, excl_audio, incl_audio, defl_audio)
+        subtitle_streams = self._map_streams("s", self.subtitle, excl_subtitle, incl_subtitle, defl_subtitle)
         return seq_list + audio_streams + subtitle_streams
 
     def eval_numeric(self, rulename: str, pred: str, value: str) -> bool:

@@ -1,6 +1,17 @@
 
 ### Version History
 
+Version 2.0.0
+    * Added "automap" setting to Global and Profile sections to expressly enable or disable mapping (default is ENABLED).
+    * Added include_languages to "audio" and "subtitle" profile sections.  Use Include or Exclude, not both.  If you
+      use both then Includes will take precedence.
+    * Enabled audio and subtitle filtering in cluster mode too.
+    * Fixed bug in inverted vcodec check (ex. vcodec !h264)
+    * Fixed bug where cluster mode wasn't removing completed jobs from the queue file.
+    * Been running reliably and well for months now - time for a version bump to 2.0!
+    * Added a ctrl-c (sigint) handler to prevent threads from removing original media during termination.
+      This seems to be a python 3.7 thing.
+
 Version 1.5.12
     * Merging of input_options and output_options supported at the option level. For example, if the included
       profiles has "-c:a copy" and the including profile has "-c:a libmp3lame", the including profile option will

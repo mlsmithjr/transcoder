@@ -9,7 +9,7 @@ from pathlib import PureWindowsPath, PosixPath
 from queue import Queue
 from tempfile import gettempdir
 from threading import Thread, Lock
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 import crayons
 
@@ -172,10 +172,13 @@ class ManagedHost(Thread):
     def complete(self, source):
         self._complete.add(source)
 
+    @property
+    def completed(self) -> Set:
+        return self._complete
+
     def log(self, *args):
         self.lock.acquire()
         try:
-            #msg = crayons.blue(f'[{self._manager.name}]') + crayons.white(f'({self.hostname}): ')
             msg = crayons.blue(f'({self.hostname}): ')
             print(msg, *args)
             sys.stdout.flush()
@@ -296,7 +299,7 @@ class StreamingManagedHost(ManagedHost):
 #                quiet = ['-nostats', '-hide_banner']
 
                 if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
-                    ooutput = ooutput + job.media_info.ffmpeg_streams()
+                    ooutput = ooutput + job.media_info.ffmpeg_streams(_profile)
 
                 cmd = ['-y', *oinput, '-i', self.converted_path(remote_inpath),
                        *ooutput, self.converted_path(remote_outpath)]
@@ -470,7 +473,7 @@ class MountedManagedHost(ManagedHost):
                 remote_outpath = self.converted_path(remote_outpath)
 
                 if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
-                    ooutput = ooutput + job.media_info.ffmpeg_streams()
+                    ooutput = ooutput + job.media_info.ffmpeg_streams(_profile)
                 cmd = ['-y', *oinput, '-i', f'"{remote_inpath}"', *ooutput, f'"{remote_outpath}"']
 
                 #
@@ -599,7 +602,8 @@ class LocalHost(ManagedHost):
                 remote_outpath = self.converted_path(outpath)
 
                 if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
-                    ooutput = ooutput + job.media_info.ffmpeg_streams()
+                    ooutput = ooutput + job.media_info.ffmpeg_streams(_profile)
+
                 cli = ['-y', *oinput, '-i', remote_inpath, *ooutput, remote_outpath]
 
                 #
@@ -673,7 +677,6 @@ class LocalHost(ManagedHost):
 class Cluster(Thread):
     """Thread to create host threads and wait for their completion."""
 
-    hosts:          List[ManagedHost]
     terminal_lock:  Lock = Lock()       # class-level
 
     def __init__(self, name, configs: Dict, config: ConfigFile, ssh: str):
@@ -686,11 +689,12 @@ class Cluster(Thread):
         super().__init__(name=name, group=None, daemon=True)
         self.queues: Dict[str, Queue] = dict()
         self.ssh = ssh
-        self.hosts = list()
+        self.hosts: List[ManagedHost] = list()
         self.config = config
         self.verbose = verbose
         self.ffmpeg = FFmpeg(config.ffmpeg_path)
         self.lock = Cluster.terminal_lock
+        self.completed: Set = set()
 
         for host, props in configs.items():
             hostprops = RemoteHostProperties(host, props)
@@ -770,7 +774,8 @@ class Cluster(Thread):
                     print(crayons.yellow(f'No matching profile found - skipped'))
                     return None, None
                 if rule.is_skip():
-                    print(f'Skipping due to profile rule: {rule.name}')
+                    basename = os.path.basename(path)
+                    print(f'{basename}: Skipping due to profile rule - {rule.name}')
                     return None, None
                 profile_name = rule.profile
 
@@ -803,25 +808,24 @@ class Cluster(Thread):
         # all hosts running, wait for them to finish
         for host in self.hosts:
             host.join()
-
-        # wait for queue to process
-        # self.queue.join()
+            self.completed.update(host.completed)
 
     @property
     def profiles(self):
         return self.config.profiles
 
 
-def manage_clusters(files, config: ConfigFile, testing=False):
+def manage_clusters(files, config: ConfigFile, testing=False) -> Set:
     """Main entry point for setup and execution of all clusters
 
         There is one thread per cluster, and each cluster manages multiple hosts, each having their own thread.
     """
+    completed = set()
 
     cluster_config = config.settings.get('clusters', None)
     if cluster_config is None:
         print('Error: no clusters defined')
-        return
+        return completed
     clusters = dict()
     for name, this_config in cluster_config.items():
         for item in files:
@@ -846,5 +850,8 @@ def manage_clusters(files, config: ConfigFile, testing=False):
         #
         # wait for each cluster thread to complete
         #
+        completed: Set = set()
         for _, cluster in clusters.items():
             cluster.join()
+            completed.update(cluster.completed)
+    return completed

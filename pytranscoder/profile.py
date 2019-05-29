@@ -54,6 +54,10 @@ class Profile:
             return []
         return alist.split()
 
+    @property
+    def automap(self) -> bool:
+        return self.profile.get('automap', True)
+
     @staticmethod
     def option_merge(parent: List, child: List) -> List:
         pdict = {}
@@ -103,11 +107,23 @@ class Profile:
 
         self.profile = p
 
+    def included_audio(self) -> list:
+        audio_section = self.profile.get('audio')
+        if audio_section is None:
+            return []
+        return audio_section.get('include_languages', [])
+
     def excluded_audio(self) -> list:
         audio_section = self.profile.get('audio')
         if audio_section is None:
             return []
         return audio_section.get('exclude_languages', [])
+
+    def included_subtitles(self) -> list:
+        subtitle_section = self.profile.get('subtitle')
+        if subtitle_section is None:
+            return []
+        return subtitle_section.get('include_languages', [])
 
     def excluded_subtitles(self) -> list:
         subtitle_section = self.profile.get('subtitle')
