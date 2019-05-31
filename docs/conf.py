@@ -22,7 +22,7 @@ copyright = '2019, Marshall L Smith Jr'
 author = 'Marshall L Smith Jr'
 
 # The full version, including alpha/beta/rc tags
-release = '2.0.0'
+release = '2.0.1'
 
 
 # -- General configuration ---------------------------------------------------
