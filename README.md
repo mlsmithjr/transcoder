@@ -34,5 +34,5 @@ Video Tutorials: [Part 1 - Linux Setup](https://www.youtube.com/watch?v=LHhC_w34
 
 #### Documentation
 
-[Read The Docs](New, better documentation taking shape at https://pytranscoder.readthedocs.io/en/latest/)
+[Read The Docs](https://pytranscoder.readthedocs.io/en/latest/)
 
