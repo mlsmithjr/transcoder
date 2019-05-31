@@ -57,3 +57,15 @@ def run(cmd):
     output = p.communicate()[0].decode('utf-8')
     return p.returncode, output
 
+
+def dump_stats(completed):
+
+    paths = [p for p, _ in completed]
+    max_width = len(max(paths, key=len))
+    print("-" * (max_width + 9))
+    for path, elapsed in completed:
+        pathname = path.rjust(max_width)
+        _min = int(elapsed / 60)
+        _sec = int(elapsed % 60)
+        print(f"{pathname}  ({_min:3}m {_sec:2}s)")
+    print()

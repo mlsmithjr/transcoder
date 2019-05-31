@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+import datetime
 import glob
 import os
 import sys
@@ -17,7 +18,7 @@ from pytranscoder.config import ConfigFile
 from pytranscoder.ffmpeg import FFmpeg
 from pytranscoder.media import MediaInfo
 from pytranscoder.profile import Profile
-from pytranscoder.utils import filter_threshold, files_from_file, calculate_progress
+from pytranscoder.utils import filter_threshold, files_from_file, calculate_progress, dump_stats
 
 DEFAULT_CONFIG = os.path.expanduser('~/.transcode.yml')
 
@@ -51,8 +52,8 @@ class QueueThread(Thread):
     def lock(self):
         return self._manager.lock
 
-    def complete(self, path: Path):
-        self._manager.complete.add(path)
+    def complete(self, path: Path, elapsed_seconds):
+        self._manager.complete.add((path, elapsed_seconds))
 
     def start_test(self):
         self.go()
@@ -111,16 +112,20 @@ class QueueThread(Thread):
                     # continue
                     return False
 
+                job_start = datetime.datetime.now()
                 code = self.ffmpeg.run(cli, log_callback)
+                job_stop = datetime.datetime.now()
+                elapsed = job_stop - job_start
+
                 if code == 0:
                     if not filter_threshold(job.profile, str(job.inpath), outpath):
                         # oops, this transcode didn't do so well, lets keep the original and scrap this attempt
                         self.log(f'Transcoded file {job.inpath} did not meet minimum savings threshold, skipped')
-                        self.complete(job.inpath)
+                        self.complete(job.inpath, (job_stop - job_start).seconds)
                         outpath.unlink()
                         continue
 
-                    self.complete(job.inpath)
+                    self.complete(job.inpath, elapsed.seconds)
                     if not pytranscoder.keep_source:
                         if pytranscoder.verbose:
                             self.log(f'replacing {job.inpath} with {outpath}')
@@ -144,7 +149,7 @@ class LocalHost:
     """Encapsulates functionality for local encoding"""
 
     lock:       Lock = Lock()
-    complete:   Set[Path] = set()            # list of completed files, shared across threads
+    complete:   List = list()            # list of completed files, shared across threads
 
     def __init__(self, configfile: ConfigFile):
         self.queues = dict()
@@ -208,6 +213,7 @@ class LocalHost:
 
             if pytranscoder.verbose:
                 print('matching ' + path)
+
             media_info = self.ffmpeg.fetch_details(path)
             if media_info is None:
                 print(crayons.red(f'File not found: {path}'))
@@ -221,7 +227,7 @@ class LocalHost:
                         continue
                     if rule.is_skip():
                         print(crayons.green(os.path.basename(path)), f'SKIPPED ({rule.name})')
-                        self.complete.add(path)
+                        self.complete.append((path, 0))
                         continue
                     profile_name = rule.profile
                     the_profile = self.configfile.get_profile(profile_name)
@@ -417,9 +423,12 @@ def start():
                 for name, this_config in cluster.items():
                     if name != host_override:
                         this_config['status'] = 'disabled'
-        completed: Set = manage_clusters(files, configfile)
-        qpath = queue_path if queue_path is not None else configfile.default_queue_file
-        cleanup_queuefile(qpath, completed)
+        completed: List = manage_clusters(files, configfile)
+        if len(completed) > 0:
+            qpath = queue_path if queue_path is not None else configfile.default_queue_file
+            pathlist = [p for p, _ in completed]
+            cleanup_queuefile(qpath, set(pathlist))
+            dump_stats(completed)
         sys.exit(0)
 
     host = LocalHost(configfile)
@@ -428,9 +437,13 @@ def start():
     # start all threads and wait for work to complete
     #
     host.start()
-    cleanup_queuefile(queue_path, host.complete)
+    if len(host.complete) > 0:
+        completed_paths = [p for p, _ in host.complete]
+        cleanup_queuefile(queue_path, set(completed_paths))
+        dump_stats(host.complete)
 
-    host.notify_plex()
+        host.notify_plex()
+
     os.system("stty sane")
 
 

@@ -1,6 +1,7 @@
 """
     Cluster support
 """
+import datetime
 import os
 import shutil
 import subprocess
@@ -9,7 +10,7 @@ from pathlib import PureWindowsPath, PosixPath
 from queue import Queue
 from tempfile import gettempdir
 from threading import Thread, Lock
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 
 import crayons
 
@@ -154,7 +155,7 @@ class ManagedHost(Thread):
         self.hostname = hostname
         self.props = props
         self.queue = queue
-        self._complete = set()
+        self._complete = list()
         self._manager = cluster
         self.ffmpeg = FFmpeg(props.ffmpeg_path)
 
@@ -169,11 +170,11 @@ class ManagedHost(Thread):
     def configfile(self) -> ConfigFile:
         return self._manager.config
 
-    def complete(self, source):
-        self._complete.add(source)
+    def complete(self, source, elapsed=0):
+        self._complete.append((source, elapsed))
 
     @property
-    def completed(self) -> Set:
+    def completed(self) -> List:
         return self._complete
 
     def log(self, *args):
@@ -355,7 +356,9 @@ class StreamingManagedHost(ManagedHost):
                 #
                 # Start remote ffmpeg
                 #
+                job_start = datetime.datetime.now()
                 code = self.ffmpeg.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, log_callback)
+                job_stop = datetime.datetime.now()
 
                 if code != 0:
                     self.log(crayons.red('Unknown error encoding on remote'))
@@ -377,10 +380,10 @@ class StreamingManagedHost(ManagedHost):
                     if not filter_threshold(_profile, inpath, retrieved_copy_name):
                         self.log(
                             f'Transcoded file {inpath} did not meet minimum savings threshold, skipped')
-                        self.complete(inpath)
+                        self.complete(inpath, (job_stop - job_start).seconds)
                         os.remove(retrieved_copy_name)
                         continue
-                    self.complete(inpath)
+                    self.complete(inpath, (job_stop - job_start).seconds)
 
                     if not pytranscoder.keep_source:
                         os.rename(retrieved_copy_name, retrieved_copy_name[0:-4])
@@ -508,7 +511,9 @@ class MountedManagedHost(ManagedHost):
                 #
                 # Start remote ffmpeg
                 #
+                job_start = datetime.datetime.now()
                 code = self.ffmpeg.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, log_callback)
+                job_stop = datetime.datetime.now()
 
                 #
                 # process completed, check results and finish
@@ -517,7 +522,7 @@ class MountedManagedHost(ManagedHost):
                     if not filter_threshold(_profile, inpath, outpath):
                         self.log(
                             f'Transcoded file {inpath} did not meet minimum savings threshold, skipped')
-                        self.complete(inpath)
+                        self.complete(inpath, (job_stop - job_start).seconds)
                         os.remove(outpath)
                         continue
 
@@ -528,7 +533,7 @@ class MountedManagedHost(ManagedHost):
                         if verbose:
                             self.log('renaming ' + outpath)
                         os.rename(outpath, outpath[0:-4])
-                        self.complete(inpath)
+                        self.complete(inpath, (job_stop - job_start).seconds)
                     self.log(crayons.green(f'Finished {job.inpath}'))
                 elif code is not None:
                     self.log(f'Did not complete normally: {self.ffmpeg.last_command}')
@@ -638,7 +643,9 @@ class LocalHost(ManagedHost):
                 #
                 # Start ffmpeg
                 #
+                job_start = datetime.datetime.now()
                 code = self.ffmpeg.run(cli, log_callback)
+                job_stop = datetime.datetime.now()
 
                 #
                 # process completed, check results and finish
@@ -647,7 +654,7 @@ class LocalHost(ManagedHost):
                     if not filter_threshold(_profile, inpath, outpath):
                         self.log(
                             f'Transcoded file {inpath} did not meet minimum savings threshold, skipped')
-                        self.complete(inpath)
+                        self.complete(inpath, (job_stop - job_start).seconds)
                         os.remove(outpath)
                         continue
 
@@ -658,7 +665,7 @@ class LocalHost(ManagedHost):
                         if verbose:
                             self.log('renaming ' + outpath)
                         os.rename(outpath, outpath[0:-4])
-                        self.complete(inpath)
+                        self.complete(inpath, (job_stop - job_start).seconds)
                     self.log(crayons.green(f'Finished {job.inpath}'))
                 elif code is not None:
                     self.log(f' Did not complete normally: {self.ffmpeg.last_command}')
@@ -694,7 +701,7 @@ class Cluster(Thread):
         self.verbose = verbose
         self.ffmpeg = FFmpeg(config.ffmpeg_path)
         self.lock = Cluster.terminal_lock
-        self.completed: Set = set()
+        self.completed: List = list()
 
         for host, props in configs.items():
             hostprops = RemoteHostProperties(host, props)
@@ -808,19 +815,19 @@ class Cluster(Thread):
         # all hosts running, wait for them to finish
         for host in self.hosts:
             host.join()
-            self.completed.update(host.completed)
+            self.completed.extend(host.completed)
 
     @property
     def profiles(self):
         return self.config.profiles
 
 
-def manage_clusters(files, config: ConfigFile, testing=False) -> Set:
+def manage_clusters(files, config: ConfigFile, testing=False) -> List:
     """Main entry point for setup and execution of all clusters
 
         There is one thread per cluster, and each cluster manages multiple hosts, each having their own thread.
     """
-    completed = set()
+    completed = list()
 
     cluster_config = config.settings.get('clusters', None)
     if cluster_config is None:
@@ -850,8 +857,7 @@ def manage_clusters(files, config: ConfigFile, testing=False) -> Set:
         #
         # wait for each cluster thread to complete
         #
-        completed: Set = set()
         for _, cluster in clusters.items():
             cluster.join()
-            completed.update(cluster.completed)
+            completed.extend(cluster.completed)
     return completed

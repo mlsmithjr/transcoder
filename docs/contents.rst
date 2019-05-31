@@ -31,6 +31,7 @@ Features
    configuration/cluster
    usage/running-local.rst
    usage/running-clustered.rst
+   usage/includes.rst
 
 Indices and tables
 
