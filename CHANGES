@@ -1,6 +1,9 @@
 
 ### Version History
 
+Version 2.0.2
+    * Fixed output bug which failed to report proper filename on termination of encode job.
+
 Version 2.0.1
     * Added "automap" setting to Global and Profile sections to expressly enable or disable mapping (default is ENABLED).
     * Added include_languages to "audio" and "subtitle" profile sections.  Use Include or Exclude, not both.  If you

@@ -341,7 +341,8 @@ class TranscoderTests(unittest.TestCase):
         cluster.testrun()
         for host in cluster.hosts:
             if host.hostname == 'm1' and len(host._complete) > 0:
-                self.assertEqual('/dev/null.mp4', host._complete.pop(), 'Completed filename missing from assigned host')
+                filename, elapsed = host.completed.pop()
+                self.assertEqual('/dev/null.mp4', filename, 'Completed filename missing from assigned host')
                 break
 
     @staticmethod
@@ -415,7 +416,8 @@ class TranscoderTests(unittest.TestCase):
         cluster.testrun()
         for host in cluster.hosts:
             if host.hostname == 'm2' and len(host._complete) > 0:
-                self.assertEqual('/dev/null.mp4', host._complete.pop(),
+                filename, elapsed = host.completed.pop()
+                self.assertEqual('/dev/null.mp4', filename,
                                   'Completed filename missing from assigned host')
                 break
 
@@ -452,7 +454,8 @@ class TranscoderTests(unittest.TestCase):
         cluster.testrun()
         for host in cluster.hosts:
             if host.hostname == 'workstation' and len(host._complete) > 0:
-                self.assertEqual('/dev/null.mp4', host._complete.pop(), 'Completed filename missing from assigned host')
+                filename, elapsed = host.completed.pop()
+                self.assertEqual('/dev/null.mp4', filename, 'Completed filename missing from assigned host')
                 break
 
 
