@@ -212,13 +212,16 @@ class ManagedHost(Thread):
         return True
 
     def ssh_test_ok(self):
-        remote_cmd = 'dir' if self.props.is_windows() else 'ls'
-        sshtest = subprocess.run([*self.ssh_cmd(), remote_cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                 shell=False, timeout=5)
-        if sshtest.returncode != 0:
-            self.log('ssh test failed with the following output: ' + sshtest.stderr)
+        try:
+            remote_cmd = 'dir' if self.props.is_windows() else 'ls'
+            sshtest = subprocess.run([*self.ssh_cmd(), remote_cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                     shell=False, timeout=5)
+            if sshtest.returncode != 0:
+                self.log('ssh test failed with the following output: ' + sshtest.stderr)
+                return False
+            return True
+        except subprocess.TimeoutExpired:
             return False
-        return True
 
     def host_ok(self):
         return self.ping_test_ok() and self.ssh_test_ok()

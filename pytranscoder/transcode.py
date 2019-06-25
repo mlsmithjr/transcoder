@@ -303,7 +303,10 @@ def cleanup_queuefile(queue_path: str, completed: Set):
                     f.write(path + '\n')
         else:
             # processed them all, just remove the file
-            os.remove(queue_path)
+            try:
+                os.remove(queue_path)
+            except FileNotFoundError:
+                pass
 
 
 def install_sigint_handler():
