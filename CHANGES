@@ -1,6 +1,9 @@
 
 ### Version History
 
+Version 2.0.5
+    * Fixed another unhandled exception collecting statistics when using non-clustered transcoding.
+
 Version 2.0.4
     * Fixed unhandled exception collecting statistics when using non-clustered transcoding.
 
