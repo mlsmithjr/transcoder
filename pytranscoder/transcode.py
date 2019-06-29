@@ -53,7 +53,7 @@ class QueueThread(Thread):
         return self._manager.lock
 
     def complete(self, path: Path, elapsed_seconds):
-        self._manager.complete.add((path, elapsed_seconds))
+        self._manager.complete.append((path, elapsed_seconds))
 
     def start_test(self):
         self.go()
