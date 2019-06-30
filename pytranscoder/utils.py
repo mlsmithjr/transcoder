@@ -4,6 +4,7 @@ import platform
 import subprocess
 from typing import Dict
 
+import pytranscoder
 from pytranscoder.media import MediaInfo
 from pytranscoder.profile import Profile
 
@@ -59,6 +60,9 @@ def run(cmd):
 
 
 def dump_stats(completed):
+
+    if pytranscoder.dry_run:
+        return
 
     paths = [p for p, _ in completed]
     max_width = len(max(paths, key=len))
