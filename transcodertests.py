@@ -9,7 +9,7 @@ from pytranscoder.config import ConfigFile
 from pytranscoder.ffmpeg import status_re, FFmpeg
 from pytranscoder.media import MediaInfo
 from pytranscoder.transcode import LocalHost
-from pytranscoder.utils import files_from_file, get_local_os_type, calculate_progress
+from pytranscoder.utils import files_from_file, get_local_os_type, calculate_progress, dump_stats
 
 
 class TranscoderTests(unittest.TestCase):
@@ -454,6 +454,7 @@ class TranscoderTests(unittest.TestCase):
         cluster.testrun()
         for host in cluster.hosts:
             if host.hostname == 'workstation' and len(host._complete) > 0:
+                dump_stats(host._complete)
                 filename, elapsed = host.completed.pop()
                 self.assertEqual('/dev/null.mp4', filename, 'Completed filename missing from assigned host')
                 break

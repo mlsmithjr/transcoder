@@ -107,7 +107,7 @@ class QueueThread(Thread):
                     if job.profile.threshold_check < 100:
                         if pct_done >= job.profile.threshold_check and pct_comp < job.profile.threshold:
                             # compression goal (threshold) not met, kill the job and waste no more time...
-                            self.log('Encoding of {basename} cancelled and skipped due to threshold not met')
+                            self.log(f'Encoding of {basename} cancelled and skipped due to threshold not met')
                             return True
                     # continue
                     return False

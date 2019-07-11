@@ -1,6 +1,9 @@
 
 ### Version History
 
+Version 2.0.7
+    * Fixed minor string formatting problem on abort of encode.
+
 Version 2.0.6
     * Suppress summary on --dry-run
 
