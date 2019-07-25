@@ -1,6 +1,9 @@
 
 ### Version History
 
+Version 2.0.8
+    * Fixed automap=No recognition problem using non-clustered transcoding.
+
 Version 2.0.7
     * Fixed minor string formatting problem on abort of encode.
 

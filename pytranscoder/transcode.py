@@ -80,7 +80,7 @@ class QueueThread(Thread):
                 #
                 # check if we need to exclude any streams
                 #
-                if job.info.is_multistream():
+                if job.info.is_multistream() and self.config.automap and job.profile.automap:
                     ooutput = ooutput + job.info.ffmpeg_streams(job.profile)
                 cli = ['-y', *oinput, '-i', str(job.inpath), *ooutput, str(outpath)]
 
