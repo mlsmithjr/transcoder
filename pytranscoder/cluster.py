@@ -234,6 +234,16 @@ class ManagedHost(Thread):
                 self.log(p.stderr)
         return p
 
+    def match_profile(self, job: EncodeJob, name: str) -> Optional[Profile]:
+        if job.profile_name is None:
+            rule = self.configfile.match_rule(job.media_info, restrict_profiles=self.props.profiles)
+            if rule is None:
+                self.log(crayons.yellow(
+                    f'Failed to match rule/profile for host {name} for file {job.inpath} - skipped'))
+                return None
+            job.profile_name = rule.profile
+        return self._manager.profiles[job.profile_name]
+
 
 class StreamingManagedHost(ManagedHost):
     """Implementation of a streaming host worker thread"""
@@ -277,16 +287,9 @@ class StreamingManagedHost(ManagedHost):
                 # Got to do the rule matching again.
                 # This time we narrow down the available profiles based on host definition
                 #
-                if job.profile_name is None:
-                    if pytranscoder.verbose:
-                        self.log('matching ' + inpath)
-                    rule = self.configfile.match_rule(job.media_info, restrict_profiles=self.props.profiles)
-                    if rule is None:
-                        self.log(crayons.yellow(
-                            f'Failed to match rule/profile for host {self.name} for file {inpath} - skipped'))
-                        continue
-                    job.profile_name = rule.profile
-                _profile: Profile = self._manager.profiles[job.profile_name]
+                _profile: Profile = self.match_profile(job, self.name)
+                if _profile is None:
+                    continue
 
                 #
                 # calculate full input and output paths
@@ -298,8 +301,8 @@ class StreamingManagedHost(ManagedHost):
                 #
                 # build remote ffmpeg commandline
                 #
-                oinput = _profile.input_options
-                ooutput = _profile.output_options
+                oinput = _profile.input_options.as_shell_params()
+                ooutput = _profile.output_options.as_shell_params()
 #                quiet = ['-nostats', '-hide_banner']
 
                 if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
@@ -447,14 +450,9 @@ class MountedManagedHost(ManagedHost):
                 if pytranscoder.verbose:
                     self.log('matching ' + inpath)
 
-                if job.profile_name is None:
-                    rule = self.configfile.match_rule(job.media_info, restrict_profiles=self.props.profiles)
-                    if rule is None:
-                        self.log(crayons.yellow(
-                            f'Failed to match rule/profile for host {self.name} for file {inpath} - skipped'))
-                        continue
-                    job.profile_name = rule.profile
-                _profile: Profile = self._manager.profiles[job.profile_name]
+                _profile: Profile = self.match_profile(job, self.name)
+                if _profile is None:
+                    continue
 
                 #
                 # calculate paths
@@ -471,8 +469,8 @@ class MountedManagedHost(ManagedHost):
                 #
                 # build command line
                 #
-                oinput = _profile.input_options
-                ooutput = _profile.output_options
+                oinput = _profile.input_options.as_shell_params()
+                ooutput = _profile.output_options.as_shell_params()
 #                quiet = ['-nostats', '-hide_banner']
 
                 remote_inpath = self.converted_path(remote_inpath)
@@ -585,15 +583,9 @@ class LocalHost(ManagedHost):
                 if pytranscoder.verbose:
                     self.log('matching ' + inpath)
 
-                if job.profile_name is None:
-                    rule = self.configfile.match_rule(job.media_info, restrict_profiles=self.props.profiles)
-                    if rule is None:
-                        self.log(crayons.yellow(
-                            f'Failed to match rule/profile for host {self.name} for file {inpath} - skipped'))
-                        continue
-                    job.profile_name = rule.profile
-                _profile: Profile = self._manager.profiles[job.profile_name]
-
+                _profile: Profile = self.match_profile(job, self.name)
+                if _profile is None:
+                    continue
                 #
                 # calculate paths
                 #
@@ -602,8 +594,8 @@ class LocalHost(ManagedHost):
                 #
                 # build command line
                 #
-                oinput = _profile.input_options
-                ooutput = _profile.output_options
+                oinput = _profile.input_options.as_shell_params()
+                ooutput = _profile.output_options.as_shell_params()
 #                quiet = ['-nostats', '-hide_banner']
 
                 remote_inpath = self.converted_path(inpath)

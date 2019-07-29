@@ -261,13 +261,13 @@ class TranscoderTests(unittest.TestCase):
                 },
                 "qsv": {
                     "input_options": None,
-                    "output_options": "-c:v copy -c:a copy",
+                    "output_options": ["-c:v copy -c:a copy"],
                     "extension": ".mkv",
                     "queue": "q3",
                 },
                 "vintage_tv": {
                     "input_options": None,
-                    "output_options": "-c:v copy -c:a copy",
+                    "output_options": ["-c:v copy -c:a copy"],
                     "extension": ".mp4",
                 },
             },

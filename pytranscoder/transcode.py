@@ -72,8 +72,8 @@ class QueueThread(Thread):
         while not self.queue.empty():
             try:
                 job: LocalJob = self.queue.get()
-                oinput = job.profile.input_options
-                ooutput = job.profile.output_options
+                oinput = job.profile.input_options.as_shell_params()
+                ooutput = job.profile.output_options.as_shell_params()
 
                 outpath = job.inpath.with_suffix(job.profile.extension + '.tmp')
 

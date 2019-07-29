@@ -1,4 +1,59 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
+
+
+class Options:
+    def __init__(self, opts: List = None):
+        self.options = list()
+        if opts:
+            self.merge(opts)
+
+    def merge(self, child):
+        pdict = {}
+        parent: List = self.options
+        if isinstance(child, List):
+            child: List = child
+        else:
+            child: List = child.options
+        # prep the parent list for easy search/replace
+        for p in parent:
+            tmp = p.split()
+            if len(tmp) == 2:
+                pdict[tmp[0]] = tmp[1]
+            else:
+                pdict[tmp[0]] = None
+
+        # check child options against parent, replacing as needed
+        for child_opt in child:
+            tmp = child_opt.split()
+            if len(tmp) == 2:
+                if tmp[1]:
+                    pdict[tmp[0]] = tmp[1]
+            else:
+                pdict[tmp[0]] = None
+
+        new_opts = []
+        for k, v in pdict.items():
+            if v:
+                new_opts.append(k + ' ' + v)
+            else:
+                new_opts.append(k)
+        self.options = new_opts
+
+    def remove(self, opt: str):
+        for o in self.options:
+            if o.split()[0] == opt:
+                self.options.remove(o)
+                break
+
+    def as_list(self):
+        return list(self.options)
+
+    def as_shell_params(self) -> List:
+        z = []
+        for o in self.options:
+            for t in o.split():
+                z.append(t)
+        return z
 
 
 class Profile:
@@ -8,28 +63,23 @@ class Profile:
     def __init__(self, name: str, profile: Dict):
         self.profile = profile
         self.name = name
+        if "input_options" in self.profile:
+            self.profile["input_options"] = Options(profile["input_options"])
+        else:
+            self.profile["input_options"] = Options()
 
-    @staticmethod
-    def level_options(opts: List) -> List:
-        z = []
-        for o in opts:
-            for t in o.split():
-                z.append(t)
-        return z
-
-    @property
-    def input_options(self) -> [str]:
-        if 'input_options' in self.profile and self.profile['input_options'] is not None:
-            if isinstance(self.profile['input_options'], List):
-                return Profile.level_options(self.profile['input_options'])
-            return self.profile['input_options'].split()
-        return []
+        if "output_options" in self.profile:
+            self.profile["output_options"] = Options(profile["output_options"])
+        else:
+            self.profile["output_options"] = Options()
 
     @property
-    def output_options(self) -> [str]:
-        if isinstance(self.profile['output_options'], List):
-            return Profile.level_options(self.profile['output_options'])
-        return self.profile['output_options'].split()
+    def input_options(self) -> Options:
+        return self.profile["input_options"]
+
+    @property
+    def output_options(self) -> Options:
+        return self.profile["output_options"]
 
     @property
     def extension(self) -> str:
@@ -58,54 +108,29 @@ class Profile:
     def automap(self) -> bool:
         return self.profile.get('automap', True)
 
-    @staticmethod
-    def option_merge(parent: List, child: List) -> List:
-        pdict = {}
-        # prep the parent list for easy search/replace
-        for p in parent:
-            tmp = p.split()
-            if len(tmp) == 2:
-                pdict[tmp[0]] = tmp[1]
-            else:
-                pdict[p] = None
 
-        # check child options against parent, replacing as needed
-        for child_opt in child:
-            tmp = child_opt.split()
-            if len(tmp) == 2:
-                if tmp[1]:
-                    pdict[tmp[0]] = tmp[1]
-            else:
-                pdict[tmp] = None
-
-        newopts = []
-        for k, v in pdict.items():
-            if v:
-                newopts.append(k + ' ' + v)
-            else:
-                newopts.append(k)
-        return newopts
-
-    def include(self, parent):
+    def include(self, parent):      # accepts dict or Profile object
         # overlay this profile settings on top of parent profile to make a new one
-        p = dict(parent.profile)
-        for k, v in self.profile.items():
-            if k in p:
-                if isinstance(p[k], List):
-                    if isinstance(v, List):
+        if isinstance(parent, dict):
+            p = dict(parent)
+        else:
+            p = dict(parent.profile)
+        for k, v in p.items():
+            if k in self.profile:
+                if isinstance(v, Options):
+                    if isinstance(self.profile[k], Options):
                         # merge existing key values
-                        #p[k] = p[k] + v
-                        p[k] = self.option_merge(p[k], v)
+                        self.profile[k].merge(v)
                     else:
                         # replace
-                        p[k] = v
+                        self.profile[k] = v
                 else:
                     # keep child value
-                    p[k] = v
+                    self.profile[k] = v
             else:
-                p[k] = v
+                self.profile[k] = v
 
-        self.profile = p
+        return self
 
     def included_audio(self) -> list:
         audio_section = self.profile.get('audio')
