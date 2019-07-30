@@ -80,6 +80,14 @@ profiles:
         - "-c:s copy"
 
 
+  cuda_common:
+      input_options: 
+          - "-hwaccel cuvid"
+      output_options:
+          - "-c:v hevc_nvenc"
+          - "-profile:v main"
+          - "-preset medium"
+
   #
   # Sample cpu-based transcode, uses built-in default sequential queue
   #
@@ -96,7 +104,10 @@ profiles:
   #
   hevc_qsv:
     include: common
-    input_options: -hwaccel vaapi -hwaccel_device /dev/dri/renderD129 -hwaccel_output_format vaapi
+    input_options: 
+        - "-hwaccel vaapi"
+        - "-hwaccel_device /dev/dri/renderD129"
+        - "-hwaccel_output_format vaapi"
     output_options: 
         - "-vf scale_vaapi=format=p010"
         - "-c:v hevc_vaapi"
@@ -107,22 +118,14 @@ profiles:
   # Sample nVidia transcode setup, uses 'cuda' queue defined above
   #
   hevc_cuda:
-      include: common
-      input_options: -hwaccel cuvid
+      include: common cuda_common
       output_options:
-          - "-c:v hevc_nvenc"
-          - "-profile:v main"
-          - "-preset medium"
           - "-crf 20"
       queue: cuda
 
   h264_cuda:
-      include: common
-      input_options: -hwaccel cuvid
+      include: common cuda_common
       output_options:
-          - "-c:v h264_nvenc"
-          - "-profile:v main"
-          - "-preset medium"
           - "-crf 20"
       queue: cuda
 
@@ -131,30 +134,27 @@ profiles:
   # in this profile to include alternate audio and subtitle tracks
   #
   hevc_cuda_anime:
-      include: common
-      input_options: -hwaccel cuvid
+      include: common cuda_common
       output_options:
-          - "-c:v hevc_nvenc"
-          - "-profile:v main"
-          - "-preset medium"
           - "-crf 20"
       queue: cuda
       automap: yes
 
   hevc_30fps:               # when movie source is just too big, cut down fps
-      include: common
-      input_options: -hwaccel cuvid
+      include: common cuda_common
       output_options:
-          - "-c:v hevc_nvenc"
-          - "-profile:v main"
-          - "-preset medium"
           - "-crf 20"
           - "-r 30"
       queue: cuda
 
   h264:                    # basic h264 transcode using CPU (no CUDA or QSV support)
       input_options:
-      output_options: -c:v x264 -crf 22 -c:a copy -c:s copy -f mp4
+      output_options: 
+          - "-c:v x264"
+          - "-crf 22"
+          - "-c:a copy"
+          - "-c:s copy"
+          - "-f mp4"
       extension: '.mp4'
 
 

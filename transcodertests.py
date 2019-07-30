@@ -8,6 +8,7 @@ from pytranscoder.cluster import RemoteHostProperties, Cluster, StreamingManaged
 from pytranscoder.config import ConfigFile
 from pytranscoder.ffmpeg import status_re, FFmpeg
 from pytranscoder.media import MediaInfo
+from pytranscoder.profile import Profile
 from pytranscoder.transcode import LocalHost
 from pytranscoder.utils import files_from_file, get_local_os_type, calculate_progress, dump_stats
 
@@ -55,6 +56,17 @@ class TranscoderTests(unittest.TestCase):
             p = setup.get_profile('excl_test_2')
             streams = info.ffmpeg_streams(p)
             self.assertEqual(len(streams), 8, 'expected 4 streams (8 elements)')
+
+    def test_profile_merge(self):
+        p1 = Profile("p1", {"one": 1, "two": 2, "input_options": ["three", "four", "five"]})
+        p2 = Profile("p2", {"one": 11, "six": 6, "input_options": ["seven", "four"]})
+        p2.include(p1)
+        self.assertEqual(p2.get("one"), 11, 'expected 11 for "one"')
+        self.assertEqual(p2.get("two"), 2, 'expected 2 for "two"')
+        self.assertEqual(p2.get("six"), 6, 'expected 6 for "six"')
+        op2 = sorted(p2.input_options.as_list())
+        expected = sorted(["three", "four", "five", "seven"])
+        self.assertEqual(op2, expected, "Unexpected input_options merger")
 
     def test_progress(self):
         info = TranscoderTests.make_media(None, None, None, 1080, 90 * 60, 2300, 25, None, [], [])

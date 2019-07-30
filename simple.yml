@@ -22,7 +22,13 @@ profiles:
   #
   h264:
     input_options:
-    output_options: -threads 4 -c:v x264 -crf 20 -c:a copy -c:s copy -f matroska
+    output_options: 
+        - "-threads 4"
+        - "-c:v x264 "
+        - "-crf 20 "
+        - "-c:a copy" 
+        - "-c:s copy "
+        - "-f matroska"
     extension: '.mkv'
     threshold: 20
 
@@ -30,8 +36,16 @@ profiles:
   # Sample nVidia transcode setup, uses 'cuda' queue defined above
   #
   hevc_cuda:
-      input_options: -hwaccel cuvid
-      output_options: -c:v hevc_nvenc -profile:v main -preset medium -crf 20 -c:a copy -c:s copy -f matroska
+      input_options: 
+        -  "-hwaccel cuvid"
+      output_options: 
+        -  "-c:v hevc_nvenc"
+        -  "-profile:v main"
+        -  "-preset medium"
+        -  "-crf 20"
+        -  "-c:a copy"
+        -  "-c:s copy"
+        -  '-f matroska"
       extension: '.mkv'
       threshold: 20         # 20% minimum size reduction %, otherwise source is preserved as-is
 

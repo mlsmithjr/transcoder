@@ -73,6 +73,9 @@ class Profile:
         else:
             self.profile["output_options"] = Options()
 
+    def get(self, key: str):
+        return self.profile.get(key, None)
+
     @property
     def input_options(self) -> Options:
         return self.profile["input_options"]
@@ -108,7 +111,6 @@ class Profile:
     def automap(self) -> bool:
         return self.profile.get('automap', True)
 
-
     def include(self, parent):      # accepts dict or Profile object
         # overlay this profile settings on top of parent profile to make a new one
         if isinstance(parent, dict):
@@ -126,7 +128,7 @@ class Profile:
                         self.profile[k] = v
                 else:
                     # keep child value
-                    self.profile[k] = v
+                    continue
             else:
                 self.profile[k] = v
 
