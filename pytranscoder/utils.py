@@ -73,3 +73,14 @@ def dump_stats(completed):
         _sec = int(elapsed % 60)
         print(f"{pathname}  ({_min:3}m {_sec:2}s)")
     print()
+
+
+def try_hook(media_info: MediaInfo):
+    if not pytranscoder.hook_loaded:
+        hookfile = os.path.join(pytranscoder.__path__[0], "rule_hook.py")
+        if os.path.exists(hookfile):
+            m = __import__(hookfile)
+            pytranscoder.hook_loaded = True
+            pytranscoder.hook_call = getattr(m, "rule_hook")
+    if pytranscoder.hook_call:
+        return pytranscoder.hook_call(media_info)

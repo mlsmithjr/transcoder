@@ -9,3 +9,5 @@ __license__ = 'GPLv3'
 verbose = False
 keep_source = False
 dry_run = False
+hook_loaded = False
+hook_call = None

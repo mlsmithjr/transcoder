@@ -5,7 +5,10 @@ class Options:
     def __init__(self, opts: List = None):
         self.options = list()
         if opts:
-            self.merge(opts)
+            if isinstance(opts, str):
+                self.options.append(opts)
+            else:
+                self.merge(opts)
 
     def merge(self, child):
         pdict = {}
@@ -56,13 +59,16 @@ class Options:
         return z
 
 
-class Profile:
-    name: str
-    profile: Dict
+class ProfileSKIP(Exception):
+    pass
 
-    def __init__(self, name: str, profile: Dict):
+
+class Profile:
+    def __init__(self, name: str, profile: Optional[Dict] = None):
         self.profile = profile
         self.name = name
+        if not profile:
+            self.profile = dict()
         if "input_options" in self.profile:
             self.profile["input_options"] = Options(profile["input_options"])
         else:
@@ -92,6 +98,10 @@ class Profile:
     def queue_name(self) -> str:
         return self.profile.get('queue', None)
 
+    @queue_name.setter
+    def queue_name(self, name: str):
+        self.profile["queue"] = name
+
     @property
     def threshold(self) -> int:
         return self.profile.get('threshold', 0)
@@ -110,6 +120,10 @@ class Profile:
     @property
     def automap(self) -> bool:
         return self.profile.get('automap', True)
+
+    @automap.setter
+    def automap(self, val: bool):
+        self.profile["automap"] = val
 
     def include(self, parent):      # accepts dict or Profile object
         # overlay this profile settings on top of parent profile to make a new one

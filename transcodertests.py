@@ -4,6 +4,7 @@ import os
 from typing import Dict
 from unittest import mock
 
+from pytranscoder import transcode
 from pytranscoder.cluster import RemoteHostProperties, Cluster, StreamingManagedHost
 from pytranscoder.config import ConfigFile
 from pytranscoder.ffmpeg import status_re, FFmpeg
@@ -56,6 +57,10 @@ class TranscoderTests(unittest.TestCase):
             p = setup.get_profile('excl_test_2')
             streams = info.ffmpeg_streams(p)
             self.assertEqual(len(streams), 8, 'expected 4 streams (8 elements)')
+
+    def test_hook(self):
+        transcode.manage_hook("rule_hook_ex.py")
+        transcode.manage_hook(None)
 
     def test_profile_merge(self):
         p1 = Profile("p1", {"one": 1, "two": 2, "input_options": ["three", "four", "five"]})
