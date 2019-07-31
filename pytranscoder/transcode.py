@@ -18,7 +18,7 @@ from pytranscoder.config import ConfigFile
 from pytranscoder.ffmpeg import FFmpeg
 from pytranscoder.media import MediaInfo
 from pytranscoder.profile import Profile, ProfileSKIP
-from pytranscoder.utils import filter_threshold, files_from_file, calculate_progress, dump_stats
+from pytranscoder.utils import filter_threshold, files_from_file, calculate_progress, dump_stats, try_hook
 
 DEFAULT_CONFIG = os.path.expanduser('~/.transcode.yml')
 
@@ -221,25 +221,33 @@ class LocalHost:
             if media_info.valid:
 
                 if forced_profile is None:
-
                     the_profile = None
+                    #
+                    # first, try to invoke any user-installed hooks
+                    #
                     try:
                         the_profile = try_hook(media_info)
                     except ProfileSKIP:
-                        print(crayons.green(os.path.basename(path)), f'SKIPPED ({hook})')
+                        print(crayons.green(os.path.basename(path)), f'SKIPPED (hook)')
                         self.complete.append((path, 0))
                         continue
-
-                    rule = self.configfile.match_rule(media_info)
-                    if rule is None:
-                        print(crayons.yellow(f'No matching profile found - skipped'))
-                        continue
-                    if rule.is_skip():
-                        print(crayons.green(os.path.basename(path)), f'SKIPPED ({rule.name})')
-                        self.complete.append((path, 0))
-                        continue
-                    profile_name = rule.profile
-                    the_profile = self.configfile.get_profile(profile_name)
+                    except ModuleNotFoundError:
+                        # no hook/bad hook - ignore
+                        pass
+                    #
+                    # if no profile returned from hook, try declared rules
+                    #
+                    if not the_profile:
+                        rule = self.configfile.match_rule(media_info)
+                        if rule is None:
+                            print(crayons.yellow(f'No matching profile found - skipped'))
+                            continue
+                        if rule.is_skip():
+                            print(crayons.green(os.path.basename(path)), f'SKIPPED ({rule.name})')
+                            self.complete.append((path, 0))
+                            continue
+                        profile_name = rule.profile
+                        the_profile = self.configfile.get_profile(profile_name)
                 else:
                     #
                     # looks good, add this file to the thread queue
@@ -337,7 +345,11 @@ def manage_hook(path=None):
                 out.write(hook_file.read())
     else:
         outpath = pytranscoder.__path__[0]
-        os.remove(os.path.join(outpath, "rule_hook.py"))
+        with open(os.path.join(outpath, "rule_hook.py"), "w") as out:
+            out.write("""
+def rule_hook(mediainfo):
+    return None
+""")
 
 
 def main():

@@ -11,7 +11,7 @@ from pytranscoder.ffmpeg import status_re, FFmpeg
 from pytranscoder.media import MediaInfo
 from pytranscoder.profile import Profile
 from pytranscoder.transcode import LocalHost
-from pytranscoder.utils import files_from_file, get_local_os_type, calculate_progress, dump_stats
+from pytranscoder.utils import files_from_file, get_local_os_type, calculate_progress, dump_stats, try_hook
 
 
 class TranscoderTests(unittest.TestCase):
@@ -60,7 +60,14 @@ class TranscoderTests(unittest.TestCase):
 
     def test_hook(self):
         transcode.manage_hook("rule_hook_ex.py")
+        info = TranscoderTests.make_media("/some/path/to/anime/content", "x264", None, 720, 45, 3000, 25, None, [], [])
+        profile = try_hook(info)
         transcode.manage_hook(None)
+        self.assertEqual(profile.name, "anime", "Expected to match anime")
+        expected = sorted(["-f matroska", "-c:a copy", "-c:s copy", "-c:v hevc_nvenc", "-profile:v main",
+                           "-preset medium", "-crf 20"])
+        actual = sorted(profile.output_options.as_list())
+        self.assertEqual(actual, expected, "Output options mismatch")
 
     def test_profile_merge(self):
         p1 = Profile("p1", {"one": 1, "two": 2, "input_options": ["three", "four", "five"]})

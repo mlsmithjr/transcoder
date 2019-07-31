@@ -20,8 +20,8 @@ from pytranscoder import verbose
 from pytranscoder.config import ConfigFile
 from pytranscoder.ffmpeg import FFmpeg
 from pytranscoder.media import MediaInfo
-from pytranscoder.profile import Profile
-from pytranscoder.utils import filter_threshold, get_local_os_type, calculate_progress, run
+from pytranscoder.profile import Profile, ProfileSKIP
+from pytranscoder.utils import filter_threshold, get_local_os_type, calculate_progress, run, try_hook
 
 
 class RemoteHostProperties:
@@ -751,7 +751,7 @@ class Cluster(Thread):
             else:
                 print(crayons.red(f'Unknown cluster host type "{hosttype}" - skipping'))
 
-    def enqueue(self, file, profile_name: Optional[str]) -> (str, Optional[EncodeJob]):
+    def enqueue(self, file, forced_profile: Optional[str]) -> (str, Optional[EncodeJob]):
         """Add a media file to this cluster queue.
            This is different than in local mode in that we only care about handling skips here.
            The profile will be selected once a host is assigned to the work
@@ -767,28 +767,46 @@ class Cluster(Thread):
             return None, None
         if media_info.valid:
 
-            if profile_name is None:
+            if forced_profile is None:
                 #
                 # just interested in SKIP rule matches and queue designations here
                 #
-                rule = self.config.match_rule(media_info)
-                if rule is None:
-                    print(crayons.yellow(f'No matching profile found - skipped'))
-                    return None, None
-                if rule.is_skip():
-                    basename = os.path.basename(path)
-                    print(f'{basename}: Skipping due to profile rule - {rule.name}')
-                    return None, None
-                profile_name = rule.profile
 
-            profile = self.profiles[profile_name]
+                profile = None
+                #
+                # first, try to invoke any user-installed hooks
+                #
+                try:
+                    profile = try_hook(media_info)
+                except ProfileSKIP:
+                    print(crayons.green(os.path.basename(path)), f'SKIPPED (hook)')
+                    return None, None
+                except ModuleNotFoundError:
+                    # no hook/bad hook - ignore
+                    pass
+                #
+                # if no profile returned from hook, try declared rules
+                #
+                if not profile:
+                    rule = self.config.match_rule(media_info)
+                    if rule is None:
+                        print(crayons.yellow(f'No matching profile found - skipped'))
+                        return None, None
+                    if rule.is_skip():
+                        basename = os.path.basename(path)
+                        print(f'{basename}: Skipping due to profile rule - {rule.name}')
+                        return None, None
+                    profile = rule.profile
+            else:
+                profile = self.profiles[forced_profile]
+
             # not short circuited by a skip rule, add to appropriate queue
             queue_name = profile.queue_name if profile.queue_name is not None else '_default'
             if queue_name not in self.queues:
                 print(crayons.red('Error: ') +
                       f'Queue "{queue_name}" referenced in profile "{profile.name}" not defined in any host')
                 exit(1)
-            job = EncodeJob(file, media_info, profile_name)
+            job = EncodeJob(file, media_info, forced_profile)
             self.queues[queue_name].put(job)
             return queue_name, job
         return None, None

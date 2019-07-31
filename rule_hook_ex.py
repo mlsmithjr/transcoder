@@ -3,7 +3,7 @@ from typing import Optional
 from pytranscoder.media import MediaInfo
 from pytranscoder.profile import Profile, ProfileSKIP
 
-common = {
+common = Profile("common", {
     'extension': '.mkv',
     'threshold': 20,         # 20% minimum size reduction %, otherwise source is preserved as-is
     'threshold_check': 60,   # start checking threshold at 60% done, kill job if threshold not met
@@ -15,7 +15,7 @@ common = {
         "-c:a copy",
         "-c:s copy",
     ]
-}
+})
 
 
 ##

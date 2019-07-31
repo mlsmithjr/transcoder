@@ -76,11 +76,9 @@ def dump_stats(completed):
 
 
 def try_hook(media_info: MediaInfo):
-    if not pytranscoder.hook_loaded:
-        hookfile = os.path.join(pytranscoder.__path__[0], "rule_hook.py")
-        if os.path.exists(hookfile):
-            m = __import__(hookfile)
-            pytranscoder.hook_loaded = True
-            pytranscoder.hook_call = getattr(m, "rule_hook")
-    if pytranscoder.hook_call:
-        return pytranscoder.hook_call(media_info)
+
+    filepath = os.path.dirname(pytranscoder.__file__)
+    if os.path.exists(os.path.join(filepath, "rule_hook.py")):
+        from pytranscoder.rule_hook import rule_hook
+        return rule_hook(media_info)
+    return None
