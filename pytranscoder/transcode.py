@@ -248,6 +248,8 @@ class LocalHost:
                             continue
                         profile_name = rule.profile
                         the_profile = self.configfile.get_profile(profile_name)
+                    else:
+                        profile_name = the_profile.name
                 else:
                     #
                     # looks good, add this file to the thread queue

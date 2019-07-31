@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Any
 
 
 class Options:
@@ -65,10 +65,12 @@ class ProfileSKIP(Exception):
 
 class Profile:
     def __init__(self, name: str, profile: Optional[Dict] = None):
-        self.profile = profile
+        self.profile: Dict[str, Any] = profile
         self.name = name
+
         if not profile:
             self.profile = dict()
+
         if "input_options" in self.profile:
             self.profile["input_options"] = Options(profile["input_options"])
         else:
