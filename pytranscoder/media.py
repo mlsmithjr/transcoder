@@ -126,6 +126,7 @@ class MediaInfo:
             # simple numeric equality test
 
             if pred == 'runtime':
+                # convert to seconds
                 value = str(int(value) * 60)
 
             expr = f'{attr} == {value}'

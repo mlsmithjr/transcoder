@@ -69,7 +69,7 @@ class Profile:
         self.name = name
 
         if not profile:
-            self.profile = dict()
+            self.profile: Dict[str, Any] = dict()
 
         if "input_options" in self.profile:
             self.profile["input_options"] = Options(profile["input_options"])
@@ -114,7 +114,7 @@ class Profile:
 
     @property
     def include_profiles(self) -> List[str]:
-        alist = self.profile.get('include', None)
+        alist: str = self.profile.get('include', None)
         if alist is None:
             return []
         return alist.split()

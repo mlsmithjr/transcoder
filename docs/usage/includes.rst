@@ -34,7 +34,14 @@ The above example is equivalent to:
 .. code-block:: yaml
 
       hevc_cuda:
-        output_options: -crf 18 -preset slow -c:a copy -c:s copy -f matroska -c:v hevc_nvenc -profile:v main
+        output_options:
+          - "-crf 18"
+          - "-preset slow"
+          - "-c:a copy"
+          - "-c:s copy"
+          - "-f matroska"
+          - "-c:v hevc_nvenc"
+          - "-profile:v main"
         threshold : 18
         extension: ".mkv"
 
@@ -51,13 +58,20 @@ Here is the same example slightly reformatted:
     #
       profiles:
         hq:
-          output_options: -crf 18 -preset slow -c:a copy -c:s copy -f matroska
+          output_options:
+            - "-crf 18"
+            - "-preset slow"
+            - "-c:a copy"
+            - "-c:s copy"
+            - "-f matroska"
           threshold: 20
           extension: ".mkv"
 
         hevc_cuda:
           include: hq
-          output_options: -c:v hevc_nvenc -profile:v main
+          output_options:
+            - "-c:v hevc_nvenc"
+            - "-profile:v main"
           threshold: 18
 
 This will produce a bad profile. Now I need to mention a feature of YAML only used in the **include** examples - lists.  YAML-formatted data can be very complex but pytranscoder requirements are meager and simple.  But to support the include feature in both _replace_ and _merge_ modes I needed another way to express input and output options.
@@ -67,7 +81,9 @@ With this new information we can now see why the Replace example produces a bad 
 .. code-block:: yaml
 
     hevc_cuda:
-      output_options: -c:v hevc_nvenc -profile:v main
+      output_options:
+        - "-c:v hevc_nvenc"
+        - "-profile:v main"
       threshold: 18
       extension: ".mkv"
 

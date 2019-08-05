@@ -26,7 +26,7 @@ common = Profile("common", {
 # The result of calling rule_hook() should be one of:
 #   - raise ProfileSKIP(), which raises an exception telling pytranscoder to skip the file
 #   - return a valid Profile of your custom settings
-#   - return None, indicating no match was made and to continue evaluating the transcoder.yml rules.
+#   - return None, indicating no match was made and to continue by evaluating the transcoder.yml rules.
 ##
 def rule_hook(mediainfo: MediaInfo) -> Optional[Profile]:
 
@@ -76,7 +76,6 @@ def rule_hook(mediainfo: MediaInfo) -> Optional[Profile]:
           "-crf 20",
           "-r 30"])
         profile.queue_name = "cuda"
-
 
     #
     # default to no profile to continue on and evaluate defined rules next (transcoder.yml)
