@@ -56,3 +56,9 @@ audio       list of audio tracks (list of dictionaries). Keys=stream, lang, form
 subtitle    list of subtitle tracks (list of dictionaries). Keys=stream, lang
 ========    =====
 
+-------
+Testing
+-------
+
+You are free to add a __main__ to your code and any unit tests you like.
+You can perform final testing by installing and using the --dry-run option to check your media.
