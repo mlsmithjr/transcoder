@@ -96,6 +96,10 @@ class Profile:
     def extension(self) -> str:
         return self.profile['extension']
 
+    @extension.setter
+    def extension(self, ext: str):
+        self.profile["extension"] = ext
+
     @property
     def queue_name(self) -> str:
         return self.profile.get('queue', None)
@@ -108,16 +112,17 @@ class Profile:
     def threshold(self) -> int:
         return self.profile.get('threshold', 0)
 
+    @threshold.setter
+    def threshold(self, val):
+        self.profile["threshold"] = val
+
     @property
     def threshold_check(self) -> int:
         return self.profile.get('threshold_check', 100)
 
-    @property
-    def include_profiles(self) -> List[str]:
-        alist: str = self.profile.get('include', None)
-        if alist is None:
-            return []
-        return alist.split()
+    @threshold_check.setter
+    def threshold_check(self, val):
+        self.profile["threshold_check"] = val
 
     @property
     def automap(self) -> bool:
@@ -126,6 +131,13 @@ class Profile:
     @automap.setter
     def automap(self, val: bool):
         self.profile["automap"] = val
+
+    @property
+    def include_profiles(self) -> List[str]:
+        alist: str = self.profile.get('include', None)
+        if alist is None:
+            return []
+        return alist.split()
 
     def include(self, parent):      # accepts dict or Profile object
         # overlay this profile settings on top of parent profile to make a new one
