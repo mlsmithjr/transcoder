@@ -44,6 +44,9 @@ class ConfigFile:
             else:
                 self.queues = dict()
 
+    def fls_path(self) -> str:
+        return self.settings.get('fls_path', None)
+
     def colorize(self) -> bool:
         return self.settings.get('colorize', 'no').lower() == 'yes'
 

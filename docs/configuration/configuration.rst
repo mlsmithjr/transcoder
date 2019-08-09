@@ -26,9 +26,10 @@ These options apply globally to pytranscoder.
         queues:
             qsv:                1                   # sequential encodes
             cuda:               2                   # maximum of 2 encodes at a time
-        plex_server:          192.168.2.61:32400  # optional, use 'address:port'
+        plex_server:          192.168.2.61:32400    # optional, use 'address:port'
         colorize:             yes
         automap:              no
+        fls_path:             '/tmp'                # use local SSD to reduce thrashing of my NAS
 
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | Setting               | Purpose                                                                                                                                                                                                                                   |
@@ -46,6 +47,8 @@ These options apply globally to pytranscoder.
 | colorize              | optional, defaults to "no". If "yes" terminal output will have some color added                                                                                                                                                           |
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | automap               | optional, defaults to "yes". If "yes" then auto calculate and insert *ffmpeg* **-map** options to preserve all audio and subtitle tracks                                                                                                  |
++-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| fls_path              | optional. If given, this path is used when transcoding to build the output file if the input is on a network share. This reduces random seek overhead (thrashing). When finished, the output is only then moved to the network share.     |
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 

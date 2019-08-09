@@ -2,8 +2,9 @@
 import datetime
 import glob
 import os
+import shutil
 import sys
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Set, List, Optional
 
 from queue import Queue
@@ -18,7 +19,7 @@ from pytranscoder.config import ConfigFile
 from pytranscoder.ffmpeg import FFmpeg
 from pytranscoder.media import MediaInfo
 from pytranscoder.profile import Profile, ProfileSKIP
-from pytranscoder.utils import filter_threshold, files_from_file, calculate_progress, dump_stats, try_hook
+from pytranscoder.utils import filter_threshold, files_from_file, calculate_progress, dump_stats, try_hook, is_mounted
 
 DEFAULT_CONFIG = os.path.expanduser('~/.transcode.yml')
 
@@ -75,7 +76,13 @@ class QueueThread(Thread):
                 oinput = job.profile.input_options.as_shell_params()
                 ooutput = job.profile.output_options.as_shell_params()
 
-                outpath = job.inpath.with_suffix(job.profile.extension + '.tmp')
+                fls = False
+                if is_mounted(job.inpath) and self.config.fls_path():
+                    # lets write output to local storage, for efficiency
+                    outpath = PurePath(self.config.fls_path(), job.inpath.with_suffix(job.profile.extension).name)
+                    fls = True
+                else:
+                    outpath = job.inpath.with_suffix(job.profile.extension + '.tmp')
 
                 #
                 # check if we need to exclude any streams
@@ -130,7 +137,12 @@ class QueueThread(Thread):
                         if pytranscoder.verbose:
                             self.log(f'replacing {job.inpath} with {outpath}')
                         job.inpath.unlink()
-                        outpath.rename(job.inpath.with_suffix(job.profile.extension))
+
+                        if fls:
+                            shutil.move(outpath, job.inpath.with_suffix(job.profile.extension))
+                        else:
+                            outpath.rename(job.inpath.with_suffix(job.profile.extension))
+
                         self.log(crayons.green(f'Finished {job.inpath}'))
                     else:
                         self.log(crayons.yellow(f'Finished {outpath}, original file unchanged'))

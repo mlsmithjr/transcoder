@@ -1,6 +1,15 @@
 
 ### Version History
 
+Version 2.1.0
+    * Added 'fls_path' option to transcode.yml, which allows designating a "fast local storage" path where
+      output is written during transcode rather than thrashing your network share/NAS with many small reads
+      and writes. Final output is moved to the share when complete.  Only applicable if the input file is on
+      a detected network share.
+
+    * Added a hook to allow creation of custom Python rule and profile functionality outside of that defined
+      in the transcode.yml file. See documentation for details.
+
 Version 2.0.8
     * Fixed automap=No recognition problem using non-clustered transcoding.
 

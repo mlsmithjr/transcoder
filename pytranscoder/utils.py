@@ -2,6 +2,7 @@ import math
 import os
 import platform
 import subprocess
+from pathlib import Path
 from typing import Dict
 
 import pytranscoder
@@ -73,6 +74,14 @@ def dump_stats(completed):
         _sec = int(elapsed % 60)
         print(f"{pathname}  ({_min:3}m {_sec:2}s)")
     print()
+
+
+def is_mounted(filepath: Path) -> bool:
+    p = filepath.resolve()
+    for part in p.parents:
+        if part != Path.root and part.is_mount():
+            return True
+    return False
 
 
 def try_hook(media_info: MediaInfo):
