@@ -41,12 +41,51 @@ def rule_hook(mediainfo: MediaInfo) -> Optional[Profile]:
     #
     if mediainfo.filesize_mb < 2500 and 720 < mediainfo.res_height < 1081 and 30 < mediainfo.runtime < 65:
         raise ProfileSKIP()
+
+    #
+    # skip video if resolution < 700:  # don't re-encode something this small - no gain in it
+    #
+    if mediainfo.res_height < 700:
+        raise ProfileSKIP()
+
+    #
+    # Here is a complex example you can only perform with a custom hook.
+    #
+    # strip redundant HD audio tracks from 4k to make it smaller
+    #
+    if mediainfo.vcodec == 'hevc' and mediainfo.res_height >= 2160 and len(mediainfo.audio) > 1:
+        profile = Profile("strip-DTS")
+
+        truehd = None
+        ac3_track = None
+        for track in mediainfo.audio:
+            if track['lang'] != 'eng':
+                continue
+            if track['format'] == 'truehd':
+                truehd_track = track['stream']
+            elif track['format'] == 'ac3':
+                ac3_track = track['stream']
+
+        # if both English tracks exist, eliminate truehd and keep ac3 - don't transcode video
+        if truehd_track and ac3_track:
+            profile.automap = False             # override default
+            profile.output_options.merge({
+                '-map': ac3_track,
+                '-c:v': 'copy',
+                '-c:s': 'copy',
+                '-c:a': 'copy',
+                '-f'  : 'matroksa'
+            })
+            profile.extension = '.mkv'
+            return profile
+
     #
     # anime
     #
     if '/anime/' in mediainfo.path:
         profile = Profile("anime")
         profile.include(common)                          # include: common
+        profile.include(incremental)
         profile.output_options.merge([
           "-c:v hevc_nvenc",
           "-profile:v main",
@@ -58,17 +97,12 @@ def rule_hook(mediainfo: MediaInfo) -> Optional[Profile]:
         return profile
 
     #
-    # skip video if resolution < 700:  # don't re-encode something this small - no gain in it
-    #
-    if mediainfo.res_height < 700:
-        raise ProfileSKIP()
-
-    #
     # high frame rate
     #
     if mediainfo.fps > 30 and mediainfo.filesize_mb > 500:
         profile = Profile("high-frame-rate")
         profile.include(common)                          # include: common
+        profile.include(incremental)
         profile.output_options.merge([
           "-c:v hevc_nvenc",
           "-profile:v main",
