@@ -85,7 +85,6 @@ def rule_hook(mediainfo: MediaInfo) -> Optional[Profile]:
     if '/anime/' in mediainfo.path:
         profile = Profile("anime")
         profile.include(common)                          # include: common
-        profile.include(incremental)
         profile.output_options.merge([
           "-c:v hevc_nvenc",
           "-profile:v main",
@@ -102,7 +101,6 @@ def rule_hook(mediainfo: MediaInfo) -> Optional[Profile]:
     if mediainfo.fps > 30 and mediainfo.filesize_mb > 500:
         profile = Profile("high-frame-rate")
         profile.include(common)                          # include: common
-        profile.include(incremental)
         profile.output_options.merge([
           "-c:v hevc_nvenc",
           "-profile:v main",

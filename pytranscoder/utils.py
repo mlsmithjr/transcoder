@@ -79,7 +79,7 @@ def dump_stats(completed):
 def is_mounted(filepath: Path) -> bool:
     p = filepath.resolve()
     for part in p.parents:
-        if part != Path.root and part.is_mount():
+        if str(part) != str(part.root) and part.is_mount():
             return True
     return False
 

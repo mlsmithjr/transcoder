@@ -13,6 +13,9 @@ config:
     qsv: 1                      # max 1 job at a time for QSV transcode
     cuda: 2                     # max 2 jobs at a time for nVidia CUDA transcodes
                                 # everything else defaults to 1 (sequential transcode)
+  colorize: yes
+  fls_path: '/tmp'
+
   #####################################################
   # Define your home cluster here,
   # or remove this section if not

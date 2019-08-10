@@ -796,7 +796,7 @@ class Cluster(Thread):
                         basename = os.path.basename(path)
                         print(f'{basename}: Skipping due to profile rule - {rule.name}')
                         return None, None
-                    profile = rule.profile
+                    profile = self.profiles[rule.profile]
             else:
                 profile = self.profiles[forced_profile]
 
@@ -806,7 +806,7 @@ class Cluster(Thread):
                 print(crayons.red('Error: ') +
                       f'Queue "{queue_name}" referenced in profile "{profile.name}" not defined in any host')
                 exit(1)
-            job = EncodeJob(file, media_info, forced_profile)
+            job = EncodeJob(file, media_info, profile.name)
             self.queues[queue_name].put(job)
             return queue_name, job
         return None, None
