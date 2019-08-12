@@ -355,11 +355,11 @@ def manage_hook(path=None):
     if path:
         with open(path, "r") as hook_file:
             outpath = pytranscoder.__path__[0]
-            with open(os.path.join(outpath, "rule_hook.py"), "w") as out:
+            with open(os.path.join(outpath, "hook", "rule_hook.py"), "w") as out:
                 out.write(hook_file.read())
     else:
         outpath = pytranscoder.__path__[0]
-        with open(os.path.join(outpath, "rule_hook.py"), "w") as out:
+        with open(os.path.join(outpath, "hook", "rule_hook.py"), "w") as out:
             out.write("""
 def rule_hook(mediainfo):
     return None

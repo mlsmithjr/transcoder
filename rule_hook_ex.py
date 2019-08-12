@@ -56,7 +56,7 @@ def rule_hook(mediainfo: MediaInfo) -> Optional[Profile]:
     if mediainfo.vcodec == 'hevc' and mediainfo.res_height >= 2160 and len(mediainfo.audio) > 1:
         profile = Profile("strip-DTS")
 
-        truehd = None
+        truehd_track = None
         ac3_track = None
         for track in mediainfo.audio:
             if track['lang'] != 'eng':

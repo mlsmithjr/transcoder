@@ -1,3 +1,4 @@
+import importlib
 import math
 import os
 import platform
@@ -84,10 +85,10 @@ def is_mounted(filepath: Path) -> bool:
     return False
 
 
-def try_hook(media_info: MediaInfo):
+def try_hook(media_info: MediaInfo, is_testing = False):
 
-    filepath = os.path.dirname(pytranscoder.__file__)
-    if os.path.exists(os.path.join(filepath, "rule_hook.py")):
-        from pytranscoder.rule_hook import rule_hook
-        return rule_hook(media_info)
-    return None
+    m = importlib.import_module("pytranscoder.hook.rule_hook")
+    if is_testing:
+        m = importlib.reload(m)
+    fn = getattr(m, 'rule_hook')
+    return fn(media_info)
