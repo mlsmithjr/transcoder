@@ -7,6 +7,8 @@ Version 2.0.9
       and writes. Final output is moved to the share when complete.  Only applicable if the input file is on
       a detected network share.
 
+    * Configuration files now require lists to use the multi-line YAML format for consistency (see updated example included)
+
 Version 2.0.8
     * Fixed automap=No recognition problem using non-clustered transcoding.
 
