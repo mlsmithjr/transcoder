@@ -1,4 +1,5 @@
 import sys
+import os
 from typing import Dict, Any, Optional
 
 import yaml
@@ -24,6 +25,9 @@ class ConfigFile:
             if isinstance(configuration, Dict):
                 yml = configuration
             else:
+                if not os.path.exists(configuration):
+                    print(f'Configuration file "{configuration}" not found')
+                    exit(1)
                 with open(configuration, 'r') as f:
                     yml = yaml.load(f, Loader=yaml.Loader)
             self.settings = yml['config']
