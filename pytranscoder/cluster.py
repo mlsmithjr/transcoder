@@ -21,7 +21,7 @@ from pytranscoder.config import ConfigFile
 from pytranscoder.ffmpeg import FFmpeg
 from pytranscoder.media import MediaInfo
 from pytranscoder.profile import Profile, ProfileSKIP
-from pytranscoder.utils import filter_threshold, get_local_os_type, calculate_progress, run, try_hook
+from pytranscoder.utils import filter_threshold, get_local_os_type, calculate_progress, run
 
 
 class RemoteHostProperties:
@@ -767,38 +767,29 @@ class Cluster(Thread):
             return None, None
         if media_info.valid:
 
+            if pytranscoder.verbose:
+                print(str(media_info))
+
             if forced_profile is None:
                 #
                 # just interested in SKIP rule matches and queue designations here
                 #
 
                 profile = None
-                #
-                # first, try to invoke any user-installed hooks
-                #
-                try:
-                    profile = try_hook(media_info)
-                except ProfileSKIP:
-                    print(crayons.green(os.path.basename(path)), f'SKIPPED (hook)')
+                rule = self.config.match_rule(media_info)
+                if rule is None:
+                    print(crayons.yellow(f'No matching profile found - skipped'))
                     return None, None
-                except ModuleNotFoundError:
-                    # no hook/bad hook - ignore
-                    pass
-                #
-                # if no profile returned from hook, try declared rules
-                #
-                if not profile:
-                    rule = self.config.match_rule(media_info)
-                    if rule is None:
-                        print(crayons.yellow(f'No matching profile found - skipped'))
-                        return None, None
-                    if rule.is_skip():
-                        basename = os.path.basename(path)
-                        print(f'{basename}: Skipping due to profile rule - {rule.name}')
-                        return None, None
-                    profile = self.profiles[rule.profile]
+                if rule.is_skip():
+                    basename = os.path.basename(path)
+                    print(f'{basename}: Skipping due to profile rule - {rule.name}')
+                    return None, None
+                profile = self.profiles[rule.profile]
             else:
                 profile = self.profiles[forced_profile]
+
+            if pytranscoder.verbose:
+                print("Matched to profile {profile.name}")
 
             # not short circuited by a skip rule, add to appropriate queue
             queue_name = profile.queue_name if profile.queue_name is not None else '_default'

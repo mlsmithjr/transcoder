@@ -29,7 +29,6 @@ Features
    configuration/configuration
    configuration/concurrency
    configuration/cluster
-   configuration/hook
    usage/running-local.rst
    usage/running-clustered.rst
    usage/includes.rst

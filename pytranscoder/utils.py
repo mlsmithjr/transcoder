@@ -84,11 +84,3 @@ def is_mounted(filepath: Path) -> bool:
             return True
     return False
 
-
-def try_hook(media_info: MediaInfo, is_testing = False):
-
-    m = importlib.import_module("pytranscoder.hook.rule_hook")
-    if is_testing:
-        m = importlib.reload(m)
-    fn = getattr(m, 'rule_hook')
-    return fn(media_info)

@@ -1,6 +1,7 @@
 
 import os
 import re
+from datetime import timedelta
 from typing import Dict, Optional, List
 
 from pytranscoder import verbose
@@ -33,6 +34,15 @@ class MediaInfo:
         self.colorspace = info['colorspace']
         self.audio = info['audio']
         self.subtitle = info['subtitle']
+
+    def __str__(self):
+        runtime = "{:0>8}".format(str(timedelta(seconds=self.runtime)))
+        audios = [a['stream'] + ':' + a['lang'] + ':' + a['format'] + ':' + a['default'] for a in self.audio]
+        audio = '(' + ','.join(audios) + ')'
+        subs = [s['stream'] + ':' + s['lang'] + ':' + s['default'] for s in self.subtitle]
+        sub = '(' + ','.join(subs) + ')'
+        buf = f"MediaInfo: {self.path}, {self.filesize_mb}mb, {self.fps} fps, cs={self.colorspace}, {self.res_width}x{self.res_height}, {runtime}, c:v={self.vcodec}, audio={audio}, sub={sub}"
+        return buf
 
     def is_multistream(self) -> bool:
         return len(self.audio) > 1 or len(self.subtitle) > 1

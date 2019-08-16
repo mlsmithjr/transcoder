@@ -19,7 +19,7 @@ from pytranscoder.config import ConfigFile
 from pytranscoder.ffmpeg import FFmpeg
 from pytranscoder.media import MediaInfo
 from pytranscoder.profile import Profile, ProfileSKIP
-from pytranscoder.utils import filter_threshold, files_from_file, calculate_progress, dump_stats, try_hook, is_mounted
+from pytranscoder.utils import filter_threshold, files_from_file, calculate_progress, dump_stats, is_mounted
 
 DEFAULT_CONFIG = os.path.expanduser('~/.transcode.yml')
 
@@ -220,11 +220,8 @@ class LocalHost:
                 continue
 
             if not os.path.isfile(path):
-                print(crayons.red('path not found, skipping: ' + path))
+                print(crayons.red('file not found, skipping: ' + path))
                 continue
-
-            if pytranscoder.verbose:
-                print('matching ' + path)
 
             media_info = self.ffmpeg.fetch_details(path)
             if media_info is None:
@@ -232,36 +229,21 @@ class LocalHost:
                 continue
             if media_info.valid:
 
+                if pytranscoder.verbose:
+                    print(str(media_info))
+
                 if forced_profile is None:
                     the_profile = None
-                    #
-                    # first, try to invoke any user-installed hooks
-                    #
-                    try:
-                        the_profile = try_hook(media_info)
-                    except ProfileSKIP:
-                        print(crayons.green(os.path.basename(path)), f'SKIPPED (hook)')
+                    rule = self.configfile.match_rule(media_info)
+                    if rule is None:
+                        print(crayons.yellow(f'No matching profile found - skipped'))
+                        continue
+                    if rule.is_skip():
+                        print(crayons.green(os.path.basename(path)), f'SKIPPED ({rule.name})')
                         self.complete.append((path, 0))
                         continue
-                    except ModuleNotFoundError:
-                        # no hook/bad hook - ignore
-                        pass
-                    #
-                    # if no profile returned from hook, try declared rules
-                    #
-                    if not the_profile:
-                        rule = self.configfile.match_rule(media_info)
-                        if rule is None:
-                            print(crayons.yellow(f'No matching profile found - skipped'))
-                            continue
-                        if rule.is_skip():
-                            print(crayons.green(os.path.basename(path)), f'SKIPPED ({rule.name})')
-                            self.complete.append((path, 0))
-                            continue
-                        profile_name = rule.profile
-                        the_profile = self.configfile.get_profile(profile_name)
-                    else:
-                        profile_name = the_profile.name
+                    profile_name = rule.profile
+                    the_profile = self.configfile.get_profile(profile_name)
                 else:
                     #
                     # looks good, add this file to the thread queue
@@ -270,6 +252,8 @@ class LocalHost:
                     profile_name = forced_profile
 
                 qname = the_profile.queue_name
+                if pytranscoder.verbose:
+                    print('Matched with profile {profile_name}')
                 if qname is not None:
                     if not self.configfile.has_queue(the_profile.queue_name):
                         print(crayons.red(
@@ -278,6 +262,8 @@ class LocalHost:
                         sys.exit(1)
                     else:
                         self.queues[qname].put(LocalJob(path, the_profile, media_info))
+                        if pytranscoder.verbose:
+                            print('Added to queue {qname}')
                 else:
                     self.queues['_default_'].put(LocalJob(path, the_profile, media_info))
 
@@ -351,21 +337,6 @@ def install_sigint_handler():
     signal.signal(signal.SIGINT, signal_handler)
 
 
-def manage_hook(path=None):
-    if path:
-        with open(path, "r") as hook_file:
-            outpath = pytranscoder.__path__[0]
-            with open(os.path.join(outpath, "hook", "rule_hook.py"), "w") as out:
-                out.write(hook_file.read())
-    else:
-        outpath = pytranscoder.__path__[0]
-        with open(os.path.join(outpath, "hook", "rule_hook.py"), "w") as out:
-            out.write("""
-def rule_hook(mediainfo):
-    return None
-""")
-
-
 def main():
     start()
 
@@ -378,8 +349,6 @@ def start():
         print('  or   pytrancoder [OPTIONS] --from-file <filename>')
         print('  or   pytrancoder [OPTIONS] file ...')
         print('  or   pytrancoder -c <cluster> file... -c <cluster> file...')
-        print('  or   pytranscoder --hook-install <path>')
-        print('  or   pytranscoder --hook-remove')
         print('No parameters indicates to process the default queue files using profile matching rules.')
         print(
             'The --from-file filename is a file containing a list of full paths to files for transcoding. ' +
@@ -431,12 +400,6 @@ def start():
                 pytranscoder.verbose = True
             elif sys.argv[arg] == '-c':                 # cluster
                 cluster = sys.argv[arg + 1]
-                arg += 1
-            elif sys.argv[arg] == '--hook-install':
-                manage_hook(sys.argv[arg + 1])
-                arg += 1
-            elif sys.argv[arg] == '--hook-remove':
-                manage_hook(None)
                 arg += 1
             else:
                 if os.name == "nt":
