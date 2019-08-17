@@ -78,6 +78,9 @@ def dump_stats(completed):
 
 
 def is_mounted(filepath: Path) -> bool:
+    if get_local_os_type() == "win10":
+        # mounted filesystem detection not available in Windows
+        return False
     p = filepath.resolve()
     for part in p.parents:
         if str(part) != str(part.root) and part.is_mount():
