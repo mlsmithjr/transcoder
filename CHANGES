@@ -1,7 +1,10 @@
 
 ### Version History
 
-Verion 2.0.10
+Version 2.0.11
+    * Fixed bug preventing completed work items from being removed from the queue file.
+
+Version 2.0.10
     * Fixed but on Windows trying to detect mounted filesystem.  Not available under Windows.
 
 Version 2.0.9

@@ -426,6 +426,7 @@ def start():
 
     if len(files) == 0 and queue_path is None and configfile.default_queue_file is not None:
         tmpfiles = files_from_file(configfile.default_queue_file)
+        queue_path = configfile.default_queue_file
         if cluster is None:
             files.extend([(f, profile) for f in tmpfiles])
         else:
