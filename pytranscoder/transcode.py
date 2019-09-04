@@ -214,7 +214,7 @@ class LocalHost:
             #
             if forced_profile is not None and not self.configfile.has_profile(forced_profile):
                 print(f'profile "{forced_profile}" referenced from command line not found')
-                exit(1)
+                sys.exit(1)
 
             if len(path) == 0:
                 continue
@@ -434,7 +434,7 @@ def start():
 
     if len(files) == 0:
         print(crayons.yellow(f'Nothing to do'))
-        exit(0)
+        sys.exit(0)
 
     if cluster is not None:
         if host_override is not None:
