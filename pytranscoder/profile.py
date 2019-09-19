@@ -10,13 +10,13 @@ class Options:
             else:
                 self.merge(opts)
 
-    def merge(self, child):
+    def merge(self, parent):
         pdict = {}
-        parent: List = self.options
-        if isinstance(child, List):
-            child: List = child
+        child: List = self.options
+        if isinstance(parent, List):
+            parent: List = parent
         else:
-            child: List = child.options
+            parent: List = parent.options
         # prep the parent list for easy search/replace
         for p in parent:
             tmp = p.split()
