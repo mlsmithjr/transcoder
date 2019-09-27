@@ -122,12 +122,14 @@ profiles:
         - "-hwaccel cuvid"      # use hardware decoding
         - "-c:v h264_cuvid"     # only works if source is h264 !!
       output_options:
-        - "-cq:v 18"            # crf option passed to CUDA engine
+        - "-cq:v 23"            # crf option passed to CUDA engine
         - "-rc vbr_hq"          # variable bit-rate, high quality
-        - "-b:v 6M"
-        - "-maxrate:v 12M"
-        - "-c:v hevc_nvenc"
+        - "-rc-lookahead 32"
+        - "-b:v 1000K"
         - "-profile:v main"
+        - "-maxrate:v 8M"
+        - "-c:v hevc_nvenc"
+        - "-preset slow"
 
   ##############################################
   # nVidia CUDA-specific for 10bit video support
@@ -140,20 +142,6 @@ profiles:
         - "-profile:v main10"   # redefine the profile:v value from "base" options
 
   ###############################################
-  # HEVC CUDA lower quality, for videos that
-  # don't need the added space overhead of higher
-  # quality.
-  ###############################################
-  hevc_cuda_lq:
-      include: "base cuda" # include "base" and "cuda" definitions
-      output_options:
-        - "-cq:v 23"        # -crf equivalent
-        - "-rc vbr"         # variable bit-rate
-        - "-b:v 3M"
-        - "-maxrate:v 8M"
-      queue: 'cuda'
-
-  ###############################################
   # HEVC CUDA high quality, for just about
   # everything.
   ###############################################
@@ -161,6 +149,19 @@ profiles:
       include: "base cuda" # include "base" and "cuda" definitions
       queue: 'cuda'
 
+  ############################################
+  # nVidia CUDA-specific common options
+  # without hardware decoding
+  # (for include-use only)
+  ############################################
+  cuda_nohwd:
+      output_options:
+        - "-cq:v 23"            # crf option passed to CUDA engine
+        - "-rc vbr_hq"          # variable bit-rate, high quality
+        - "-b:v 1M"
+        - "-maxrate:v 8M"
+        - "-c:v hevc_nvenc"
+        - "-profile:v main"
 
   ###############################################
   # Intel QSV common options
@@ -172,9 +173,11 @@ profiles:
       - "-hwaccel_device /dev/dri/renderD128"
       - "-hwaccel_output_format vaapi"
     output_options: 
-      - "-vf scale_vaapi=format=p010"
-      - "-rc_mode QVBR"
-      - "-qp 18"
+      - "-rc vbr_hq"
+      - "-qp 23"
+      - "-vf 'format=nv12,hwupload'"
+      - "-b:v 1M"
+      - "-maxrate 8M"
       - "-c:a copy"
       - "-c:s copy"
 
