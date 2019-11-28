@@ -148,6 +148,17 @@ class TranscoderTests(unittest.TestCase):
         options = info.ffmpeg_streams(p)
         self.assertEqual(options, ['-map', '0:0', '-map', '0:1', '-disposition:a:0', 'default'])
 
+    def test_include_overides(self):
+        info = TranscoderTests.make_media(None, None, None, 720, 45, 3000, 25, None,
+                                          [{'lang': 'eng', 'stream': '1'},
+                                           {'lang': 'ger', 'stream': '2', 'default': True}], [])
+        setup = ConfigFile(self.get_setup())
+        p = setup.get_profile('hevc_cuda_8bit')
+        self.assertEqual(p.threshold, 0, 'Threshold should be 0')
+        self.assertEqual(p.threshold_check, 100, 'Threshold check should be 100')
+        self.assertIn("-cq:v 21", p.output_options.as_list(), 'Expected -cq:v 21')
+        self.assertIn('-pix_fmt yuv420p', p.output_options.as_list(), 'expected pix_fmt')
+
     def test_default_profile(self):
         info = TranscoderTests.make_media(None, None, None, 720, 45, 3000, 25, None, [], [])
         config = ConfigFile(self.get_setup())
@@ -252,6 +263,17 @@ class TranscoderTests(unittest.TestCase):
                         "include_languages": ["eng"],
                         "default_language": "eng",
                     }
+                },
+                "hevc_cuda_8bit": {
+                    "include": "hq",
+                    "output_options": [
+                        "-cq:v 21",
+                        "-b:v 2000K",
+                        "-maxrate:v 4M",
+                        "-pix_fmt yuv420p"
+                    ],
+                    "threshold": 0,
+                    "threshold_check": 100
                 },
                 "excl_test_1": {
                     "include": "hq",
