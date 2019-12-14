@@ -1,6 +1,9 @@
 
 ### Version History
 
+Version 2.0.12
+    * Fixed bad unlink() reference in threshold cleanup.
+
 Version 2.0.11
     * Fixed bug preventing completed work items from being removed from the queue file.
 
