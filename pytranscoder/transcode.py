@@ -129,7 +129,7 @@ class QueueThread(Thread):
                         # oops, this transcode didn't do so well, lets keep the original and scrap this attempt
                         self.log(f'Transcoded file {job.inpath} did not meet minimum savings threshold, skipped')
                         self.complete(job.inpath, (job_stop - job_start).seconds)
-                        outpath.unlink()
+                        os.unlink(str(outpath))
                         continue
 
                     self.complete(job.inpath, elapsed.seconds)
