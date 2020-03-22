@@ -8,6 +8,7 @@ from pathlib import PurePath
 from random import randint
 from tempfile import gettempdir
 from typing import Dict, Any, Optional
+import json
 
 from pytranscoder.media import MediaInfo
 
@@ -33,7 +34,26 @@ class FFmpeg:
         """
         with subprocess.Popen([self.ffmpeg, '-i', _path], stderr=subprocess.PIPE) as proc:
             output = proc.stderr.read().decode(encoding='utf8')
-            return MediaInfo.parse_details(_path, output)
+            mi = MediaInfo.parse_details(_path, output)
+            if mi.valid:
+                return mi
+        # try falling back to ffprobe, if it exists
+        try:
+            return self.fetch_details_ffprobe(_path)
+        except Exception as ex:
+            print("Unable to fallback to ffprobe - " + str(ex))
+            return MediaInfo(None)
+
+    def fetch_details_ffprobe(self, _path: str) -> MediaInfo:
+        ffprobe_path = str(PurePath(self.ffmpeg).parent.joinpath('ffprobe'))
+        if not os.path.exists(ffprobe_path):
+            return MediaInfo(None)
+
+        args = [ffprobe_path, '-v', '1', '-show_streams', '-print_format', 'json', '-i', _path]
+        with subprocess.Popen(args, stdout=subprocess.PIPE) as proc:
+            output = proc.stdout.read().decode(encoding='utf8')
+            info = json.loads(output)
+            return MediaInfo.parse_details_json(_path, info)
 
     def monitor_ffmpeg(self, proc: subprocess.Popen):
         diff = datetime.timedelta(seconds=self.monitor_interval)
@@ -41,11 +61,10 @@ class FFmpeg:
 
         #
         # Create a transaction log for this run, to be left behind if an error is encountered.
-        # This could be a lot of text so we'll write it gzipped.
         #
-        salt = randint(100, 999)
+        suffix = randint(100, 999)
         self.log_path: PurePath = PurePath(gettempdir(), 'pytranscoder-' + threading.current_thread().getName() + '-' +
-                                           str(salt) + '.log')
+                                           str(suffix) + '.log')
 
         with open(str(self.log_path), 'w') as logfile:
             while proc.poll() is None:

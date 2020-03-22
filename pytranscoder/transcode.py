@@ -233,10 +233,9 @@ class LocalHost:
                     print(str(media_info))
 
                 if forced_profile is None:
-                    the_profile = None
                     rule = self.configfile.match_rule(media_info)
                     if rule is None:
-                        print(crayons.yellow(f'No matching profile found - skipped'))
+                        print(crayons.green(os.path.basename(path)), crayons.yellow(f'No matching profile found - skipped'))
                         continue
                     if rule.is_skip():
                         print(crayons.green(os.path.basename(path)), f'SKIPPED ({rule.name})')

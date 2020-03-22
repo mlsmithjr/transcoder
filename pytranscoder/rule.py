@@ -52,7 +52,7 @@ class Rule:
                 break
             if pred == 'path':
                 try:
-                    match = re.match(value, media_info.path)
+                    match = re.search(value, media_info.path)
                     if match is None:
                         if verbose:
                             print(f'  >> predicate path ("{value}") did not match {media_info.path}')
