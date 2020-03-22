@@ -122,10 +122,10 @@ profiles:
         - "-hwaccel cuvid"      # use hardware decoding
         - "-c:v h264_cuvid"     # only works if source is h264 !!
       output_options:
-        - "-cq:v 23"            # crf option passed to CUDA engine
+        - "-cq:v 19"            # crf option passed to CUDA engine
         - "-rc vbr_hq"          # variable bit-rate, high quality
         - "-rc-lookahead 32"
-        - "-b:v 1000K"
+        - "-b:v 3000K"
         - "-profile:v main"
         - "-maxrate:v 8M"
         - "-c:v hevc_nvenc"
@@ -319,6 +319,13 @@ rules:
         filesize_mb: '<2000'
         res_height: '721-1081'
         runtime:  '30-65'
+
+  'special HD higher quality':
+      profile: SKIP
+      criteria:
+        filesize_mb: '<3500'
+        runtime: '45-65'
+        path: 'Westworld|Walking|Vikings|Expanse'
 
   'high frame rate':
       profile: hevc_cuda_30fps

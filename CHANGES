@@ -4,6 +4,7 @@
 Version 2.0.13
     * Added support for ffprobe media analysis as a fallback if normal ffmpeg info dump parsing fails.
     * Fixed a regex issue where certain patterns in a "path" criteria didn't match
+    * Tweaks to the sample transcode.yml
 
 Version 2.0.12
     * Fixed bad unlink() reference in threshold cleanup.
