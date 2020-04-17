@@ -225,7 +225,7 @@ class MediaInfo:
                 minfo['fps'] = str(fr)
                 minfo['colorspace'] = stream['pix_fmt']
                 if 'duration' in stream:
-                    minfo['runtime'] = int(stream['duration'])
+                    minfo['runtime'] = int(float(stream['duration']))
                 else:
                     if 'tags' in stream:
                         for name, value in stream['tags'].items():
