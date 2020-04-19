@@ -11,7 +11,7 @@ from pytranscoder.ffmpeg import status_re, FFmpeg
 from pytranscoder.media import MediaInfo
 from pytranscoder.profile import Profile
 from pytranscoder.transcode import LocalHost
-from pytranscoder.utils import files_from_file, get_local_os_type, calculate_progress, dump_stats
+from pytranscoder.utils import files_from_file, get_local_os_type, calculate_progress, dump_stats, is_exceeded_threshold
 
 
 class TranscoderTests(unittest.TestCase):
@@ -196,6 +196,13 @@ class TranscoderTests(unittest.TestCase):
         config: Dict = self.get_setup()
         host = LocalHost(ConfigFile(config))
         self.assertEqual(len(host.queues), 3, 'Expected 3 queues configured')
+
+    def test_threshold_calculation(self):
+        src = 1_234_567_890
+        dest = 1_000_000_000
+        threshold = 20
+        result = is_exceeded_threshold(threshold, src, dest)
+        self.assertFalse(result, "Expected threshold to be false")
 
     @staticmethod
     def get_setup():

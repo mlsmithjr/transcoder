@@ -1,6 +1,9 @@
 
 ### Version History
 
+Version 2.0.14:
+    * Fixed ffprobe output parsing problem - thanks Grant.
+
 Version 2.0.13
     * Added support for ffprobe media analysis as a fallback if normal ffmpeg info dump parsing fails.
     * Fixed a regex issue where certain patterns in a "path" criteria didn't match

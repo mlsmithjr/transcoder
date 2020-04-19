@@ -13,13 +13,16 @@ from pytranscoder.profile import Profile
 
 def filter_threshold(profile: Profile, inpath, outpath):
     if profile.threshold > 0:
-        # see if size reduction matches minimum requirement
-        pct_threshold = profile.threshold
         orig_size = os.path.getsize(inpath)
         new_size = os.path.getsize(outpath)
-        pct_savings = 100 - math.floor((new_size * 100) / orig_size)
-        if pct_savings < pct_threshold:
-            return False
+        return is_exceeded_threshold(profile.threshold, orig_size, new_size)
+    return True
+
+
+def is_exceeded_threshold(pct_threshold: int, orig_size: int, new_size: int) -> bool:
+    pct_savings = 100 - math.floor((new_size * 100) / orig_size)
+    if pct_savings < pct_threshold:
+        return False
     return True
 
 
