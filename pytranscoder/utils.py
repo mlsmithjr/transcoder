@@ -17,8 +17,8 @@ def filter_threshold(profile: Profile, inpath, outpath):
         pct_threshold = profile.threshold
         orig_size = os.path.getsize(inpath)
         new_size = os.path.getsize(outpath)
-        pct_savings = 100 - math.floor((new_size * 100) / orig_size)
-        if pct_savings < pct_threshold:
+        size_threshold = pct_threshold * orig_size
+        if new_size > size_threshold:
             return False
     return True
 
