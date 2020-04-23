@@ -31,7 +31,7 @@ nVidia CUDA-enabled graphics card or Intel accelerated video (QSV)
 * latest *ffmpeg* (3.4.3-2 or higher, lower versions may still work)
 * nVidia graphics card with latest nVidia CUDA drivers (_optional_)
 * Intel CPU with QSV enabled (_optional_)
-* Python 3 (3.6 or higher)
+* Python 3 (3.7 or higher)
 * Python PlexAPI package (optional).  Install with `pip3 install --user plexapi`
 
 #### Support
