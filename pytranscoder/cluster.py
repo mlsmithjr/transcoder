@@ -217,7 +217,7 @@ class ManagedHost(Thread):
             sshtest = subprocess.run([*self.ssh_cmd(), remote_cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                      shell=False, timeout=5)
             if sshtest.returncode != 0:
-                self.log('ssh test failed with the following output: ' + sshtest.stderr)
+                self.log('ssh test failed with the following output: ' + str(sshtest.stderr))
                 return False
             return True
         except subprocess.TimeoutExpired:

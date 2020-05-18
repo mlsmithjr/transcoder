@@ -10,6 +10,7 @@ PlexAPI = "*"
 crayons = "*"
 pyyaml = "*"
 mock = "*"
+glob3 = "*"
 
 [requires]
-python_version = "3.7"
+python_version = "3.8"

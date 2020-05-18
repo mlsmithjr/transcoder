@@ -82,6 +82,10 @@ class ConfigFile:
         return self.settings['ffmpeg']
 
     @property
+    def hbcli_path(self):
+        return self.settings.get('hbcli', None)
+
+    @property
     def ssh_path(self):
         return self.settings.get('ssh', '/usr/bin/ssh')
 

@@ -85,6 +85,14 @@ class Profile:
         return self.profile.get(key, None)
 
     @property
+    def is_ffmpeg(self) -> bool:
+        return self.processor == 'ffmpeg'
+
+    @property
+    def processor(self) -> str:
+        return self.profile.get('processor', 'ffmpeg')
+
+    @property
     def input_options(self) -> Options:
         return self.profile["input_options"]
 

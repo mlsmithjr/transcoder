@@ -17,6 +17,7 @@ from pytranscoder import __version__
 from pytranscoder.cluster import manage_clusters
 from pytranscoder.config import ConfigFile
 from pytranscoder.ffmpeg import FFmpeg
+from pytranscoder.handbrake import Handbrake
 from pytranscoder.media import MediaInfo
 from pytranscoder.profile import Profile, ProfileSKIP
 from pytranscoder.utils import filter_threshold, files_from_file, calculate_progress, dump_stats, is_mounted
@@ -48,6 +49,7 @@ class QueueThread(Thread):
         self.config = configfile
         self._manager = manager
         self.ffmpeg = FFmpeg(self.config.ffmpeg_path)
+        self.hbcli = Handbrake(self.config.hbcli_path)
 
     @property
     def lock(self):
@@ -87,9 +89,12 @@ class QueueThread(Thread):
                 #
                 # check if we need to exclude any streams
                 #
-                if job.info.is_multistream() and self.config.automap and job.profile.automap:
-                    ooutput = ooutput + job.info.ffmpeg_streams(job.profile)
-                cli = ['-y', *oinput, '-i', str(job.inpath), *ooutput, str(outpath)]
+                if job.profile.is_ffmpeg:
+                    if job.info.is_multistream() and self.config.automap and job.profile.automap:
+                        ooutput = ooutput + job.info.ffmpeg_streams(job.profile)
+                    cli = ['-y', *oinput, '-i', str(job.inpath), *ooutput, str(outpath)]
+                else:
+                    cli = ['-i', str(job.inpath), *oinput, *ooutput, '-o', str(outpath)]
 
                 #
                 # display useful information
@@ -99,7 +104,7 @@ class QueueThread(Thread):
                     print('-' * 40)
                     print('Filename : ' + crayons.green(os.path.basename(str(job.inpath))))
                     print(f'Profile  : {job.profile.name}')
-                    print('ffmpeg   : ' + ' '.join(cli) + '\n')
+                    print('{:<6}   : '.format(job.profile.processor) + ' '.join(cli) + '\n')
                 finally:
                     self.lock.release()
 
@@ -119,8 +124,15 @@ class QueueThread(Thread):
                     # continue
                     return False
 
+                def hbcli_callback(stats):
+                    self.log(f'{basename}: avg fps: {stats["fps"]}, ETA: {stats["eta"]}')
+                    return False
+
                 job_start = datetime.datetime.now()
-                code = self.ffmpeg.run(cli, log_callback)
+                if job.profile.is_ffmpeg:
+                    code = self.ffmpeg.run(cli, log_callback)
+                else:
+                    code = self.hbcli.run(cli, hbcli_callback)
                 job_stop = datetime.datetime.now()
                 elapsed = job_stop - job_start
 
@@ -167,6 +179,8 @@ class LocalHost:
         self.queues = dict()
         self.configfile = configfile
         self.ffmpeg = FFmpeg(self.configfile.ffmpeg_path)
+        self.hbcli = Handbrake(self.configfile.hbcli_path)
+
         #
         # initialize the queues
         #
@@ -223,7 +237,20 @@ class LocalHost:
                 print(crayons.red('file not found, skipping: ' + path))
                 continue
 
-            media_info = self.ffmpeg.fetch_details(path)
+            processor = 'ffmpeg'
+
+            if forced_profile:
+                the_profile = self.configfile.get_profile(forced_profile)
+                if not the_profile.is_ffmpeg:
+                    processor = 'hbcli'
+
+            if self.ffmpeg.is_available and processor == 'ffmpeg':
+                media_info = self.ffmpeg.fetch_details(path)
+            elif self.hbcli.is_available and processor == 'hbcli':
+                media_info = self.hbcli.fetch_details(path)
+            else:
+                media_info = None
+
             if media_info is None:
                 print(crayons.red(f'File not found: {path}'))
                 continue
@@ -247,7 +274,6 @@ class LocalHost:
                     #
                     # looks good, add this file to the thread queue
                     #
-                    the_profile = self.configfile.get_profile(forced_profile)
                     profile_name = forced_profile
 
                 qname = the_profile.queue_name
@@ -361,6 +387,8 @@ def start():
             'name and .tmp extension')
         print('  -y <file>  Full path to configuration file.  Default is ~/.transcode.yml')
         print('  -p         profile to use. If used with --from-file, applies to all listed media in <filename>')
+        print('\n** PyPi Repo: https://pypi.org/project/pytranscoder-ffmpeg/')
+        print('** Read the docs at https://pytranscoder.readthedocs.io/en/latest/')
         sys.exit(0)
 
     install_sigint_handler()

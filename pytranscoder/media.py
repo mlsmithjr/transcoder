@@ -161,7 +161,7 @@ class MediaInfo:
         return True
 
     @staticmethod
-    def parse_details(_path, output):
+    def parse_ffmpeg_details(_path, output):
 
         match1 = video_dur.match(output)
         if match1 is None or len(match1.groups()) < 3:
@@ -207,7 +207,7 @@ class MediaInfo:
         return MediaInfo(minfo)
 
     @staticmethod
-    def parse_details_json(_path, info):
+    def parse_ffmpeg_details_json(_path, info):
         minone = MediaInfo(None)
         minfo = { 'audio': [], 'subtitle': []}
         if 'streams' not in info:
@@ -273,4 +273,50 @@ class MediaInfo:
                                 sub['lang'] = lang
                                 break
                 minfo['subtitle'].append(sub)
+        return MediaInfo(minfo)
+
+    @staticmethod
+    def parse_handbrake_details(_path, output):
+
+        match1 = video_dur.match(output)
+        if match1 is None or len(match1.groups()) < 3:
+            print(f'>>>> regex match on video stream data failed: HandBrakeCLI -i {_path}')
+            return MediaInfo(None)
+
+        match2 = video_info.match(output)
+        if match2 is None or len(match2.groups()) < 5:
+            print(f'>>>> regex match on video stream data failed: HandBrakeCLI -i {_path}')
+            return MediaInfo(None)
+
+        audio_tracks = list()
+        for audio_match in audio_info.finditer(output):
+            ainfo = audio_match.groupdict()
+            if ainfo['lang'] is None:
+                ainfo['lang'] = 'und'
+            audio_tracks.append(ainfo)
+
+        subtitle_tracks = list()
+        for subt_match in subtitle_info.finditer(output):
+            sinfo = subt_match.groupdict()
+            if sinfo['lang'] is None:
+                sinfo['lang'] = 'und'
+            subtitle_tracks.append(sinfo)
+
+        _dur_hrs, _dur_mins, _dur_secs = match1.group(1, 2, 3)
+        _id, _codec, _colorspace, _res_width, _res_height, fps = match2.group(1, 2, 3, 4, 5, 6)
+        filesize = os.path.getsize(_path) / (1024 * 1024)
+
+        minfo = {
+            'path': _path,
+            'vcodec': _codec,
+            'stream': _id,
+            'res_width': int(_res_width),
+            'res_height': int(_res_height),
+            'runtime': (int(_dur_hrs) * 3600) + (int(_dur_mins) * 60) + int(_dur_secs),
+            'filesize_mb': filesize,
+            'fps': int(fps),
+            'colorspace': _colorspace,
+            'audio': audio_tracks,
+            'subtitle': subtitle_tracks
+        }
         return MediaInfo(minfo)

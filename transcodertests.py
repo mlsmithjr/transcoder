@@ -36,7 +36,7 @@ class TranscoderTests(unittest.TestCase):
 
     def test_stream_map_all(self):
         with open('tests/ffmpeg3.out', 'r') as ff:
-            info = MediaInfo.parse_details('/dev/null', ff.read())
+            info = MediaInfo.parse_ffmpeg_details('/dev/null', ff.read())
             setup = ConfigFile(self.get_setup())
             p = setup.get_profile('qsv')
             streams = info.ffmpeg_streams(p)
@@ -44,7 +44,7 @@ class TranscoderTests(unittest.TestCase):
 
     def test_stream_exclude(self):
         with open('tests/ffmpeg3.out', 'r') as ff:
-            info = MediaInfo.parse_details('/dev/null', ff.read())
+            info = MediaInfo.parse_ffmpeg_details('/dev/null', ff.read())
             setup = ConfigFile(self.get_setup())
             p = setup.get_profile('excl_test_1')
             streams = info.ffmpeg_streams(p)
@@ -52,7 +52,7 @@ class TranscoderTests(unittest.TestCase):
 
     def test_stream_reassign_default(self):
         with open('tests/ffmpeg4.out', 'r') as ff:
-            info = MediaInfo.parse_details('/dev/null', ff.read())
+            info = MediaInfo.parse_ffmpeg_details('/dev/null', ff.read())
             setup = ConfigFile(self.get_setup())
             p = setup.get_profile('excl_test_2')
             streams = info.ffmpeg_streams(p)
@@ -108,7 +108,7 @@ class TranscoderTests(unittest.TestCase):
 
     def test_mediainfo(self):
         with open('tests/ffmpeg.out', 'r') as ff:
-            info = MediaInfo.parse_details('/dev/null', ff.read())
+            info = MediaInfo.parse_ffmpeg_details('/dev/null', ff.read())
             self.assertIsNotNone(info)
             self.assertEqual(info.vcodec, 'h264')
             self.assertEqual(info.res_width, 1280)
@@ -119,7 +119,7 @@ class TranscoderTests(unittest.TestCase):
 
     def test_mediainfo2(self):
         with open('tests/ffmpeg2.out', 'r') as ff:
-            info = MediaInfo.parse_details('/dev/null', ff.read())
+            info = MediaInfo.parse_ffmpeg_details('/dev/null', ff.read())
             self.assertIsNotNone(info)
             self.assertEqual(info.vcodec, 'h264')
             self.assertEqual(info.res_width, 1920)
@@ -130,7 +130,7 @@ class TranscoderTests(unittest.TestCase):
 
     def test_mediainfo3(self):
         with open('tests/ffmpeg3.out', 'r') as ff:
-            info = MediaInfo.parse_details('/dev/null', ff.read())
+            info = MediaInfo.parse_ffmpeg_details('/dev/null', ff.read())
             self.assertIsNotNone(info)
             self.assertEqual(info.vcodec, 'hevc')
             self.assertEqual(info.res_width, 3840)
@@ -169,7 +169,7 @@ class TranscoderTests(unittest.TestCase):
 
     def test_skip_profile(self):
         with open('tests/ffmpeg.out', 'r') as ff:
-            info = MediaInfo.parse_details('/dev/null', ff.read())
+            info = MediaInfo.parse_ffmpeg_details('/dev/null', ff.read())
             info.filesize_mb = 499
             config = ConfigFile(self.get_setup())
             rule = config.match_rule(info)
@@ -435,7 +435,7 @@ class TranscoderTests(unittest.TestCase):
     @mock.patch('pytranscoder.cluster.filter_threshold')
     @mock.patch('pytranscoder.cluster.os.rename')
     @mock.patch('pytranscoder.cluster.os.remove')
-    @mock.patch.object(MediaInfo, 'parse_details')
+    @mock.patch.object(MediaInfo, 'parse_ffmpeg_details')
     @mock.patch('pytranscoder.cluster.run')
     @mock.patch('pytranscoder.cluster.shutil.move')
     @mock.patch.object(FFmpeg, 'fetch_details')
@@ -478,7 +478,7 @@ class TranscoderTests(unittest.TestCase):
     @mock.patch('pytranscoder.cluster.filter_threshold')
     @mock.patch('pytranscoder.cluster.os.rename')
     @mock.patch('pytranscoder.cluster.os.remove')
-    @mock.patch.object(MediaInfo, 'parse_details')
+    @mock.patch.object(MediaInfo, 'parse_ffmpeg_details')
     @mock.patch.object(FFmpeg, 'fetch_details')
     def test_cluster_match_default_queue(self, mock_ffmpeg_details, mock_info_parser, mock_os_rename, mock_os_remove,
                                          mock_filter_threshold, mock_run_remote):

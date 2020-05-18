@@ -12,54 +12,37 @@ import json
 
 from pytranscoder.media import MediaInfo
 
-status_re = re.compile(
-    r'^.* fps=\s*(?P<fps>.+?) q=(?P<q>.+\.\d) size=\s*(?P<size>\d+?)kB time=(?P<time>\d\d:\d\d:\d\d\.\d\d) .*speed=(?P<speed>.*?)x')
+status_re = re.compile(r'^.*avg (?P<fps>.+?) fps.*ETA\s(?P<eta>.+?)\)')
 
 _CHARSET: str = sys.getdefaultencoding()
 
 
-class FFmpeg:
+class Handbrake:
 
-    def __init__(self, ffmpeg_path):
-        self.ffmpeg = ffmpeg_path
+    def __init__(self, hbcli_path):
+        self.hbcli = hbcli_path
         self.last_command = ''
         self.monitor_interval = 30
         self.log_path: PurePath = None
 
     @property
     def is_available(self) -> bool:
-        return self.ffmpeg is not None
+        return self.hbcli is not None
 
     def fetch_details(self, _path: str) -> MediaInfo:
-        """Use ffmpeg to get media information
+        """Use HandBrakeCLI to get media information
 
         :param _path:   Absolute path to media file
         :return:        Instance of MediaInfo
         """
-        with subprocess.Popen([self.ffmpeg, '-i', _path], stderr=subprocess.PIPE) as proc:
+        with subprocess.Popen([self.hbcli, '--scan', '-i', _path], stderr=subprocess.PIPE) as proc:
             output = proc.stderr.read().decode(encoding='utf8')
-            mi = MediaInfo.parse_ffmpeg_details(_path, output)
+            mi = MediaInfo.parse_handbrake_details(_path, output)
             if mi.valid:
                 return mi
-        # try falling back to ffprobe, if it exists
-        try:
-            return self.fetch_details_ffprobe(_path)
-        except Exception as ex:
-            print("Unable to fallback to ffprobe - " + str(ex))
-            return MediaInfo(None)
+        return MediaInfo(None)
 
-    def fetch_details_ffprobe(self, _path: str) -> MediaInfo:
-        ffprobe_path = str(PurePath(self.ffmpeg).parent.joinpath('ffprobe'))
-        if not os.path.exists(ffprobe_path):
-            return MediaInfo(None)
-
-        args = [ffprobe_path, '-v', '1', '-show_streams', '-print_format', 'json', '-i', _path]
-        with subprocess.Popen(args, stdout=subprocess.PIPE) as proc:
-            output = proc.stdout.read().decode(encoding='utf8')
-            info = json.loads(output)
-            return MediaInfo.parse_ffmpeg_details_json(_path, info)
-
-    def monitor_ffmpeg(self, proc: subprocess.Popen):
+    def monitor_hbcli(self, proc: subprocess.Popen):
         diff = datetime.timedelta(seconds=self.monitor_interval)
         event = datetime.datetime.now() + diff
 
@@ -77,15 +60,10 @@ class FFmpeg:
                 logfile.flush()
 
                 match = status_re.match(line)
-                if match is not None and len(match.groups()) >= 5:
+                if match is not None and len(match.groups()) >= 2:
                     if datetime.datetime.now() > event:
                         event = datetime.datetime.now() + diff
                         info: Dict[str, Any] = match.groupdict()
-
-                        info['size'] = int(info['size'].strip()) * 1024
-                        hh, mm, ss = info['time'].split(':')
-                        ss = ss.split('.')[0]
-                        info['time'] = (int(hh) * 3600) + (int(mm) * 60) + int(ss)
                         yield info
 
         if proc.returncode == 0:
@@ -95,15 +73,15 @@ class FFmpeg:
 
     def run(self, params, event_callback) -> Optional[int]:
 
-        self.last_command = ' '.join([self.ffmpeg, *params])
-        with subprocess.Popen([self.ffmpeg,
+        self.last_command = ' '.join([self.hbcli, *params])
+        with subprocess.Popen([self.hbcli,
                                *params],
                               stdout=subprocess.PIPE,
                               stderr=subprocess.STDOUT,
                               universal_newlines=True,
                               shell=False) as p:
 
-            for stats in self.monitor_ffmpeg(p):
+            for stats in self.monitor_hbcli(p):
                 if event_callback is not None:
                     veto = event_callback(stats)
                     if veto:
@@ -112,14 +90,14 @@ class FFmpeg:
             return p.returncode
 
     def run_remote(self, sshcli: str, user: str, ip: str, params: list, event_callback) -> Optional[int]:
-        cli = [sshcli, user + '@' + ip, self.ffmpeg, *params]
+        cli = [sshcli, user + '@' + ip, self.hbcli, *params]
         self.last_command = ' '.join(cli)
         with subprocess.Popen(cli,
                               stdout=subprocess.PIPE,
                               stderr=subprocess.STDOUT,
                               universal_newlines=True,
                               shell=False) as p:
-            for stats in self.monitor_ffmpeg(p):
+            for stats in self.monitor_hbcli(p):
                 if event_callback is not None:
                     veto = event_callback(stats)
                     if veto:
