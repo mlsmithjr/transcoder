@@ -87,14 +87,13 @@ class QueueThread(Thread):
                 #
                 # check if we need to exclude any streams
                 #
+                processor = self.config.get_processor_by_name(job.profile.processor)
                 if job.profile.is_ffmpeg:
                     if job.info.is_multistream() and self.config.automap and job.profile.automap:
                         ooutput = ooutput + job.info.ffmpeg_streams(job.profile)
                     cli = ['-y', *oinput, '-i', str(job.inpath), *ooutput, str(outpath)]
-                    processor = FFmpeg(self.config.ffmpeg_path)
                 else:
                     cli = ['-i', str(job.inpath), *oinput, *ooutput, '-o', str(outpath)]
-                    processor = Handbrake(self.config.hbcli_path)
 
                 #
                 # display useful information
@@ -241,12 +240,8 @@ class LocalHost:
                 if not the_profile.is_ffmpeg:
                     processor_name = 'hbcli'
 
-            if processor_name == 'ffmpeg':
-                media_info = FFmpeg(self.configfile.ffmpeg_path).fetch_details(path)
-            elif processor_name == 'hbcli':
-                media_info = Handbrake(self.configfile.hbcli_path).fetch_details(path)
-            else:
-                media_info = None
+            processor = self.configfile.get_processor_by_name(processor_name)
+            media_info = processor.fetch_details(path)
 
             if media_info is None:
                 print(crayons.red(f'File not found: {path}'))

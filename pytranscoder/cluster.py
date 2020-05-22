@@ -16,11 +16,12 @@ import crayons
 
 import pytranscoder
 
-from pytranscoder import verbose
+from pytranscoder import verbose, utils
 from pytranscoder.config import ConfigFile
 from pytranscoder.ffmpeg import FFmpeg
 from pytranscoder.handbrake import Handbrake
 from pytranscoder.media import MediaInfo
+from pytranscoder.processor import Processor
 from pytranscoder.profile import Profile
 from pytranscoder.utils import filter_threshold, get_local_os_type, calculate_progress, run
 
@@ -56,6 +57,23 @@ class RemoteHostProperties:
     @property
     def host_type(self):
         return self.props['type']
+
+    def get_processor(self) -> Processor:
+        # match first available processor (for info parsing use only)
+        if self.ffmpeg_path:
+            return self.get_processor_by_name('ffmpeg')
+        elif self.hbcli_path:
+            return self.get_processor_by_name('hbcli')
+        print(f'Missing "ffmpeg" or "hbcli" path on host "{self.name}"')
+        sys.exit(1)
+
+    def get_processor_by_name(self, name: str) -> Processor:
+        if name == 'ffmpeg':
+            return FFmpeg(self.ffmpeg_path)
+        if self.hbcli_path:
+            return Handbrake(self.hbcli_path)
+        print(f'Unknown processor type "{name}" for host "{self.name}"')
+        sys.exit(1)
 
     @property
     def ffmpeg_path(self):
@@ -162,8 +180,8 @@ class ManagedHost(Thread):
         self.queue = queue
         self._complete = list()
         self._manager = cluster
-        self.ffmpeg = FFmpeg(props.ffmpeg_path)
-        self.hbcli = Handbrake(props.hbcli_path)
+#        self.ffmpeg = FFmpeg(props.ffmpeg_path)
+#        self.hbcli = Handbrake(props.hbcli_path)
 
     def validate_settings(self):
         return self.props.validate_settings()
@@ -310,20 +328,14 @@ class StreamingManagedHost(ManagedHost):
                 #
                 oinput = _profile.input_options.as_shell_params()
                 ooutput = _profile.output_options.as_shell_params()
-#                quiet = ['-nostats', '-hide_banner']
 
+                processor = self.props.get_processor_by_name(_profile.processor)
                 if _profile.is_ffmpeg:
-                    if self.ffmpeg is None:
-                        print('FFmpeg profile selected but missing "ffmpeg" path in host definition')
-                        sys.exit(1)
                     if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
                         ooutput = ooutput + job.media_info.ffmpeg_streams(_profile)
                     cmd = ['-y', *oinput, '-i', self.converted_path(remote_inpath),
                            *ooutput, self.converted_path(remote_outpath)]
                 else:
-                    if self.hbcli is None:
-                        print('HandBrakeCLI profile selected but missing "hbcli" path in host definition')
-                        sys.exit(1)
                     cmd = ['-i', self.converted_path(remote_inpath), *oinput,
                            *ooutput, '-o', self.converted_path(remote_outpath)]
 
@@ -384,10 +396,10 @@ class StreamingManagedHost(ManagedHost):
                 # Start remote
                 #
                 job_start = datetime.datetime.now()
-                if _profile.is_ffmpeg:
-                    code = self.ffmpeg.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, log_callback)
+                if processor.is_ffmpeg():
+                    code = processor.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, log_callback)
                 else:
-                    code = self.hbcli.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, hb_log_callback)
+                    code = processor.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, hb_log_callback)
                 job_stop = datetime.datetime.now()
 
                 if code != 0:
@@ -424,8 +436,8 @@ class StreamingManagedHost(ManagedHost):
                     self.log(crayons.green(f'Finished {inpath}'))
                 elif code is not None:
                     self.log(crayons.red(f'error during remote transcode of {inpath}'))
-                    self.log(f' Did not complete normally: {self.ffmpeg.last_command}')
-                    self.log(f'Output can be found in {self.ffmpeg.log_path}')
+                    self.log(f' Did not complete normally: {processor.last_command}')
+                    self.log(f'Output can be found in {processor.log_path}')
 
                 # self.log(f'Removing temporary media copies from {remote_working_dir}')
                 if self.props.is_windows():
@@ -499,17 +511,12 @@ class MountedManagedHost(ManagedHost):
                 remote_inpath = self.converted_path(remote_inpath)
                 remote_outpath = self.converted_path(remote_outpath)
 
+                processor = self.props.get_processor_by_name(_profile.processor)
                 if _profile.is_ffmpeg:
-                    if self.ffmpeg is None:
-                        print('FFmpeg profile selected but missing "ffmpeg" path in host definition')
-                        sys.exit(1)
                     if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
                         ooutput = ooutput + job.media_info.ffmpeg_streams(_profile)
                     cmd = ['-y', *oinput, '-i', f'"{remote_inpath}"', *ooutput, f'"{remote_outpath}"']
                 else:
-                    if self.hbcli is None:
-                        print('HandBrakeCLI profile selected but missing "hbcli" path in host definition')
-                        sys.exit(1)
                     cmd = ['-i', f'"{remote_inpath}"', *oinput, *ooutput, '-o', f'"{remote_outpath}"']
 
                 #
@@ -549,10 +556,10 @@ class MountedManagedHost(ManagedHost):
                 # Start remote
                 #
                 job_start = datetime.datetime.now()
-                if _profile.is_ffmpeg:
-                    code = self.ffmpeg.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, log_callback)
+                if processor.is_ffmpeg():
+                    code = processor.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, log_callback)
                 else:
-                    code = self.hbcli.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, hb_log_callback)
+                    code = processor.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, hb_log_callback)
                 job_stop = datetime.datetime.now()
 
                 #
@@ -576,8 +583,8 @@ class MountedManagedHost(ManagedHost):
                         self.complete(inpath, (job_stop - job_start).seconds)
                     self.log(crayons.green(f'Finished {job.inpath}'))
                 elif code is not None:
-                    self.log(f'Did not complete normally: {self.ffmpeg.last_command}')
-                    self.log(f'Output can be found in {self.ffmpeg.log_path}')
+                    self.log(f'Did not complete normally: {processor.last_command}')
+                    self.log(f'Output can be found in {processor.log_path}')
                     try:
                         os.remove(outpath)
                     except:
@@ -635,24 +642,17 @@ class LocalHost(ManagedHost):
                 #
                 oinput = _profile.input_options.as_shell_params()
                 ooutput = _profile.output_options.as_shell_params()
-#                quiet = ['-nostats', '-hide_banner']
 
                 remote_inpath = self.converted_path(inpath)
                 remote_outpath = self.converted_path(outpath)
 
+                processor = self.props.get_processor_by_name(_profile.processor)
                 if _profile.is_ffmpeg:
-                    if self.ffmpeg is None:
-                        print('FFmpeg profile selected but missing "ffmpeg" path in host definition')
-                        sys.exit(1)
                     if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
                         ooutput = ooutput + job.media_info.ffmpeg_streams(_profile)
                     cli = ['-y', *oinput, '-i', remote_inpath, *ooutput, remote_outpath]
                 else:
-                    if self.hbcli is None:
-                        print('HandBrakeCLI profile selected but missing "hbcli" path in host definition')
-                        sys.exit(1)
                     cli = ['-i', remote_inpath, *oinput, *ooutput, '-o', remote_outpath]
-
 
                 #
                 # display useful information
@@ -680,7 +680,6 @@ class LocalHost(ManagedHost):
                             # compression goal (threshold) not met, kill the job and waste no more time...
                             self.log(f'Encoding of {basename} cancelled and skipped due to threshold not met')
                             return True
-                    # continue
                     return False
 
                 def hb_log_callback(stats):
@@ -691,10 +690,10 @@ class LocalHost(ManagedHost):
                 # Start process
                 #
                 job_start = datetime.datetime.now()
-                if _profile.is_ffmpeg:
-                    code = self.ffmpeg.run(cli, log_callback)
+                if processor.is_ffmpeg():
+                    code = processor.run(cli, log_callback)
                 else:
-                    code = self.hbcli.run(cli, log_callback)
+                    code = processor.run(cli, hb_log_callback)
                 job_stop = datetime.datetime.now()
 
                 #
@@ -718,8 +717,8 @@ class LocalHost(ManagedHost):
                         self.complete(inpath, (job_stop - job_start).seconds)
                     self.log(crayons.green(f'Finished {job.inpath}'))
                 elif code is not None:
-                    self.log(f' Did not complete normally: {self.ffmpeg.last_command}')
-                    self.log(f'Output can be found in {self.ffmpeg.log_path}')
+                    self.log(f' Did not complete normally: {processor.last_command}')
+                    self.log(f'Output can be found in {processor.log_path}')
                     try:
                         os.remove(outpath)
                     except:
@@ -749,10 +748,11 @@ class Cluster(Thread):
         self.hosts: List[ManagedHost] = list()
         self.config = config
         self.verbose = verbose
-        self.ffmpeg = FFmpeg(config.ffmpeg_path)
-        self.hbcli = Handbrake(config.hbcli_path)
+#        self.ffmpeg = FFmpeg(config.ffmpeg_path)
+#        self.hbcli = Handbrake(config.hbcli_path)
         self.lock = Cluster.terminal_lock
         self.completed: List = list()
+        self.info_processor = config.get_processor()
 
         for host, props in configs.items():
             hostprops = RemoteHostProperties(host, props)
@@ -817,13 +817,7 @@ class Cluster(Thread):
         if pytranscoder.verbose:
             print('matching ' + path)
 
-        if self.ffmpeg:
-            media_info = self.ffmpeg.fetch_details(path)
-        elif self.hbcli:
-            media_info = self.hbcli.fetch_details(path)
-        else:
-            print('Missing "ffmpeg" or "hbcli" path')
-            sys.exit(1)
+        media_info = self.info_processor.fetch_details(path)
 
         if media_info is None:
             print(crayons.red(f'File not found: {path}'))

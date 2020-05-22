@@ -4,6 +4,11 @@ Running (HandBrakeCLI)
 
 Although this tool is designed for **ffmpeg**, it has limited support for HandBrakeCLI as well.
 
+Handbrake support is much more simple than ffmpeg and doesn't support the following features:
+
+* Automatic audio or subtitle track mapping based on preferred languages.
+* Thresholds and early encode termination.
+
 *Sample .transcode.yml exerpt:*
 
 .. code-block:: yaml

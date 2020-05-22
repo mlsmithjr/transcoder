@@ -4,7 +4,6 @@ import os
 from typing import Dict
 from unittest import mock
 
-from pytranscoder import transcode
 from pytranscoder.cluster import RemoteHostProperties, Cluster, StreamingManagedHost
 from pytranscoder.config import ConfigFile
 from pytranscoder.ffmpeg import status_re, FFmpeg
@@ -209,6 +208,7 @@ class TranscoderTests(unittest.TestCase):
         setup = {
             'config': {
                 'ffmpeg': '/usr/bin/ffmpeg',
+                'hbcli': '/usr/bin/HandBrakeCLI',
                 'queues': {
                     'q1': 1,
                     'q2': 2
@@ -323,6 +323,12 @@ class TranscoderTests(unittest.TestCase):
                     "output_options": ["-c:v copy -c:a copy"],
                     "extension": ".mp4",
                 },
+                "hbcli_qsv": {
+                    "input_options": None,
+                    "output_options": ["-f av_mkv -q 20.0 -B 256 -e qsv_h265"],
+                    "extension": ".mkv",
+                    "queue": "qsv"
+                }
             },
             "rules": {
                 'vintage tv': {
