@@ -11,23 +11,21 @@ from typing import Dict, Any, Optional
 import json
 
 from pytranscoder.media import MediaInfo
+from pytranscoder.processor import Processor
 
 status_re = re.compile(r'^.*avg (?P<fps>.+?) fps.*ETA\s(?P<eta>.+?)\)')
 
 _CHARSET: str = sys.getdefaultencoding()
 
 
-class Handbrake:
+class Handbrake(Processor):
 
-    def __init__(self, hbcli_path):
-        self.hbcli = hbcli_path
-        self.last_command = ''
+    def __init__(self, cli_path: str):
+        super().__init__(cli_path)
         self.monitor_interval = 30
-        self.log_path: PurePath = None
 
-    @property
-    def is_available(self) -> bool:
-        return self.hbcli is not None
+    def is_hbcli(self) -> bool:
+        return True
 
     def fetch_details(self, _path: str) -> MediaInfo:
         """Use HandBrakeCLI to get media information
@@ -35,7 +33,7 @@ class Handbrake:
         :param _path:   Absolute path to media file
         :return:        Instance of MediaInfo
         """
-        with subprocess.Popen([self.hbcli, '--scan', '-i', _path], stderr=subprocess.PIPE) as proc:
+        with subprocess.Popen([self.path, '--scan', '-i', _path], stderr=subprocess.PIPE) as proc:
             output = proc.stderr.read().decode(encoding='utf8')
             mi = MediaInfo.parse_handbrake_details(_path, output)
             if mi.valid:
@@ -72,35 +70,8 @@ class Handbrake:
             self.log_path = None
 
     def run(self, params, event_callback) -> Optional[int]:
-
-        self.last_command = ' '.join([self.hbcli, *params])
-        with subprocess.Popen([self.hbcli,
-                               *params],
-                              stdout=subprocess.PIPE,
-                              stderr=subprocess.STDOUT,
-                              universal_newlines=True,
-                              shell=False) as p:
-
-            for stats in self.monitor_hbcli(p):
-                if event_callback is not None:
-                    veto = event_callback(stats)
-                    if veto:
-                        p.kill()
-                        return None
-            return p.returncode
+        return self.execute_and_monitor(params, event_callback, self.monitor_hbcli)
 
     def run_remote(self, sshcli: str, user: str, ip: str, params: list, event_callback) -> Optional[int]:
-        cli = [sshcli, user + '@' + ip, self.hbcli, *params]
-        self.last_command = ' '.join(cli)
-        with subprocess.Popen(cli,
-                              stdout=subprocess.PIPE,
-                              stderr=subprocess.STDOUT,
-                              universal_newlines=True,
-                              shell=False) as p:
-            for stats in self.monitor_hbcli(p):
-                if event_callback is not None:
-                    veto = event_callback(stats)
-                    if veto:
-                        p.kill()
-                        return None
-            return p.returncode
+        return self.remote_execute_and_monitor(sshcli, user, ip, params, event_callback, self.monitor_hbcli)
+

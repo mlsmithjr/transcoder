@@ -21,14 +21,14 @@ These options apply globally to pytranscoder.
 
     config:
         default_queue_file:   '/path/to/default/list/of/files.txt'
-        ffmpeg:               '/usr/bin/ffmpeg'       # path to ffmpeg for this config
-        ssh:                  '/usr/bin/ssh'
+        ffmpeg:               '/usr/bin/ffmpeg'       # path to ffmpeg
+        hbcli:                '/usr/bin/HandBrakeCLI' # path to HandBrake CLI
+        ssh:                  '/usr/bin/ssh'        # your ssh client (for cluster support)
         queues:
             qsv:                1                   # sequential encodes
             cuda:               2                   # maximum of 2 encodes at a time
-        plex_server:          192.168.2.61:32400    # optional, use 'address:port'
         colorize:             yes
-        automap:              no
+        automap:              no                    # automatically generate ffmpeg -map options for all streams
         fls_path:             '/tmp'                # use local SSD to reduce thrashing of my NAS
 
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -38,11 +38,11 @@ These options apply globally to pytranscoder.
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | ffmpeg                | Full path to *ffmpeg* on this host                                                                                                                                                                                                        |
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| hbcli                 | Full path to *HandBrakeCLI* on this host (optional)                                                                                                                                                                                       |
++-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | ssh                   | Full path to *ssh* on this host, used only in cluster mode.                                                                                                                                                                               |
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | queues                | If using concurrency, define your queues here. The queue name is whatever you want. Each name specifies a maximum number of concurrent encoding jobs on the host machine. The default is sequential encoding (one at a time)              |
-+-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| plex_server           | optional, if you want your Plex server notified after media is encoded. Use address:port format.                                                                                                                                          |
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | colorize              | optional, defaults to "no". If "yes" terminal output will have some color added                                                                                                                                                           |
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -56,7 +56,7 @@ These options apply globally to pytranscoder.
 Profiles
 --------
 
-Profiles are used to provide ffmpeg with various options for encoding. One profile definition is required, but mostly likely
+Profiles are used to provide the encoder with various options for encoding. One profile definition is required, but mostly likely
 you will define multiples for different encoding scenarios.  The name of the profile can be provided on the command line
 to select the appropriate one for your needs. Alternatively, you can define rules (see below) to auto-match media with profiles for a less manual encoding workflow.
 
@@ -75,11 +75,12 @@ to select the appropriate one for your needs. Alternatively, you can define rule
                 - "-f matroska"
             extension: '.mkv'
             threshold: 20
-            threshold_check: 60
+            threshold_check: 30
             automap: yes
             audio:
                 include_languages:
                     - "eng"
+                    - "jpn"
                 default_language: eng
 
             subtitle:
@@ -92,7 +93,10 @@ to select the appropriate one for your needs. Alternatively, you can define rule
         #
         hevc_qsv:
             include: common
-            input_options: -hwaccel vaapi -hwaccel_device /dev/dri/renderD129 -hwaccel_output_format vaapi
+            input_options:
+                - "-hwaccel vaapi"
+                - "-hwaccel_device /dev/dri/renderD129"
+                - "-hwaccel_output_format vaapi"
             output_options: 				# in addition to those included from 'common'
                 - "-vf scale_vaapi=format=p010"
                 - "-c:v hevc_vaapi"
@@ -114,7 +118,6 @@ to select the appropriate one for your needs. Alternatively, you can define rule
             # optionally you can filter out audio/subtitle tracks you don't need.
             # these can also be moved to the "common" profile.
 
-
         x264:                        # simple h264
             include: common
             input_options: 
@@ -132,6 +135,16 @@ to select the appropriate one for your needs. Alternatively, you can define rule
                     - "eng"
                     - "jpn"
 
+          handbrake_qsv_hevc:
+            processor: hbcli
+            output_options:
+              - "-f av_mkv"
+              - "-q 20.0"
+              - "-B 256"
+              - "-e qsv_h265"
+            extension: '.mkv'
+            queue: 'qsv'
+
 
 Take a look over this sample.  Most of what you need is here.  Of special note is the **include** directive, which literally includes
 one or more other profiles to create a new, combined one. Use this to isolate common flags to keep new profile definitions simpler.
@@ -139,13 +152,15 @@ one or more other profiles to create a new, combined one. Use this to isolate co
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | Setting               | Purpose                                                                                                                                                                       |
 +=======================+===============================================================================================================================================================================+
-| input_options         | *ffmpeg* options related to the input (see ffmpeg docs)                                                                                                                       |
+| input_options         | Encoder options related to the input (see ffmpeg or HandBrakeCLI docs)                                                                                                        |
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| output_options        | *ffmpeg* options related to the output (see ffmpeg docs)                                                                                                                      |
+| output_options        | Encoder options related to the output (see ffmpeg or HandBrakeCLI docs)                                                                                                       |
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | extension             | Filename extension to use for the encoded file                                                                                                                                |
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | queue                 | optional. Assign encodes for this profile to a specific queue (defined in *config* section)                                                                                   |
++-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| processor             | optional, defaults to ffmpeg. Allows you to designate which encoder to use for this profile. Choices are ffmpeg or hbcli (for handbrake)                                      |
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | threshold             | optional. If provided this number represents a minimum percentage compression savings for the encoded media.                                                                  | 
 |                       | If it does not meet this threshold the transcoded file is discarded and the source file remains as-is.                                                                        |

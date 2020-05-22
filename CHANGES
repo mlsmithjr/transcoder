@@ -1,6 +1,11 @@
 
 ### Version History
 
+Version 2.1.0:
+    * Added support for HandBrakeCLI.
+    * Removed Plex integration.
+    * Removed Sonarr integration
+
 Version 2.0.14:
     * Fixed ffprobe output parsing problem - thanks Grant.
 

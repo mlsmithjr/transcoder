@@ -1,6 +1,7 @@
 ==========================
 Custom Rule & Profile Hook
 ==========================
+CURRENTLY NOT IMPLEMENTED - DISREGARD
 
 The Rule and Profile declarative capabilities are a tradeoff between common, simple tasks and a simple
 means of expressing them (yaml).  That said, there are situations where the flexibility of the Rule matcher isn't

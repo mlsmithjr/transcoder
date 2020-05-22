@@ -11,7 +11,6 @@ config:
   queues:
     qsv: 1
     cuda: 1
-  plex_server: '192.168.2.91:32400'           # can be 'server:port'
   colorize: yes
   fls_path: '/tmp'
 

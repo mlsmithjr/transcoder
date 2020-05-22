@@ -219,7 +219,8 @@ class ManagedHost(Thread):
 
     def ssh_test_ok(self):
         try:
-            remote_cmd = 'dir' if self.props.is_windows() else 'ls'
+            #remote_cmd = 'dir' if self.props.is_windows() else 'ls'
+            remote_cmd = 'ls'
             sshtest = subprocess.run([*self.ssh_cmd(), remote_cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                      shell=False, timeout=5)
             if sshtest.returncode != 0:
@@ -494,7 +495,6 @@ class MountedManagedHost(ManagedHost):
                 #
                 oinput = _profile.input_options.as_shell_params()
                 ooutput = _profile.output_options.as_shell_params()
-#                quiet = ['-nostats', '-hide_banner']
 
                 remote_inpath = self.converted_path(remote_inpath)
                 remote_outpath = self.converted_path(remote_outpath)
@@ -521,7 +521,7 @@ class MountedManagedHost(ManagedHost):
                     print(f'Host     : {self.hostname} (mounted)')
                     print('Filename : ' + crayons.green(os.path.basename(remote_inpath)))
                     print(f'Profile  : {_profile.name}')
-                    print('ssh    : ' + ' '.join(cmd) + '\n')
+                    print('ssh      : ' + ' '.join(cmd) + '\n')
                 finally:
                     self.lock.release()
 

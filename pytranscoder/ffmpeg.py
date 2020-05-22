@@ -11,6 +11,7 @@ from typing import Dict, Any, Optional
 import json
 
 from pytranscoder.media import MediaInfo
+from pytranscoder.processor import Processor
 
 status_re = re.compile(
     r'^.* fps=\s*(?P<fps>.+?) q=(?P<q>.+\.\d) size=\s*(?P<size>\d+?)kB time=(?P<time>\d\d:\d\d:\d\d\.\d\d) .*speed=(?P<speed>.*?)x')
@@ -18,17 +19,14 @@ status_re = re.compile(
 _CHARSET: str = sys.getdefaultencoding()
 
 
-class FFmpeg:
+class FFmpeg(Processor):
 
-    def __init__(self, ffmpeg_path):
-        self.ffmpeg = ffmpeg_path
-        self.last_command = ''
+    def __init__(self, ffmpeg_path: str):
+        super().__init__(ffmpeg_path)
         self.monitor_interval = 30
-        self.log_path: PurePath = None
 
-    @property
-    def is_available(self) -> bool:
-        return self.ffmpeg is not None
+    def is_ffmpeg(self) -> bool:
+        return True
 
     def fetch_details(self, _path: str) -> MediaInfo:
         """Use ffmpeg to get media information
@@ -36,7 +34,7 @@ class FFmpeg:
         :param _path:   Absolute path to media file
         :return:        Instance of MediaInfo
         """
-        with subprocess.Popen([self.ffmpeg, '-i', _path], stderr=subprocess.PIPE) as proc:
+        with subprocess.Popen([self.path, '-i', _path], stderr=subprocess.PIPE) as proc:
             output = proc.stderr.read().decode(encoding='utf8')
             mi = MediaInfo.parse_ffmpeg_details(_path, output)
             if mi.valid:
@@ -49,7 +47,7 @@ class FFmpeg:
             return MediaInfo(None)
 
     def fetch_details_ffprobe(self, _path: str) -> MediaInfo:
-        ffprobe_path = str(PurePath(self.ffmpeg).parent.joinpath('ffprobe'))
+        ffprobe_path = str(PurePath(self.path).parent.joinpath('ffprobe'))
         if not os.path.exists(ffprobe_path):
             return MediaInfo(None)
 
@@ -94,35 +92,7 @@ class FFmpeg:
             self.log_path = None
 
     def run(self, params, event_callback) -> Optional[int]:
-
-        self.last_command = ' '.join([self.ffmpeg, *params])
-        with subprocess.Popen([self.ffmpeg,
-                               *params],
-                              stdout=subprocess.PIPE,
-                              stderr=subprocess.STDOUT,
-                              universal_newlines=True,
-                              shell=False) as p:
-
-            for stats in self.monitor_ffmpeg(p):
-                if event_callback is not None:
-                    veto = event_callback(stats)
-                    if veto:
-                        p.kill()
-                        return None
-            return p.returncode
+        return self.execute_and_monitor(params, event_callback, self.monitor_ffmpeg)
 
     def run_remote(self, sshcli: str, user: str, ip: str, params: list, event_callback) -> Optional[int]:
-        cli = [sshcli, user + '@' + ip, self.ffmpeg, *params]
-        self.last_command = ' '.join(cli)
-        with subprocess.Popen(cli,
-                              stdout=subprocess.PIPE,
-                              stderr=subprocess.STDOUT,
-                              universal_newlines=True,
-                              shell=False) as p:
-            for stats in self.monitor_ffmpeg(p):
-                if event_callback is not None:
-                    veto = event_callback(stats)
-                    if veto:
-                        p.kill()
-                        return None
-            return p.returncode
+        return self.remote_execute_and_monitor(sshcli, user, ip, params, event_callback, self.monitor_ffmpeg)
