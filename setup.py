@@ -3,8 +3,8 @@ import sys
 import re
 import os
 
-if sys.version_info < (3, 6):
-    print('pytranscoder requires at least Python 3.6 to run.')
+if sys.version_info < (3, 7):
+    print('pytranscoder requires at least Python 3.7 to run.')
     sys.exit(1)
 
 with open(os.path.join('pytranscoder', '__init__.py'), encoding='utf-8') as f:
@@ -16,7 +16,7 @@ with open('README.md', 'r') as fh:
 setuptools.setup(
     name='pytranscoder-ffmpeg',
     version=version,
-    python_requires='>=3.6',
+    python_requires='>=3.7',
     author='Marshall L Smith Jr',
     author_email='marshallsmithjr@gmail.com',
     description='A ffmpeg workflow manager for transcoding',
