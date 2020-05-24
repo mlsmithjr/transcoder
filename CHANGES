@@ -3,6 +3,7 @@
 
 Version 2.1.0:
     * Added support for HandBrakeCLI.
+    * Requires Python 3.7 or higher
     * Removed Plex integration.
     * Removed Sonarr integration
 
