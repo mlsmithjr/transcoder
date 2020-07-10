@@ -263,13 +263,13 @@ class LocalHost:
                         self.complete.append((path, 0))
                         continue
                     profile_name = rule.profile
-                    the_profile = self.configfile.get_profile(profile_name)
                 else:
                     #
                     # looks good, add this file to the thread queue
                     #
                     profile_name = forced_profile
 
+                the_profile = self.configfile.get_profile(profile_name)
                 qname = the_profile.queue_name
                 if pytranscoder.verbose:
                     print('Matched with profile {profile_name}')
