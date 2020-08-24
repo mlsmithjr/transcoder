@@ -33,7 +33,7 @@ class FFmpeg:
         :return:        Instance of MediaInfo
         """
         with subprocess.Popen([self.ffmpeg, '-i', _path], stderr=subprocess.PIPE) as proc:
-            output = proc.stderr.read().decode(encoding='utf8')
+            output = proc.stderr.read().decode(encoding='utf8', errors='replace')
             mi = MediaInfo.parse_details(_path, output)
             if mi.valid:
                 return mi
@@ -51,7 +51,7 @@ class FFmpeg:
 
         args = [ffprobe_path, '-v', '1', '-show_streams', '-print_format', 'json', '-i', _path]
         with subprocess.Popen(args, stdout=subprocess.PIPE) as proc:
-            output = proc.stdout.read().decode(encoding='utf8')
+            output = proc.stdout.read().decode(encoding='utf8', errors='replace')
             info = json.loads(output)
             return MediaInfo.parse_details_json(_path, info)
 
@@ -97,6 +97,7 @@ class FFmpeg:
                               stdout=subprocess.PIPE,
                               stderr=subprocess.STDOUT,
                               universal_newlines=True,
+                              errors='replace',
                               shell=False) as p:
 
             for stats in self.monitor_ffmpeg(p):
@@ -114,6 +115,7 @@ class FFmpeg:
                               stdout=subprocess.PIPE,
                               stderr=subprocess.STDOUT,
                               universal_newlines=True,
+                              errors='replace',
                               shell=False) as p:
             for stats in self.monitor_ffmpeg(p):
                 if event_callback is not None:
