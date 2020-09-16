@@ -2,10 +2,11 @@
 ### Version History
 
 Version 2.1.0:
-    * Added support for HandBrakeCLI.
+    * Added experimental support for HandBrakeCLI.
     * Requires Python 3.7 or higher
     * Removed Plex integration.
     * Removed Sonarr integration
+    * Fixed typo in sample.yml and updated Cuda examples.
 
 Version 2.0.14:
     * Fixed ffprobe output parsing problem - thanks Grant.

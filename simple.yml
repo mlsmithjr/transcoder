@@ -39,13 +39,16 @@ profiles:
       input_options: 
         -  "-hwaccel cuvid"
       output_options: 
-        -  "-c:v hevc_nvenc"
-        -  "-profile:v main"
-        -  "-preset medium"
-        -  "-crf 20"
-        -  "-c:a copy"
-        -  "-c:s copy"
-        -  '-f matroska"
+        - "-cq:v 19"            # crf option passed to CUDA engine
+        - "-rc vbr_hq"          # variable bit-rate, high quality
+        - "-rc-lookahead 32"
+        - "-bufsize 8M"
+        - "-b:v 8M"
+        - "-profile:v main"
+        - "-maxrate:v 8M"
+        - "-c:v hevc_nvenc"
+        - "-preset slow"
+        - "-pix_fmt yuv420p"
       extension: '.mkv'
       threshold: 20         # 20% minimum size reduction %, otherwise source is preserved as-is
 
