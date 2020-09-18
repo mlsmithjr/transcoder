@@ -4,7 +4,10 @@ from typing import Dict, Any, Optional
 
 import yaml
 
+from pytranscoder.ffmpeg import FFmpeg
+from pytranscoder.handbrake import Handbrake
 from pytranscoder.media import MediaInfo
+from pytranscoder.processor import Processor
 from pytranscoder.profile import Profile
 from pytranscoder.rule import Rule
 
@@ -77,9 +80,28 @@ class ConfigFile:
                 return rule
         return None
 
+    def get_processor(self) -> Processor:
+        # match first available processor (for info parsing use only)
+        if self.ffmpeg_path:
+            return self.get_processor_by_name('ffmpeg')
+        elif self.hbcli_path:
+            return self.get_processor_by_name('hbcli')
+
+    def get_processor_by_name(self, name: str) -> Processor:
+        if name == 'ffmpeg':
+            return FFmpeg(self.ffmpeg_path)
+        if self.hbcli_path:
+            return Handbrake(self.hbcli_path)
+        print('Missing "ffmpeg" or "hbcli" path')
+        sys.exit(1)
+
     @property
     def ffmpeg_path(self):
         return self.settings['ffmpeg']
+
+    @property
+    def hbcli_path(self):
+        return self.settings.get('hbcli', None)
 
     @property
     def ssh_path(self):

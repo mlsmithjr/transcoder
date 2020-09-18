@@ -17,8 +17,9 @@ from pytranscoder import __version__
 from pytranscoder.cluster import manage_clusters
 from pytranscoder.config import ConfigFile
 from pytranscoder.ffmpeg import FFmpeg
+from pytranscoder.handbrake import Handbrake
 from pytranscoder.media import MediaInfo
-from pytranscoder.profile import Profile, ProfileSKIP
+from pytranscoder.profile import Profile
 from pytranscoder.utils import filter_threshold, files_from_file, calculate_progress, dump_stats, is_mounted
 
 DEFAULT_CONFIG = os.path.expanduser('~/.transcode.yml')
@@ -47,7 +48,6 @@ class QueueThread(Thread):
         self.queue = queue
         self.config = configfile
         self._manager = manager
-        self.ffmpeg = FFmpeg(self.config.ffmpeg_path)
 
     @property
     def lock(self):
@@ -87,9 +87,13 @@ class QueueThread(Thread):
                 #
                 # check if we need to exclude any streams
                 #
-                if job.info.is_multistream() and self.config.automap and job.profile.automap:
-                    ooutput = ooutput + job.info.ffmpeg_streams(job.profile)
-                cli = ['-y', *oinput, '-i', str(job.inpath), *ooutput, str(outpath)]
+                processor = self.config.get_processor_by_name(job.profile.processor)
+                if job.profile.is_ffmpeg:
+                    if job.info.is_multistream() and self.config.automap and job.profile.automap:
+                        ooutput = ooutput + job.info.ffmpeg_streams(job.profile)
+                    cli = ['-y', *oinput, '-i', str(job.inpath), *ooutput, str(outpath)]
+                else:
+                    cli = ['-i', str(job.inpath), *oinput, *ooutput, '-o', str(outpath)]
 
                 #
                 # display useful information
@@ -99,7 +103,7 @@ class QueueThread(Thread):
                     print('-' * 40)
                     print('Filename : ' + crayons.green(os.path.basename(str(job.inpath))))
                     print(f'Profile  : {job.profile.name}')
-                    print('ffmpeg   : ' + ' '.join(cli) + '\n')
+                    print('{:<6}   : '.format(job.profile.processor) + ' '.join(cli) + '\n')
                 finally:
                     self.lock.release()
 
@@ -116,11 +120,17 @@ class QueueThread(Thread):
                             # compression goal (threshold) not met, kill the job and waste no more time...
                             self.log(f'Encoding of {basename} cancelled and skipped due to threshold not met')
                             return True
-                    # continue
+                    return False
+
+                def hbcli_callback(stats):
+                    self.log(f'{basename}: avg fps: {stats["fps"]}, ETA: {stats["eta"]}')
                     return False
 
                 job_start = datetime.datetime.now()
-                code = self.ffmpeg.run(cli, log_callback)
+                if processor.is_ffmpeg():
+                    code = processor.run(cli, log_callback)
+                else:
+                    code = processor.run(cli, hbcli_callback)
                 job_stop = datetime.datetime.now()
                 elapsed = job_stop - job_start
 
@@ -147,8 +157,8 @@ class QueueThread(Thread):
                     else:
                         self.log(crayons.yellow(f'Finished {outpath}, original file unchanged'))
                 elif code is not None:
-                    self.log(f' Did not complete normally: {self.ffmpeg.last_command}')
-                    self.log(f'Output can be found in {self.ffmpeg.log_path}')
+                    self.log(f' Did not complete normally: {processor.last_command}')
+                    self.log(f'Output can be found in {processor.log_path}')
                     try:
                         outpath.unlink()
                     except:
@@ -166,7 +176,7 @@ class LocalHost:
     def __init__(self, configfile: ConfigFile):
         self.queues = dict()
         self.configfile = configfile
-        self.ffmpeg = FFmpeg(self.configfile.ffmpeg_path)
+
         #
         # initialize the queues
         #
@@ -223,10 +233,21 @@ class LocalHost:
                 print(crayons.red('file not found, skipping: ' + path))
                 continue
 
-            media_info = self.ffmpeg.fetch_details(path)
+            processor_name = 'ffmpeg'
+
+            if forced_profile:
+                the_profile = self.configfile.get_profile(forced_profile)
+                if not the_profile.is_ffmpeg:
+                    processor_name = 'hbcli'
+
+            processor = self.configfile.get_processor_by_name(processor_name)
+            media_info = processor.fetch_details(path)
+
             if media_info is None:
                 print(crayons.red(f'File not found: {path}'))
                 continue
+
+            the_profile = None
             if media_info.valid:
 
                 if pytranscoder.verbose:
@@ -242,14 +263,13 @@ class LocalHost:
                         self.complete.append((path, 0))
                         continue
                     profile_name = rule.profile
-                    the_profile = self.configfile.get_profile(profile_name)
                 else:
                     #
                     # looks good, add this file to the thread queue
                     #
-                    the_profile = self.configfile.get_profile(forced_profile)
                     profile_name = forced_profile
 
+                the_profile = self.configfile.get_profile(profile_name)
                 qname = the_profile.queue_name
                 if pytranscoder.verbose:
                     print('Matched with profile {profile_name}')
@@ -265,45 +285,6 @@ class LocalHost:
                             print('Added to queue {qname}')
                 else:
                     self.queues['_default_'].put(LocalJob(path, the_profile, media_info))
-
-    def notify_plex(self):
-        """If plex notifications enabled, tell it to refresh"""
-
-        if self.configfile.plex_server is not None and not pytranscoder.dry_run:
-            plex_server = self.configfile.plex_server
-            try:
-                from plexapi.server import PlexServer
-
-                plex = PlexServer('http://{}'.format(plex_server))
-                plex.library.update()
-            except ModuleNotFoundError:
-                print(
-                    'Library not installed. To use Plex notifications please install the Python 3 Plex API ' +
-                    '("pip3 install plexapi")')
-            except Exception as ex2:
-                print(f'Unable to connect to Plex server at {plex_server}')
-                if pytranscoder.verbose:
-                    print(str(ex2))
-
-
-def sonarr_handler(qfilename: str):
-    """Handle Sonarr as caller"""
-
-    # Being called from Sonarr after download/import.
-    # It is not a good idea to start transcoding since this may be called rapidly during
-    # an import, in which case the concurrency model fails.
-    # Solution is to log the incoming file to the queue and let user run the transcode at an
-    # appropriate time.
-    if qfilename is not None:
-        path = os.environ['sonarr_episodefile_path']
-        print(f'Writing "{path}" to default queue')
-        try:
-            with open(qfilename, 'a+') as qfile:
-                qfile.write(f'{path}\n')
-        except Exception as ex:
-            print(f'Unable to write to {qfilename}')
-            print(ex)
-    sys.exit(0)
 
 
 def cleanup_queuefile(queue_path: str, completed: Set):
@@ -347,12 +328,13 @@ def start():
         print('usage: pytrancoder [OPTIONS]')
         print('  or   pytrancoder [OPTIONS] --from-file <filename>')
         print('  or   pytrancoder [OPTIONS] file ...')
-        print('  or   pytrancoder -c <cluster> file... -c <cluster> file...')
+        print('  or   pytrancoder -c <cluster> file... [--host <name>] -c <cluster> file...')
         print('No parameters indicates to process the default queue files using profile matching rules.')
         print(
             'The --from-file filename is a file containing a list of full paths to files for transcoding. ' +
             'If full paths not used, defaults to current directory')
         print('OPTIONS:')
+        print('  --host <name>  Name of a specific host in your cluster configuration to target, otherwise load-balanced')
         print('  -s         Process files sequentially even if configured for multiple concurrent jobs')
         print('  --dry-run  Run without actually transcoding or modifying anything, useful to test rules and profiles')
         print('  -v         Verbose output, helpful in debugging profiles and rules')
@@ -361,6 +343,8 @@ def start():
             'name and .tmp extension')
         print('  -y <file>  Full path to configuration file.  Default is ~/.transcode.yml')
         print('  -p         profile to use. If used with --from-file, applies to all listed media in <filename>')
+        print('\n** PyPi Repo: https://pypi.org/project/pytranscoder-ffmpeg/')
+        print('** Read the docs at https://pytranscoder.readthedocs.io/en/latest/')
         sys.exit(0)
 
     install_sigint_handler()
@@ -415,9 +399,6 @@ def start():
     if configfile is None:
         configfile = ConfigFile(DEFAULT_CONFIG)
 
-    if 'sonarr_eventtype' in os.environ and os.environ['sonarr_eventtype'] == 'Download':
-        sonarr_handler(configfile.default_queue_file)
-
     if not configfile.colorize:
         crayons.disable()
     else:
@@ -461,8 +442,6 @@ def start():
         completed_paths = [p for p, _ in host.complete]
         cleanup_queuefile(queue_path, set(completed_paths))
         dump_stats(host.complete)
-
-        host.notify_plex()
 
     os.system("stty sane")
 

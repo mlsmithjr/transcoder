@@ -11,7 +11,6 @@ config:
   queues:
     qsv: 1
     cuda: 1
-  plex_server: '192.168.2.91:32400'           # can be 'server:port'
   colorize: yes
   fls_path: '/tmp'
 
@@ -118,18 +117,20 @@ profiles:
   # (for include-use only)
   ############################################
   cuda:
-      input_options: 
-        - "-hwaccel cuvid"      # use hardware decoding
-        - "-c:v h264_cuvid"     # only works if source is h264 !!
+      input_options:
+        # optionally you can enable hardware decoding here
       output_options:
         - "-cq:v 19"            # crf option passed to CUDA engine
         - "-rc vbr_hq"          # variable bit-rate, high quality
         - "-rc-lookahead 32"
-        - "-b:v 3000K"
+        - "-bufsize 8M"
+        - "-b:v 8M"
         - "-profile:v main"
         - "-maxrate:v 8M"
         - "-c:v hevc_nvenc"
         - "-preset slow"
+        - "-pix_fmt yuv420p"
+
 
   ##############################################
   # nVidia CUDA-specific for 10bit video support
@@ -167,17 +168,18 @@ profiles:
   # Intel QSV common options
   ###############################################
   qsv:
-    input_options: 
+    input_options:
       # enable hardware decoding
+      - "-init_hw_device vaapi=intel:/dev/dri/renderD128"
       - "-hwaccel vaapi"
-      - "-hwaccel_device /dev/dri/renderD128"
       - "-hwaccel_output_format vaapi"
-    output_options: 
-      - "-rc vbr_hq"
-      - "-qp 23"
-      - "-vf 'format=nv12,hwupload'"
-      - "-b:v 1M"
-      - "-maxrate 8M"
+      - "-hwaccel_device intel"
+    output_options:
+      - "-vf format=vaapi,hwupload"
+      - "-preset slow"
+      - "-rc_mode 1"
+      - "-qp 20"
+      - "-b:v 8000K"
       - "-c:a copy"
       - "-c:s copy"
 

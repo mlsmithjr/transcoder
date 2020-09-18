@@ -16,11 +16,13 @@ import crayons
 
 import pytranscoder
 
-from pytranscoder import verbose
+from pytranscoder import verbose, utils
 from pytranscoder.config import ConfigFile
 from pytranscoder.ffmpeg import FFmpeg
+from pytranscoder.handbrake import Handbrake
 from pytranscoder.media import MediaInfo
-from pytranscoder.profile import Profile, ProfileSKIP
+from pytranscoder.processor import Processor
+from pytranscoder.profile import Profile
 from pytranscoder.utils import filter_threshold, get_local_os_type, calculate_progress, run
 
 
@@ -56,9 +58,30 @@ class RemoteHostProperties:
     def host_type(self):
         return self.props['type']
 
+    def get_processor(self) -> Processor:
+        # match first available processor (for info parsing use only)
+        if self.ffmpeg_path:
+            return self.get_processor_by_name('ffmpeg')
+        elif self.hbcli_path:
+            return self.get_processor_by_name('hbcli')
+        print(f'Missing "ffmpeg" or "hbcli" path on host "{self.name}"')
+        sys.exit(1)
+
+    def get_processor_by_name(self, name: str) -> Processor:
+        if name == 'ffmpeg':
+            return FFmpeg(self.ffmpeg_path)
+        if self.hbcli_path:
+            return Handbrake(self.hbcli_path)
+        print(f'Unknown processor type "{name}" for host "{self.name}"')
+        sys.exit(1)
+
     @property
     def ffmpeg_path(self):
-        return self.props['ffmpeg']
+        return self.props.get('ffmpeg', None)
+
+    @property
+    def hbcli_path(self):
+        return self.props.get('hbcli', None)
 
     @property
     def is_enabled(self):
@@ -157,7 +180,8 @@ class ManagedHost(Thread):
         self.queue = queue
         self._complete = list()
         self._manager = cluster
-        self.ffmpeg = FFmpeg(props.ffmpeg_path)
+#        self.ffmpeg = FFmpeg(props.ffmpeg_path)
+#        self.hbcli = Handbrake(props.hbcli_path)
 
     def validate_settings(self):
         return self.props.validate_settings()
@@ -213,11 +237,12 @@ class ManagedHost(Thread):
 
     def ssh_test_ok(self):
         try:
-            remote_cmd = 'dir' if self.props.is_windows() else 'ls'
+            #remote_cmd = 'dir' if self.props.is_windows() else 'ls'
+            remote_cmd = 'ls'
             sshtest = subprocess.run([*self.ssh_cmd(), remote_cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                      shell=False, timeout=5)
             if sshtest.returncode != 0:
-                self.log('ssh test failed with the following output: ' + sshtest.stderr)
+                self.log('ssh test failed with the following output: ' + str(sshtest.stderr))
                 return False
             return True
         except subprocess.TimeoutExpired:
@@ -299,17 +324,21 @@ class StreamingManagedHost(ManagedHost):
                 remote_outpath = os.path.join(remote_working_dir, os.path.basename(inpath) + '.tmp')
 
                 #
-                # build remote ffmpeg commandline
+                # build remote commandline
                 #
                 oinput = _profile.input_options.as_shell_params()
                 ooutput = _profile.output_options.as_shell_params()
-#                quiet = ['-nostats', '-hide_banner']
 
-                if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
-                    ooutput = ooutput + job.media_info.ffmpeg_streams(_profile)
+                processor = self.props.get_processor_by_name(_profile.processor)
+                if _profile.is_ffmpeg:
+                    if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
+                        ooutput = ooutput + job.media_info.ffmpeg_streams(_profile)
+                    cmd = ['-y', *oinput, '-i', self.converted_path(remote_inpath),
+                           *ooutput, self.converted_path(remote_outpath)]
+                else:
+                    cmd = ['-i', self.converted_path(remote_inpath), *oinput,
+                           *ooutput, '-o', self.converted_path(remote_outpath)]
 
-                cmd = ['-y', *oinput, '-i', self.converted_path(remote_inpath),
-                       *ooutput, self.converted_path(remote_outpath)]
                 cli = [*ssh_cmd, *cmd]
 
                 #
@@ -359,11 +388,18 @@ class StreamingManagedHost(ManagedHost):
                     # continue
                     return False
 
+                def hb_log_callback(stats):
+                    self.log(f'{basename}: avg fps: {stats["fps"]}, ETA: {stats["eta"]}')
+                    return False
+
                 #
-                # Start remote ffmpeg
+                # Start remote
                 #
                 job_start = datetime.datetime.now()
-                code = self.ffmpeg.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, log_callback)
+                if processor.is_ffmpeg():
+                    code = processor.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, log_callback)
+                else:
+                    code = processor.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, hb_log_callback)
                 job_stop = datetime.datetime.now()
 
                 if code != 0:
@@ -400,8 +436,8 @@ class StreamingManagedHost(ManagedHost):
                     self.log(crayons.green(f'Finished {inpath}'))
                 elif code is not None:
                     self.log(crayons.red(f'error during remote transcode of {inpath}'))
-                    self.log(f' Did not complete normally: {self.ffmpeg.last_command}')
-                    self.log(f'Output can be found in {self.ffmpeg.log_path}')
+                    self.log(f' Did not complete normally: {processor.last_command}')
+                    self.log(f'Output can be found in {processor.log_path}')
 
                 # self.log(f'Removing temporary media copies from {remote_working_dir}')
                 if self.props.is_windows():
@@ -471,14 +507,17 @@ class MountedManagedHost(ManagedHost):
                 #
                 oinput = _profile.input_options.as_shell_params()
                 ooutput = _profile.output_options.as_shell_params()
-#                quiet = ['-nostats', '-hide_banner']
 
                 remote_inpath = self.converted_path(remote_inpath)
                 remote_outpath = self.converted_path(remote_outpath)
 
-                if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
-                    ooutput = ooutput + job.media_info.ffmpeg_streams(_profile)
-                cmd = ['-y', *oinput, '-i', f'"{remote_inpath}"', *ooutput, f'"{remote_outpath}"']
+                processor = self.props.get_processor_by_name(_profile.processor)
+                if _profile.is_ffmpeg:
+                    if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
+                        ooutput = ooutput + job.media_info.ffmpeg_streams(_profile)
+                    cmd = ['-y', *oinput, '-i', f'"{remote_inpath}"', *ooutput, f'"{remote_outpath}"']
+                else:
+                    cmd = ['-i', f'"{remote_inpath}"', *oinput, *ooutput, '-o', f'"{remote_outpath}"']
 
                 #
                 # display useful information
@@ -489,7 +528,7 @@ class MountedManagedHost(ManagedHost):
                     print(f'Host     : {self.hostname} (mounted)')
                     print('Filename : ' + crayons.green(os.path.basename(remote_inpath)))
                     print(f'Profile  : {_profile.name}')
-                    print('ffmeg    : ' + ' '.join(cmd) + '\n')
+                    print('ssh      : ' + ' '.join(cmd) + '\n')
                 finally:
                     self.lock.release()
 
@@ -509,11 +548,18 @@ class MountedManagedHost(ManagedHost):
                     # continue
                     return False
 
+                def hb_log_callback(stats):
+                    self.log(f'{basename}: avg fps: {stats["fps"]}, ETA: {stats["eta"]}')
+                    return False
+
                 #
-                # Start remote ffmpeg
+                # Start remote
                 #
                 job_start = datetime.datetime.now()
-                code = self.ffmpeg.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, log_callback)
+                if processor.is_ffmpeg():
+                    code = processor.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, log_callback)
+                else:
+                    code = processor.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, hb_log_callback)
                 job_stop = datetime.datetime.now()
 
                 #
@@ -537,8 +583,8 @@ class MountedManagedHost(ManagedHost):
                         self.complete(inpath, (job_stop - job_start).seconds)
                     self.log(crayons.green(f'Finished {job.inpath}'))
                 elif code is not None:
-                    self.log(f'Did not complete normally: {self.ffmpeg.last_command}')
-                    self.log(f'Output can be found in {self.ffmpeg.log_path}')
+                    self.log(f'Did not complete normally: {processor.last_command}')
+                    self.log(f'Output can be found in {processor.log_path}')
                     try:
                         os.remove(outpath)
                     except:
@@ -596,15 +642,17 @@ class LocalHost(ManagedHost):
                 #
                 oinput = _profile.input_options.as_shell_params()
                 ooutput = _profile.output_options.as_shell_params()
-#                quiet = ['-nostats', '-hide_banner']
 
                 remote_inpath = self.converted_path(inpath)
                 remote_outpath = self.converted_path(outpath)
 
-                if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
-                    ooutput = ooutput + job.media_info.ffmpeg_streams(_profile)
-
-                cli = ['-y', *oinput, '-i', remote_inpath, *ooutput, remote_outpath]
+                processor = self.props.get_processor_by_name(_profile.processor)
+                if _profile.is_ffmpeg:
+                    if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
+                        ooutput = ooutput + job.media_info.ffmpeg_streams(_profile)
+                    cli = ['-y', *oinput, '-i', remote_inpath, *ooutput, remote_outpath]
+                else:
+                    cli = ['-i', remote_inpath, *oinput, *ooutput, '-o', remote_outpath]
 
                 #
                 # display useful information
@@ -632,14 +680,20 @@ class LocalHost(ManagedHost):
                             # compression goal (threshold) not met, kill the job and waste no more time...
                             self.log(f'Encoding of {basename} cancelled and skipped due to threshold not met')
                             return True
-                    # continue
+                    return False
+
+                def hb_log_callback(stats):
+                    self.log(f'{basename}: avg fps: {stats["fps"]}, ETA: {stats["eta"]}')
                     return False
 
                 #
-                # Start ffmpeg
+                # Start process
                 #
                 job_start = datetime.datetime.now()
-                code = self.ffmpeg.run(cli, log_callback)
+                if processor.is_ffmpeg():
+                    code = processor.run(cli, log_callback)
+                else:
+                    code = processor.run(cli, hb_log_callback)
                 job_stop = datetime.datetime.now()
 
                 #
@@ -663,8 +717,8 @@ class LocalHost(ManagedHost):
                         self.complete(inpath, (job_stop - job_start).seconds)
                     self.log(crayons.green(f'Finished {job.inpath}'))
                 elif code is not None:
-                    self.log(f' Did not complete normally: {self.ffmpeg.last_command}')
-                    self.log(f'Output can be found in {self.ffmpeg.log_path}')
+                    self.log(f' Did not complete normally: {processor.last_command}')
+                    self.log(f'Output can be found in {processor.log_path}')
                     try:
                         os.remove(outpath)
                     except:
@@ -694,9 +748,11 @@ class Cluster(Thread):
         self.hosts: List[ManagedHost] = list()
         self.config = config
         self.verbose = verbose
-        self.ffmpeg = FFmpeg(config.ffmpeg_path)
+#        self.ffmpeg = FFmpeg(config.ffmpeg_path)
+#        self.hbcli = Handbrake(config.hbcli_path)
         self.lock = Cluster.terminal_lock
         self.completed: List = list()
+        self.info_processor = config.get_processor()
 
         for host, props in configs.items():
             hostprops = RemoteHostProperties(host, props)
@@ -761,7 +817,8 @@ class Cluster(Thread):
         if pytranscoder.verbose:
             print('matching ' + path)
 
-        media_info = self.ffmpeg.fetch_details(path)
+        media_info = self.info_processor.fetch_details(path)
+
         if media_info is None:
             print(crayons.red(f'File not found: {path}'))
             return None, None

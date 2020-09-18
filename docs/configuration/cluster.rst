@@ -116,77 +116,79 @@ including the one your are running pytranscoder from, if applicable.
         clusters:
             household:                  # name for this cluster
 
-            #################################
-            # cluster manager, which will 
-            # also participate in the cluster
-            #################################
-            mediacenter:
-                type: local		# Indicates this is where pytranscoder is running and can be used in the cluster as well.
-                ffmpeg:         '/usr/bin/ffmpeg'
-                status:          'enabled'
+                #################################
+                # cluster manager, which will
+                # also participate in the cluster
+                #################################
+                mediacenter:
+                    type: local		# Indicates this is where pytranscoder is running and can be used in the cluster as well.
+                    ffmpeg:         '/usr/bin/ffmpeg'
+                    status:          'enabled'
         
-            ##################################
-            # My old MacPro booted into Ubuntu 
-            ##################################
-            macpro:                     # name of this host (does not need to be the same as network hostname)
-                type:  mounted          # machine with source media and host share a filesystem (nfs, samba, etc)
-                os:    macos            # choices are linux, macos, win10
-                ip:    192.168.2.65
-                user:  sshuser          # user account used to ssh to this host
-                ffmpeg: '/usr/bin/ffmpeg'
-                path-substitutions:     # optional, map source pathnames to equivalent on host
-                    - "/volume1/media/ /mnt/media/"
-                    - "/downloads/ /mnt/downloads/"
-                profiles:               # profiles allowed on this host
-                    - hevc
-                    - h264
-                status: 'enabled'       # set to disabled to temporarily stop using
+                ##################################
+                # My old MacPro
+                ##################################
+                macpro:                     # name of this host (does not need to be the same as network hostname)
+                    type:  mounted          # machine with source media and host share a filesystem (nfs, samba, etc)
+                    os:    macos            # choices are linux, macos, win10
+                    ip:    192.168.2.65
+                    user:  sshuser          # user account used to ssh to this host
+                    ffmpeg: '/usr/local/bin/ffmpeg'
+                    path-substitutions:     # optional, map source pathnames to equivalent on host
+                        - "/volume1/media/ /mnt/media/"
+                        - "/downloads/ /mnt/downloads/"
+                    profiles:               # profiles allowed on this host
+                        - hevc
+                        - h264
+                    status: 'enabled'       # set to disabled to temporarily stop using
 
-            #################################
-            # gaming machine (Windows OpenSSH)
-            #################################
-            gamer: 
-                type:   streaming       # host not using shared filesystem
-                os:     win10           # choices are linux, macos, win10
-                ip:     192.168.2.64    # address of host
-                user:   matt            # ssh login user
-                working_dir: 'c:\temp'  # working folder on remote host, required for streaming type
-                ffmpeg: 'c:/ffmpeg/bin/ffmpeg'
-                profiles:               # profiles allowed on this host
-                    - hevc_cuda
-                    - hevc_qsv
-                queues:
-                    qsv: 1
-                    cuda: 2
-                status: 'enabled'         # set to disabled to temporarily stop using
+                #################################
+                # gaming machine (Windows OpenSSH)
+                #################################
+                gamer:
+                    type:   streaming       # host not using a mounted filesystem (yuck)
+                    os:     win10           # choices are linux, macos, win10
+                    ip:     192.168.2.64    # address of host
+                    user:   matt            # ssh login user
+                    working_dir: 'c:\temp'  # working folder on remote host, required for streaming type
+                    ffmpeg: 'c:/ffmpeg/bin/ffmpeg'
+                    profiles:               # profiles allowed on this host
+                        - hevc_cuda
+                        - hevc_qsv
+                    queues:
+                        qsv: 1              # allow only 1 encode on the CPU at a time
+                        cuda: 2             # allow 2 concurrent encodes on the nVidia card
+                    status: 'enabled'         # set to disabled to temporarily stop using
 
-            ####################################################
-            # Spare family machine - Windows Subsystem for Linux
-            ####################################################
-            family:                     # machine configured to use WSL ssh server
-                type:  mounted
-                os:    win10
-                ip:    192.168.2.66
-                user:  chris
-                ffmpeg: /mnt/c/ffmpeg/bin/ffmpeg.exe  # using Windows ffmpeg.exe build
-                path-substitutions:         # how to map media paths on source to destination mount point
-                    - "/volume1/media Z:"   # Z: mapped to network share (media)
-                    - "/downloads/    Y:"   # Y: mapped to network share (downloads)
-                profiles:               # profiles allowed on this host
-                    - hevc_cuda
-                    - hevc_cuda_10bit
-                queues:
-                    qsv: 1
-                    cuda: 2
-                status: enabled
+                ####################################################
+                # Spare family machine - Windows Subsystem for Linux (Ubuntu)
+                ####################################################
+                family:                     # machine configured to use WSL ssh server
+                    type:  mounted
+                    os:    win10
+                    ip:    192.168.2.66
+                    user:  chris
+                    hbcli: /mnt/c/bin/HandBrakeCLI.exe
+                    ffmpeg: /mnt/c/ffmpeg/bin/ffmpeg.exe  # using Windows ffmpeg.exe build
+                    path-substitutions:         # how to map media paths on source to destination mount point
+                        - "/volume1/media Z:"   # Z: mapped to network share (media)
+                        - "/downloads/    Y:"   # Y: mapped to network share (downloads)
+                    profiles:               # profiles allowed on this host
+                        - hevc_cuda
+                        - hevc_cuda_10bit
+                        - handbrake_qsv_hevc
+                        - handbrake_qsv_h264
+                    queues:
+                        qsv: 1
+                        cuda: 2
+                    status: enabled
 
 This sample is based on a setup where a Linux machine is used as a media server, and all media is stored on that machine. The 
 relevant root paths on that machine are */downloads* and */volume1/media*.  These folders are also shared via Samba (SMB) and NFS 
 and accessible to all other machines on the network.
 
 The first machine, **mediacenter**, is of type *local* which means it's the same machine we're running pytranscoder on. This is just
-a simplified way of adding the machine without requiring ssh into itself. Notice that each machine has an *ffmpeg* path. These are required and 
-will be the *ffmpeg* being run on that host. Status is either *enabled* or *disabled*. If disabled it will not participate in the cluster.
+a simplified way of adding the machine without requiring ssh into itself. Status is either *enabled* or *disabled*. If disabled it will not participate in the cluster.
 
 .. note::
     pytranscoder will check that each machine in the cluster is up and accessible when you start a job. If a host is down it will
@@ -200,7 +202,7 @@ the *path-substitutions* configuration.
 For example, there is a video file on the server in */downloads/mymedia.mp4*.  The */downloads* folder is exported via NFS and mounted on 
 **macpro** machine under */mnt/downloads*.  Once the *ffmpeg* job starts on **macpro** it will be passed */downloads/mymedia.mp4* as the input
 filename.  Well, that path does not exist on **macpro**, but *mymedia.mp4* IS accessible as */mnt/downloads/mymedia.mp4*. So we setup 
-the *path-substitutions* patterns to account for this. Now, before *ffmpeg* is run on **macpro** the input pathname will be changed from 
+the *path-substitutions* patterns to account for this. Now, the input pathname will be changed from
 */downloads/*... to */mnt/downloads/*...
 
 Likewise, a file under */volume1/media/tv/series/season1/show.s01e01.mp4* is accessible on **macpro** as 
@@ -214,7 +216,7 @@ since this host is incapable of any hardware encoding.  If I put *hevc_cuda* as 
 has no nVidia GPU. So this host will only be called on to encode video matching those profiles.
 
 Skipping down to the **gamer** host we see a type of *streaming*. The streaming type is not encouraged but there in case you cannot or will not
-map a server drive to the host. Maybe this is a security concern, or laziness.  Who knows.  But it's there if the situation arises.
+map a server drive to the host.
 Notice there are no *path-substitutions*.  This is because for *streaming* they are not used.
 Hosts of the *streaming* type will be sent the media file via scp (secured copy) to the *working_dir* folder, *ffmpeg* will encode the file into the same
 the same folder, and the result will be copied back to the server. Finally, the 2 artifacts in *working_dir* are removed.

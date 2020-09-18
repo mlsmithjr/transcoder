@@ -22,8 +22,7 @@ nVidia CUDA-enabled graphics card or Intel accelerated video (QSV)
 * Transcode from a list of files (queue) or all on the command line
 * Cluster mode allows use of other machines See [Cluster.md](https://github.com/mlsmithjr/transcoder/blob/master/Cluster.md) for details.
 * On-the-fly compression monitoring and optional early job termination if not compressing as expected.
-* Optionally trigger Plex library update via API
-* Handles Sonarr download events and logs file path to default queue for later batch processing
+* Experimental support for HandBrakeCLI
 
 #### Requirements
 
@@ -111,7 +110,6 @@ config:
   queues:
     qsv:                1                   # sequential encodes
     cuda:               2                   # maximum of 2 encodes at a time
-  plex_server:          192.168.2.61:32400  # optional, use 'address:port'
   colorize:             yes
 ```
 
@@ -121,7 +119,6 @@ config:
 | ffmpeg                | Full path to ffmpeg on this host |
 | ssh                   | Full path to ssh on this host |
 | queues                | If using concurrency, define your queues here. The queue name is whatever you want. Each name specifies a maximum number of concurrent encoding jobs. If none defined, a default sequential queue is used. |
-| plex_server           | optional, if you want your Plex server notified after media is encoded. Use address:port format. |
 | colorize     | optional, defaults to "no". If "yes" terminal output will have some color added |
 
 #### profiles - Transcoding profiles (ffmpeg options)

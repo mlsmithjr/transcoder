@@ -17,8 +17,8 @@ Features
 * Transcode from a list of files (queue) or all on the command line
 * Cluster mode allows use of other machines See `Link Cluster.md <https://github.com/mlsmithjr/transcoder/blob/master/Cluster.md>`_ for details.
 * On-the-fly compression monitoring and optional early job termination if not compressing as expected.
-* Optionally trigger Plex library update via API
-* Handles Sonarr download events and logs file path to default queue for later batch processing
+* Experimental support for HandBrakeCLI
+
 
 .. toctree::
    :maxdepth: 2
@@ -29,6 +29,7 @@ Features
    configuration/configuration
    configuration/concurrency
    configuration/cluster
+   usage/running-hbcli.rst
    usage/running-local.rst
    usage/running-clustered.rst
    usage/includes.rst
