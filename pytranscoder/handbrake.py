@@ -34,7 +34,7 @@ class Handbrake(Processor):
         :return:        Instance of MediaInfo
         """
         with subprocess.Popen([self.path, '--scan', '-i', _path], stderr=subprocess.PIPE) as proc:
-            output = proc.stderr.read().decode(encoding='utf8')
+            output = proc.stderr.read().decode(encoding='utf8', errors='replace')
             mi = MediaInfo.parse_handbrake_details(_path, output)
             if mi.valid:
                 return mi

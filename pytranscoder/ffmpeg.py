@@ -35,7 +35,7 @@ class FFmpeg(Processor):
         :return:        Instance of MediaInfo
         """
         with subprocess.Popen([self.path, '-i', _path], stderr=subprocess.PIPE) as proc:
-            output = proc.stderr.read().decode(encoding='utf8')
+            output = proc.stderr.read().decode(encoding='utf8', errors='replace')
             mi = MediaInfo.parse_ffmpeg_details(_path, output)
             if mi.valid:
                 return mi
@@ -53,7 +53,7 @@ class FFmpeg(Processor):
 
         args = [ffprobe_path, '-v', '1', '-show_streams', '-print_format', 'json', '-i', _path]
         with subprocess.Popen(args, stdout=subprocess.PIPE) as proc:
-            output = proc.stdout.read().decode(encoding='utf8')
+            output = proc.stdout.read().decode(encoding='utf8', errors='replace')
             info = json.loads(output)
             return MediaInfo.parse_ffmpeg_details_json(_path, info)
 
