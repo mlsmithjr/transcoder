@@ -1,6 +1,12 @@
 ## pytranscoder
 
-**New!**  [Read The Docs](https://pytranscoder.readthedocs.io/en/latest/)
+[Read The Docs](https://pytranscoder.readthedocs.io/en/latest/)
+
+
+#### News
+Pytranscoder is getting a rules engine makeover in order to better support transcoding needs. You will be able to define profiles as today, but also
+optionally break them down by audio and video. So using rules you can mix and match video and audio profiles for better transcoding control. Hopefully
+this will drop by the end of October, depending on my other workload.
 
 
 Python wrapper for ffmpeg for batch, concurrent, or clustered transcoding
