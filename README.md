@@ -1,4 +1,5 @@
 ## pytranscoder
+Python wrapper for ffmpeg for batch, concurrent, or clustered transcoding
 
 [Read The Docs](https://pytranscoder.readthedocs.io/en/latest/)
 
@@ -9,8 +10,7 @@ optionally break them down by audio and video. So using rules you can mix and ma
 this will drop by the end of October, depending on my other workload.
 
 
-Python wrapper for ffmpeg for batch, concurrent, or clustered transcoding
-
+#### What it is
 This script is intended to help automate transcoding for people encoding lots of video.
 It is more than a wrapper - it is a workflow and job manager.
 
