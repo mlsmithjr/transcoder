@@ -1,5 +1,5 @@
-from typing import Dict, List, Optional, Set, Any
-
+from typing import Dict, List, Optional, Any
+from __future__ import annotations
 
 class Options:
     def __init__(self, opts: List = None):
@@ -59,10 +59,6 @@ class Options:
         return z
 
 
-class ProfileSKIP(Exception):
-    pass
-
-
 class Profile:
     def __init__(self, name: str, profile: Optional[Dict] = None):
         self.profile: Dict[str, Any] = profile
@@ -80,6 +76,9 @@ class Profile:
             self.profile["output_options"] = Options(profile["output_options"])
         else:
             self.profile["output_options"] = Options()
+
+        if "output_options_audio" in self.profile:
+            self.profile["output_options_audio"] = Options(profile["output_options_audio"])
 
     def get(self, key: str):
         return self.profile.get(key, None)
@@ -99,6 +98,10 @@ class Profile:
     @property
     def output_options(self) -> Options:
         return self.profile["output_options"]
+
+    @property
+    def output_options_audio(self) -> Options:
+        return self.profile.get("output_options_audio", None)
 
     @property
     def extension(self) -> str:

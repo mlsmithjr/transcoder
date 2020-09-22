@@ -84,16 +84,18 @@ profiles:
     # 
     output_options:
         - "-preset slow"    # use slow for better quality
-        - "-c:a copy"       # copy all audio as-is
         - "-c:s copy"       # copy all subtitles as-is
         - "-profile:v main"
         - "-f matroska"     # mkv format
+        - "-max_muxing_queue_size 1024"
+    output_options_audio:
+        - "-c:a copy"       # copy all audio as-is
     extension: '.mkv'
     threshold: 18           # minimum of 18% compression required
-    threshold_check: 30     # start checking threshold at 30% complete
+    threshold_check: 20     # start checking threshold at 20% complete
 
     #
-    # audio handling
+    # audio drop/keep handling
     #
     audio:
         #
@@ -104,7 +106,7 @@ profiles:
             - "eng"
         default_language: eng
     #
-    # subtitle handling
+    # subtitle drop/keep handling
     #
     subtitle:
         # see audio comment above
@@ -122,15 +124,14 @@ profiles:
       output_options:
         - "-cq:v 19"            # crf option passed to CUDA engine
         - "-rc vbr_hq"          # variable bit-rate, high quality
-        - "-rc-lookahead 32"
-        - "-bufsize 8M"
-        - "-b:v 8M"
+        - "-rc-lookahead 20"
+        - "-bufsize 5M"
+        - "-b:v 7M"
         - "-profile:v main"
-        - "-maxrate:v 8M"
+        - "-maxrate:v 7M"
         - "-c:v hevc_nvenc"
         - "-preset slow"
         - "-pix_fmt yuv420p"
-
 
   ##############################################
   # nVidia CUDA-specific for 10bit video support
@@ -147,22 +148,8 @@ profiles:
   # everything.
   ###############################################
   hevc_cuda:
-      include: "base cuda" # include "base" and "cuda" definitions
+      include: "base cuda"  # include "base" and "cuda" definitions
       queue: 'cuda'
-
-  ############################################
-  # nVidia CUDA-specific common options
-  # without hardware decoding
-  # (for include-use only)
-  ############################################
-  cuda_nohwd:
-      output_options:
-        - "-cq:v 23"            # crf option passed to CUDA engine
-        - "-rc vbr_hq"          # variable bit-rate, high quality
-        - "-b:v 1M"
-        - "-maxrate:v 8M"
-        - "-c:v hevc_nvenc"
-        - "-profile:v main"
 
   ###############################################
   # Intel QSV common options
@@ -179,9 +166,10 @@ profiles:
       - "-preset slow"
       - "-rc_mode 1"
       - "-qp 20"
-      - "-b:v 8000K"
-      - "-c:a copy"
+      - "-b:v 7M"
       - "-c:s copy"
+    output_options_audio:
+      - "-c:a copy"
 
   ###############################################
   # Intel QSV (HEVC)
@@ -229,6 +217,19 @@ profiles:
         - "-f mp4"
       extension: '.mp4'
 
+  #
+  # example audio-only partial profiles, to be used as mixins.
+  #
+  mp3_hq:
+    output_options_audio:
+      - "-c:a libmp3lame"
+      - "-q:a 330"
+
+  aac_hq:
+    output_options_audio:
+      - "-c:a libfdk_aac"
+      - "-b:a 384k"
+
   #################################################
   # The following are scenario-specific profiles.
   # They are examples of how to treat various
@@ -256,7 +257,7 @@ profiles:
 
   #
   # Anime - keep Japanese language track and English subtitles
-  # Engilsh subtitles already included in base profile
+  # English subtitles already included in base profile
   #
   anime:
       include: "base cuda"
@@ -264,17 +265,6 @@ profiles:
           include_languages:
               - "eng"
               - "jpn"
-
-  #
-  # Magnum PI (classic) downloads have weird audio,
-  # so adjust
-  #
-  magnum-pi:
-      include: "base cuda"
-      output_options:
-        - "-c:a libmp3lame"
-        - "-q:a 330"
-      queue: 'cuda'
 
   #
   # When you get those oddball encodes with a stupid high
@@ -304,11 +294,6 @@ profiles:
 # Rules with a profile of "SKIP" mean to skip processing of the matched video
 #
 rules:
-  'magnum':
-      profile: magnum-pi
-      criteria:
-        vcodec: '!hevc'
-        path: '.*Magnum.*'
 
   'skip video if already encoded in hevc/h265':
       profile: SKIP
@@ -322,7 +307,7 @@ rules:
         res_height: '721-1081'
         runtime:  '30-65'
 
-  'special HD higher quality':
+  'special HD higher quality, keep original':
       profile: SKIP
       criteria:
         filesize_mb: '<3500'

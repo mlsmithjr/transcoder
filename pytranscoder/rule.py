@@ -9,10 +9,6 @@ numeric_predicates = ['res_height', 'res_width', 'runtime', 'filesize_mb', 'fps'
 
 
 class Rule:
-    name: str
-    profile: str
-    criteria: Dict
-
     def __init__(self, name: str, rule: Dict):
         self.name = name
         self.profile = rule['profile']
@@ -24,7 +20,7 @@ class Rule:
     def is_skip(self):
         return self.profile.upper() == 'SKIP'
 
-    def match(self, media_info: MediaInfo) -> (str, str):
+    def match(self, media_info: MediaInfo) -> bool:
         if verbose:
             print(f' > evaluating "{self.name}"')
 
@@ -32,7 +28,7 @@ class Rule:
             # no criteria section, match by default
             if verbose:
                 print(f'  >> rule {self.name} selected by default (no criteria)')
-            return self.profile, self.name
+            return True
 
         for pred, value in self.criteria.items():
             inverted = False
@@ -73,4 +69,6 @@ class Rule:
                     break
         else:
             # didn't bail out on any predicates, have a match
-            return self.profile, self.name
+            return True
+
+        return False

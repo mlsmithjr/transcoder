@@ -16,11 +16,9 @@ import pytranscoder
 from pytranscoder import __version__
 from pytranscoder.cluster import manage_clusters
 from pytranscoder.config import ConfigFile
-from pytranscoder.ffmpeg import FFmpeg
-from pytranscoder.handbrake import Handbrake
 from pytranscoder.media import MediaInfo
 from pytranscoder.profile import Profile
-from pytranscoder.utils import filter_threshold, files_from_file, calculate_progress, dump_stats, is_mounted
+from pytranscoder.utils import filter_threshold, files_from_file, calculate_progress, dump_stats, assemble_audio_mixins
 
 DEFAULT_CONFIG = os.path.expanduser('~/.transcode.yml')
 
@@ -28,10 +26,11 @@ DEFAULT_CONFIG = os.path.expanduser('~/.transcode.yml')
 class LocalJob:
     """One file with matched profile to be encoded"""
 
-    def __init__(self, inpath: str, profile: Profile, info: MediaInfo):
+    def __init__(self, inpath: str, profile: Profile, mixins: List[str], info: MediaInfo):
         self.inpath = Path(os.path.abspath(inpath))
         self.profile = profile
         self.info = info
+        self.mixins = mixins
 
 
 class QueueThread(Thread):
@@ -74,10 +73,23 @@ class QueueThread(Thread):
             try:
                 job: LocalJob = self.queue.get()
                 oinput = job.profile.input_options.as_shell_params()
+
+                # get the generic output options
                 ooutput = job.profile.output_options.as_shell_params()
 
+                # now get the specific audio and video options, with optional mixins
+                mixin_profiles = self.config.find_mixins(job.mixins)
+                if job.profile.output_options_audio:
+                    # we have a mixin-enabled audio section - see if there are mixins to apply
+                    options = assemble_audio_mixins(mixin_profiles)
+                    if len(options) > 0:
+                        ooutput.extend(options)
+                    else:
+                        # no mixin found for output_options_audio, so use the profile version
+                        ooutput.extend(job.profile.output_options_audio.as_shell_params())
+
                 fls = False
-                if is_mounted(job.inpath) and self.config.fls_path():
+                if self.config.fls_path():
                     # lets write output to local storage, for efficiency
                     outpath = PurePath(self.config.fls_path(), job.inpath.with_suffix(job.profile.extension).name)
                     fls = True
@@ -218,7 +230,7 @@ class LocalHost:
         :return:
         """
 
-        for path, forced_profile in files:
+        for path, forced_profile, mixins in files:
             #
             # do some prechecks...
             #
@@ -247,7 +259,6 @@ class LocalHost:
                 print(crayons.red(f'File not found: {path}'))
                 continue
 
-            the_profile = None
             if media_info.valid:
 
                 if pytranscoder.verbose:
@@ -280,11 +291,11 @@ class LocalHost:
                         )
                         sys.exit(1)
                     else:
-                        self.queues[qname].put(LocalJob(path, the_profile, media_info))
+                        self.queues[qname].put(LocalJob(path, the_profile, mixins, media_info))
                         if pytranscoder.verbose:
                             print('Added to queue {qname}')
                 else:
-                    self.queues['_default_'].put(LocalJob(path, the_profile, media_info))
+                    self.queues['_default_'].put(LocalJob(path, the_profile, mixins, media_info))
 
 
 def cleanup_queuefile(queue_path: str, completed: Set):
@@ -350,6 +361,7 @@ def start():
     install_sigint_handler()
     files = list()
     profile = None
+    mixins = None
     queue_path = None
     cluster = None
     configfile: Optional[ConfigFile] = None
@@ -384,6 +396,9 @@ def start():
             elif sys.argv[arg] == '-c':                 # cluster
                 cluster = sys.argv[arg + 1]
                 arg += 1
+            elif sys.argv[arg] == '-m':                 # mixins
+                mixins = sys.argv[arg + 1].split(',')
+                arg += 1
             else:
                 if os.name == "nt":
                     expanded_files: List = glob.glob(sys.argv[arg])     # handle wildcards in Windows
@@ -393,7 +408,7 @@ def start():
                     if cluster is None:
                         files.append((f, profile))
                     else:
-                        files.append((f, cluster, profile))
+                        files.append((f, cluster, profile, mixins))
             arg += 1
 
     if configfile is None:
@@ -405,12 +420,15 @@ def start():
         crayons.enable()
 
     if len(files) == 0 and queue_path is None and configfile.default_queue_file is not None:
+        #
+        # load from list of files
+        #
         tmpfiles = files_from_file(configfile.default_queue_file)
         queue_path = configfile.default_queue_file
         if cluster is None:
             files.extend([(f, profile) for f in tmpfiles])
         else:
-            files.extend([(f, cluster, profile) for f in tmpfiles])
+            files.extend([(f, cluster, profile, mixins) for f in tmpfiles])
 
     if len(files) == 0:
         print(crayons.yellow(f'Nothing to do'))

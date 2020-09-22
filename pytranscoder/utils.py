@@ -3,12 +3,20 @@ import math
 import os
 import platform
 import subprocess
-from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
 import pytranscoder
 from pytranscoder.media import MediaInfo
 from pytranscoder.profile import Profile
+
+
+def assemble_audio_mixins(mixins: List[Profile]):
+    for mixin in mixins:
+        audio = mixin.output_options_audio
+        if audio:
+            # mixins only allow one override, so take the first we find
+            return audio.as_shell_params()
+    return []
 
 
 def filter_threshold(profile: Profile, inpath, outpath):
@@ -78,15 +86,3 @@ def dump_stats(completed):
         _sec = int(elapsed % 60)
         print(f"{pathname}  ({_min:3}m {_sec:2}s)")
     print()
-
-
-def is_mounted(filepath: Path) -> bool:
-    if get_local_os_type() == "win10":
-        # mounted filesystem detection not available in Windows
-        return False
-    p = filepath.resolve()
-    for part in p.parents:
-        if str(part) != str(part.root) and part.is_mount():
-            return True
-    return False
-

@@ -1,6 +1,9 @@
 
 ### Version History
 
+Version 2.1.1:
+    * Removed unportable is_mount detection. Now always default to any designated temp drive/path for transcoding.
+
 Version 2.1.0:
     * Added experimental support for HandBrakeCLI.
     * Requires Python 3.7 or higher

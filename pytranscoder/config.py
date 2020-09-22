@@ -1,6 +1,6 @@
 import sys
 import os
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 import yaml
 
@@ -66,6 +66,14 @@ class ConfigFile:
     def get_profile(self, profile_name) -> Profile:
         return self.profiles.get(profile_name, None)
 
+    def find_mixins(self, mixins: List[str]) -> List[Profile]:
+        profiles = []
+        for mixin in mixins:
+            p = self.get_profile(mixin)
+            if p:
+                profiles.append(p)
+        return profiles
+
     def match_rule(self, media_info: MediaInfo, restrict_profiles=None) -> Optional[Rule]:
         for rule in self.rules.values():
             if restrict_profiles is not None and rule.profile not in restrict_profiles:
@@ -76,7 +84,11 @@ class ConfigFile:
                 if not self.has_profile(rule.profile):
                     print(f'profile "{rule.profile}" referenced from rule "{rule.name}" not found')
                     exit(1)
-
+                if rule.mixins is not None:
+                    for mixin in rule.mixins:
+                        if not self.has_profile(mixin):
+                            print(f'mixin "{mixin}" referenced from rule "{rule.name}" not found')
+                            exit(1)
                 return rule
         return None
 
