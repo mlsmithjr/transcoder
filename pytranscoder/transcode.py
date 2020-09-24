@@ -18,7 +18,7 @@ from pytranscoder.cluster import manage_clusters
 from pytranscoder.config import ConfigFile
 from pytranscoder.media import MediaInfo
 from pytranscoder.profile import Profile
-from pytranscoder.utils import filter_threshold, files_from_file, calculate_progress, dump_stats, assemble_audio_mixins
+from pytranscoder.utils import filter_threshold, files_from_file, calculate_progress, dump_stats
 
 DEFAULT_CONFIG = os.path.expanduser('~/.transcode.yml')
 
@@ -72,21 +72,8 @@ class QueueThread(Thread):
         while not self.queue.empty():
             try:
                 job: LocalJob = self.queue.get()
-                oinput = job.profile.input_options.as_shell_params()
-
-                # get the generic output options
-                ooutput = job.profile.output_options.as_shell_params()
-
-                # now get the specific audio and video options, with optional mixins
-                mixin_profiles = self.config.find_mixins(job.mixins)
-                if job.profile.output_options_audio:
-                    # we have a mixin-enabled audio section - see if there are mixins to apply
-                    options = assemble_audio_mixins(mixin_profiles)
-                    if len(options) > 0:
-                        ooutput.extend(options)
-                    else:
-                        # no mixin found for output_options_audio, so use the profile version
-                        ooutput.extend(job.profile.output_options_audio.as_shell_params())
+                input_opt = job.profile.input_options.as_shell_params()
+                output_opt = self.config.output_from_profile(job.profile, job.mixins)
 
                 fls = False
                 if self.config.fls_path():
@@ -102,10 +89,10 @@ class QueueThread(Thread):
                 processor = self.config.get_processor_by_name(job.profile.processor)
                 if job.profile.is_ffmpeg:
                     if job.info.is_multistream() and self.config.automap and job.profile.automap:
-                        ooutput = ooutput + job.info.ffmpeg_streams(job.profile)
-                    cli = ['-y', *oinput, '-i', str(job.inpath), *ooutput, str(outpath)]
+                        output_opt = output_opt + job.info.ffmpeg_streams(job.profile)
+                    cli = ['-y', *input_opt, '-i', str(job.inpath), *output_opt, str(outpath)]
                 else:
-                    cli = ['-i', str(job.inpath), *oinput, *ooutput, '-o', str(outpath)]
+                    cli = ['-i', str(job.inpath), *input_opt, *output_opt, '-o', str(outpath)]
 
                 #
                 # display useful information
@@ -354,6 +341,7 @@ def start():
             'name and .tmp extension')
         print('  -y <file>  Full path to configuration file.  Default is ~/.transcode.yml')
         print('  -p         profile to use. If used with --from-file, applies to all listed media in <filename>')
+        print('  -m         Add mixins to profile. Separate multiples with a comma')
         print('\n** PyPi Repo: https://pypi.org/project/pytranscoder-ffmpeg/')
         print('** Read the docs at https://pytranscoder.readthedocs.io/en/latest/')
         sys.exit(0)

@@ -1,0 +1,60 @@
+
+config:
+    ffmpeg: "/usr/bin/ffmpeg"
+    queues:
+      - q1: 1
+      - q2: 2
+
+profiles:
+    base1:
+      output_options:
+        - "-c:v copy"
+        - "-c:s copy"
+        - "-f matroska"
+      output_options_audio:
+        - "-c:a copy"
+      threshold: 1
+      extension: ".mkv"
+
+    profile1:
+        include: "base1"
+        output_options:
+          - "-threads 4"
+        extension: ".mkv"
+
+    base2:
+      output_options_video:
+        - "-c:v copy"
+      output_options:
+        - "-c:s copy"
+        - "-f matroska"
+      output_options_audio:
+        - "-c:a copy"
+      threshold: 1
+      extension: ".mkv"
+
+    profile2:
+        include: "base2"
+        output_options:
+          - "-threads 4"
+        output_options_video:
+          - "-c:v hevc_x264"
+        extension: ".mkv"
+
+    mixin1:
+      output_options_audio:
+        - "-c:a mp3lame"
+        - "-b:a 384k"
+
+    mixin2:
+      output_options_video:
+        - "-aaa bbb"
+        - "-ccc ddd"
+        - "-eee fff"
+
+rules:
+    default:
+        profile: "hevc_cuda"
+        criteria:
+          - vcodec: "!hevc"
+

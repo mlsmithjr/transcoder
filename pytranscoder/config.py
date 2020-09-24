@@ -84,11 +84,11 @@ class ConfigFile:
                 if not self.has_profile(rule.profile):
                     print(f'profile "{rule.profile}" referenced from rule "{rule.name}" not found')
                     exit(1)
-                if rule.mixins is not None:
-                    for mixin in rule.mixins:
-                        if not self.has_profile(mixin):
-                            print(f'mixin "{mixin}" referenced from rule "{rule.name}" not found')
-                            exit(1)
+#                if rule.mixins is not None:
+#                    for mixin in rule.mixins:
+#                        if not self.has_profile(mixin):
+#                            print(f'mixin "{mixin}" referenced from rule "{rule.name}" not found')
+#                            exit(1)
                 return rule
         return None
 
@@ -106,6 +106,32 @@ class ConfigFile:
             return Handbrake(self.hbcli_path)
         print('Missing "ffmpeg" or "hbcli" path')
         sys.exit(1)
+
+    @staticmethod
+    def find_mixin_section(mixins: List[Profile], mixin_type: str):
+        for mixin in mixins:
+            section_name = f'output_options_{mixin_type}'
+            if section_name in mixin.profile:
+                section = mixin.profile[section_name]
+                # mixins only allow one override, so take the first we find
+                return section.as_shell_params()
+        return []
+
+    def output_from_profile(self, profile: Profile, mixins: List[str]) -> List[str]:
+        # start with output_options (not mixable)
+        output_opt = profile.output_options.as_shell_params()
+        mixin_profiles = self.find_mixins(mixins)
+        for section in ['audio', 'video']:
+            section_name = f'output_options_{section}'
+            if section_name in profile.profile:
+                # we have a mixin-enabled section - see if there are mixins to apply
+                options = self.find_mixin_section(mixin_profiles, section)
+                if len(options) > 0:
+                    output_opt.extend(options)
+                else:
+                    # no mixin override, just use the section in the profile
+                    output_opt.extend(profile.profile[section_name].as_shell_params())
+        return output_opt
 
     @property
     def ffmpeg_path(self):

@@ -10,15 +10,6 @@ from pytranscoder.media import MediaInfo
 from pytranscoder.profile import Profile
 
 
-def assemble_audio_mixins(mixins: List[Profile]):
-    for mixin in mixins:
-        audio = mixin.output_options_audio
-        if audio:
-            # mixins only allow one override, so take the first we find
-            return audio.as_shell_params()
-    return []
-
-
 def filter_threshold(profile: Profile, inpath, outpath):
     if profile.threshold > 0:
         orig_size = os.path.getsize(inpath)

@@ -26,6 +26,7 @@ nVidia CUDA-enabled graphics card or Intel accelerated video (QSV)
 * Preserves all streams but allows for filtering by audio and subtitle language.
 * Configurable transcoding profiles
 * Configurable rules and criteria to auto-match a video file to a transcoding profile
+* Mixins are profile fragments you can provide at runtime to dynmically change your selected profiles.
 * Transcode from a list of files (queue) or all on the command line
 * Cluster mode allows use of other machines See [Cluster.md](https://github.com/mlsmithjr/transcoder/blob/master/Cluster.md) for details.
 * On-the-fly compression monitoring and optional early job termination if not compressing as expected.
@@ -38,7 +39,6 @@ nVidia CUDA-enabled graphics card or Intel accelerated video (QSV)
 * nVidia graphics card with latest nVidia CUDA drivers (_optional_)
 * Intel CPU with QSV enabled (_optional_)
 * Python 3 (3.7 or higher)
-* Python PlexAPI package (optional).  Install with `pip3 install --user plexapi`
 
 #### Support
 Please log issues or questions via the github home page for now.
@@ -141,21 +141,26 @@ profiles:
   # some common, reusable settings to keep things tidy
   common:
     output_options:
-      - "-crf 20"
-      - "-c:a copy"
       - "-c:s copy"
        - "-f matroska"
+    output_options_audio:
+      - "-c:a copy"
+    output_options_video:
+      - "-crf 20"
     extension: '.mkv'
     threshold: 20
-    threshold_check: 60
+    threshold_check: 30
 
   #
   # Sample Intel QSV transcode setup (note to customize -hwaccel_device param for your environment)
   #
   hevc_qsv:
     include: common
-    input_options: -hwaccel vaapi -hwaccel_device /dev/dri/renderD129 -hwaccel_output_format vaapi
-    output_options: 				# in addition to those included from 'common'
+    input_options:
+      - "-hwaccel vaapi"
+      - "-hwaccel_device /dev/dri/renderD129"
+      - "-hwaccel_output_format vaapi"
+    output_options_video:         # mixin-enabled section - overrides common
       - "-vf scale_vaapi=format=p010"
       - "-c:v hevc_vaapi"
 
@@ -165,13 +170,16 @@ profiles:
 
   hevc_cuda:                  # profile name
       include: common
-      input_options: |        # ffmpeg input options
-        -hwaccel cuvid        # REQUIRED for CUDA
-        -c:v h264_cuvid       # hardware decoding too
-      output_options:         # in addition to included from 'common'
-        - "-c:v hevc_nvenc"     # REQUIRED for CUDA
+      input_options:          # ffmpeg input options
+        - "-hwaccel cuvid"    # REQUIRED for CUDA
+        - "-c:v h264_cuvid"   # hardware decoding too
+      output_options_video:   # mixen-enabled - overrides common
+        - "-c:v hevc_nvenc"   # REQUIRED for CUDA
         - "-profile:v main"
         - "-preset medium"
+      output_options_audio:
+        - "-c:a copy"
+      
       queue: cuda		# manage this encode in the 'cuda' queue defined globally
       
       # optionally you can filter out audio/subtitle tracks you don't need
@@ -192,6 +200,14 @@ profiles:
              - "ger"
              - "jpn"
          default_language: eng
+  #
+  # This is a mixin, a profile fragment that can be provided on the command line
+  # to alter a profile (ie. pytranscoder -p hevc_cuda -m mp3_hq file.mp4)
+
+  mp3_hq:
+    output_options_audio:
+      - "-c:a mp3lame"
+      - "-b:a 384k"
 
   x264:                            # profile name
       include: common
@@ -208,17 +224,19 @@ h264_cuda_anime:
  
 ```
 
-| setting          | purpose |
-| -----------      | ----------- |
-| input_options    | ffmpeg options related to the input (see ffmpeg docs)  |
-| output_options   | ffmpeg options related to the output (see ffmpeg docs)  |
-| extension        | Filename extension to use for the encoded file |
-| queue           | optional. Assign encodes for this profile to a specific queue (defined in *config* section)   |
-| threshold        | optional. If provided this number represents a minimum percentage compression savings for the encoded media. If it does not meet this threshold the transcoded file is discarded, source file remains as-is, and the source job marked as complete. This is useful if a particular file doesn't compress much and you would rather just keep the original. |
-| threshold_check  | optional. If provided this is the percent done to start checking if the threshold is being met. Default is 100% (when media is finished). Use this to have threshold checks done earlier to stop a long-running transcode if not producing expected compression (threshold).|
-| include | optional. Include options from one or more previously defined profiles. (see section on includes). |
-| audio | Audio track handling options. Include a list of **exclude_languages** to automatically remove tracks. If any track being removed is a _default_, a new default will be set based on the **default_language**. |
-| subtitle | See _audio_ above. |
+| setting               | purpose |
+| -----------           | ----------- |
+| input_options         | ffmpeg options related to the input (see ffmpeg docs)  |
+| output_options        | ffmpeg options related to the output (see ffmpeg docs). Use for generic options, not mixin-enabled |
+| output_options_video  | ffmpeg options specific to video (see ffmpeg docs). This section is mixin-enabled |
+| output_options_audio  | ffmpeg options specific to audio (see ffmpeg docs). This section is mixin-enabled |
+| extension             | Filename extension to use for the encoded file |
+| queue                 | optional. Assign encodes for this profile to a specific queue (defined in *config* section)   |
+| threshold             | optional. If provided this number represents a minimum percentage compression savings for the encoded media. If it does not meet this threshold the transcoded file is discarded, source file remains as-is, and the source job marked as complete. This is useful if a particular file doesn't compress much and you would rather just keep the original. |
+| threshold_check       | optional. If provided this is the percent done to start checking if the threshold is being met. Default is 100% (when media is finished). Use this to have threshold checks done earlier to stop a long-running transcode if not producing expected compression (threshold).|
+| include               | optional. Include options from one or more previously defined profiles. (see section on includes). |
+| audio                 | Audio track handling options. Include a list of **exclude_languages** to automatically remove tracks. If any track being removed is a _default_, a new default will be set based on the **default_language**. |
+| subtitle              | See _audio_ above. |
 
 > CPU Note: When transcoding from h264 on an Intel I5/I7 6th+ gen chip, _ffmpeg_ will use detected extensions to basically perform hardware decoding for you. So if you configured hardware encoding you'll see low CPU use. On AMD there is no chip assistance on decoding.  So even if hardware encoding, the decoding process will load down your CPU. To fix this simply enable hardware decoding as an **input option**.
 
@@ -408,6 +426,11 @@ To transcode 2 files using a specific profile:
 ```bash
     pytranscoder -p my_fave_x264 /tmp/video1.mp4 /tmp/video2.mp4
     
+```
+
+To use a profile but alter the audio track using another profile:
+```bash
+    pytranscoder -p hevc_cuda -m mp3_hq videofile.mp4
 ```
 
 To auto transcode a file using the rules system but keep the original:
