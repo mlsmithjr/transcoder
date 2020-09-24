@@ -329,8 +329,7 @@ def start():
         print('  or   pytrancoder -c <cluster> file... [--host <name>] -c <cluster> file...')
         print('No parameters indicates to process the default queue files using profile matching rules.')
         print(
-            'The --from-file filename is a file containing a list of full paths to files for transcoding. ' +
-            'If full paths not used, defaults to current directory')
+            'The --from-file filename is a file containing a list of full paths to files for transcoding. ')
         print('OPTIONS:')
         print('  --host <name>  Name of a specific host in your cluster configuration to target, otherwise load-balanced')
         print('  -s         Process files sequentially even if configured for multiple concurrent jobs')
@@ -394,9 +393,9 @@ def start():
                     expanded_files = [sys.argv[arg]]
                 for f in expanded_files:
                     if cluster is None:
-                        files.append((f, profile))
+                        files.append((f, profile, mixins))
                     else:
-                        files.append((f, cluster, profile, mixins))
+                        files.append((f, cluster, profile))
             arg += 1
 
     if configfile is None:
@@ -414,9 +413,9 @@ def start():
         tmpfiles = files_from_file(configfile.default_queue_file)
         queue_path = configfile.default_queue_file
         if cluster is None:
-            files.extend([(f, profile) for f in tmpfiles])
+            files.extend([(f, profile, mixins) for f in tmpfiles])
         else:
-            files.extend([(f, cluster, profile, mixins) for f in tmpfiles])
+            files.extend([(f, cluster, profile) for f in tmpfiles])
 
     if len(files) == 0:
         print(crayons.yellow(f'Nothing to do'))

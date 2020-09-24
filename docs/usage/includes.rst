@@ -3,6 +3,11 @@ Using includes
 ==============
 
 This feature requires a deeper familiarity with the YAML format. Essentially, you can define a partial profile or a full one and later "include" it into another profile. This facilitates reuse of definitions and simpler profiles.
+All options from all sections of the profile are combined.  If there is a conflict, the descendant one wins.
+Profile sections input_options and output_options are combined.  So all included profile options are combined with the descendant.
+Since the introduction of mixins you should only put general, non-encoding options in output_options.  Audio, video, and subtitle options have their own sections now (see Mixins before proceeding).
+The rule is: input_options and output_options can be built-up via includes (inheritance), but mixins are replacements and the last most recent one wins.
+
 
 .. code-block:: yaml
 
@@ -45,7 +50,7 @@ The above example is equivalent to:
         threshold : 18
         extension: ".mkv"
 
-The advantage is that now we have a base (parent) profile we can include into many others to avoid repetative profile definitions.  And, if we decide to change our base threshold, for example, we only need to change it in the base (parent).
+The advantage is that now we have a base (parent) profile we can include into many others to avoid repetitive profile definitions.  And, if we decide to change our base threshold, for example, we only need to change it in the base (parent).
 
 Note that the profiles "hq" and "hevc_cuda" were combined, and the value for threshold was overridden to 18.
 Lets refer to the first (base) profile as the parent, and the second as the child. So a child profile can include one or more parent profiles.  All values in the child are retained. However, if input_options or output_options are lists instead of strings, the parent and child values will be combined.

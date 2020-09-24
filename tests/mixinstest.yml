@@ -9,10 +9,11 @@ profiles:
     base1:
       output_options:
         - "-c:v copy"
-        - "-c:s copy"
         - "-f matroska"
       output_options_audio:
         - "-c:a copy"
+      output_options_subtitle:
+        - "-c:s copy"
       threshold: 1
       extension: ".mkv"
 
@@ -51,6 +52,28 @@ profiles:
         - "-aaa bbb"
         - "-ccc ddd"
         - "-eee fff"
+
+    mixin3:
+      output_options_subtitle:
+        -  "-vf subtitles=subtitle.srt"
+
+    base3:
+      output_options_video:
+        - "-c:v copy"
+      output_options_subtitle:
+        - "-c:s copy"
+      output_options:
+        - "-f matroska"
+      output_options_audio:
+        - "-c:a copy"
+      threshold: 1
+      extension: ".mkv"
+
+    profile3:
+        include: "base3"
+        output_options:
+          - "-threads 4"
+        extension: ".mkv"
 
 rules:
     default:

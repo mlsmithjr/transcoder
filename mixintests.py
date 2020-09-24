@@ -20,7 +20,7 @@ class MixinTests(unittest.TestCase):
         config = self.get_setup()
         profile = config.get_profile('profile1')
         options = config.output_from_profile(profile, ['mixin1'])
-        expect = ['-c:v', 'copy', '-c:s', 'copy', '-f', 'matroska', '-threads', '4', '-c:a', 'mp3lame', '-b:a', '384k']
+        expect = ['-c:v', 'copy', '-f', 'matroska', '-threads', '4', '-c:a', 'mp3lame', '-b:a', '384k', '-c:s', 'copy']
         self.assertEqual(expect, options, "Output options mismatch (audio)")
 
     def test_video_mixin(self):
@@ -31,12 +31,27 @@ class MixinTests(unittest.TestCase):
                   '-aaa', 'bbb', '-ccc', 'ddd', '-eee', 'fff']
         self.assertEqual(expect, options, "Output options mismatch (video)")
 
+    def test_subtitle_mixin(self):
+        config = self.get_setup()
+        profile = config.get_profile('profile1')
+        options = config.output_from_profile(profile, ['mixin3'])
+        expect = ['-c:v', 'copy', '-f', 'matroska', '-threads', '4', '-c:a', 'copy', "-vf", "subtitles=subtitle.srt"]
+        self.assertEqual(expect, options, "Output options mismatch (subtitle)")
+
     def test_multi_mixin(self):
         config = self.get_setup()
         profile = config.get_profile('profile2')
         options = config.output_from_profile(profile, ['mixin2', 'mixin1'])
         expect = ['-c:s', 'copy', '-f', 'matroska', '-threads', '4', '-c:a', 'mp3lame', '-b:a', '384k',
                   '-aaa', 'bbb', '-ccc', 'ddd', '-eee', 'fff']
+        self.assertEqual(expect, options, "Output options mismatch (video)")
+
+    def test_multi_mixin_all(self):
+        config = self.get_setup()
+        profile = config.get_profile('profile3')
+        options = config.output_from_profile(profile, ['mixin2', 'mixin1', 'mixin3'])
+        expect = ['-f', 'matroska', '-threads', '4', '-c:a', 'mp3lame', '-b:a', '384k',
+                  '-aaa', 'bbb', '-ccc', 'ddd', '-eee', 'fff', "-vf", "subtitles=subtitle.srt"]
         self.assertEqual(expect, options, "Output options mismatch (video)")
 
     def test_mixins_do_not_combine(self):

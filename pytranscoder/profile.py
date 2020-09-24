@@ -79,11 +79,10 @@ class Profile:
         else:
             self.profile["output_options"] = Options()
 
-        if "output_options_audio" in self.profile:
-            self.profile["output_options_audio"] = Options(profile["output_options_audio"])
-
-        if "output_options_video" in self.profile:
-            self.profile["output_options_video"] = Options(profile["output_options_video"])
+        for section in ['audio', 'video', 'subtitle']:
+            section_name = f'output_options_{section}'
+            if section_name in self.profile:
+                self.profile[section_name] = Options(profile[section_name])
 
 
     def get(self, key: str):
@@ -112,6 +111,10 @@ class Profile:
     @property
     def output_options_video(self) -> Options:
         return self.profile.get("output_options_video", None)
+
+    @property
+    def output_options_subtitle(self) -> Options:
+        return self.profile.get("output_options_subtitle", None)
 
     @property
     def extension(self) -> str:

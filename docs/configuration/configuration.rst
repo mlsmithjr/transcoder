@@ -22,7 +22,6 @@ These options apply globally to pytranscoder.
     config:
         default_queue_file:   '/path/to/default/list/of/files.txt'
         ffmpeg:               '/usr/bin/ffmpeg'       # path to ffmpeg
-        hbcli:                '/usr/bin/HandBrakeCLI' # path to HandBrake CLI
         ssh:                  '/usr/bin/ssh'        # your ssh client (for cluster support)
         queues:
             qsv:                1                   # sequential encodes
@@ -48,7 +47,7 @@ These options apply globally to pytranscoder.
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | automap               | optional, defaults to "yes". If "yes" then auto calculate and insert *ffmpeg* **-map** options to preserve all audio and subtitle tracks                                                                                                  |
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| fls_path              | optional. If given, this path is used when transcoding to build the output file if the input is on a network share. This reduces random seek overhead (thrashing). When finished, the output is only then moved to the network share.     |
+| fls_path              | optional. If given, this path is used when transcoding to build the output file. This reduces drive thrashing if the source is on a network share. When finished, the output is only then moved to the source.     |
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 
@@ -69,11 +68,15 @@ to select the appropriate one for your needs. Alternatively, you can define rule
         # some common, reusable settings to keep things tidy
         common:
             output_options:
-                - "-crf 20"
-                - "-c:a copy"
-                - "-c:s copy"
                 - "-f matroska"
+            output_options_audio:
+                - "-c:a copy"
+            output_options_video:
+                - "-crf 20"
+            output_options_subtitle:
+                - "-c:s copy"
             extension: '.mkv'
+
             threshold: 20
             threshold_check: 30
             automap: yes
@@ -97,7 +100,7 @@ to select the appropriate one for your needs. Alternatively, you can define rule
                 - "-hwaccel vaapi"
                 - "-hwaccel_device /dev/dri/renderD129"
                 - "-hwaccel_output_format vaapi"
-            output_options: 				# in addition to those included from 'common'
+            output_options_video:
                 - "-vf scale_vaapi=format=p010"
                 - "-c:v hevc_vaapi"
 
@@ -109,7 +112,7 @@ to select the appropriate one for your needs. Alternatively, you can define rule
             input_options:          # ffmpeg input options
                 - "-hwaccel cuvid"  # REQUIRED for CUDA
                 - "-c:v h264_cuvid" # hardware decoding too
-            output_options:         # in addition to included from 'common'
+            output_options_video:
                 - "-c:v hevc_nvenc" # REQUIRED for CUDA
                 - "-profile:v main"
                 - "-preset medium"
@@ -121,13 +124,13 @@ to select the appropriate one for your needs. Alternatively, you can define rule
         x264:                        # simple h264
             include: common
             input_options: 
-            output_options:
+            output_options_video:
                 - "-c:v x264"
                 
         h264_cuda_anime:            # h264 with animation tuning
             include: common
             input_options:
-            output_options:
+            output_options_video:
                 - "-c:v h264_nvenc"
                 - "-tune animation"
             audio:
@@ -149,35 +152,41 @@ to select the appropriate one for your needs. Alternatively, you can define rule
 Take a look over this sample.  Most of what you need is here.  Of special note is the **include** directive, which literally includes
 one or more other profiles to create a new, combined one. Use this to isolate common flags to keep new profile definitions simpler.
 
-+-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| Setting               | Purpose                                                                                                                                                                       |
-+=======================+===============================================================================================================================================================================+
-| input_options         | Encoder options related to the input (see ffmpeg or HandBrakeCLI docs)                                                                                                        |
-+-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| output_options        | Encoder options related to the output (see ffmpeg or HandBrakeCLI docs)                                                                                                       |
-+-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| extension             | Filename extension to use for the encoded file                                                                                                                                |
-+-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| queue                 | optional. Assign encodes for this profile to a specific queue (defined in *config* section)                                                                                   |
-+-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| processor             | optional, defaults to ffmpeg. Allows you to designate which encoder to use for this profile. Choices are ffmpeg or hbcli (for handbrake)                                      |
-+-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| threshold             | optional. If provided this number represents a minimum percentage compression savings for the encoded media.                                                                  | 
-|                       | If it does not meet this threshold the transcoded file is discarded and the source file remains as-is.                                                                        |
-+-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| threshold_check       | optional. If provided this is the percent done to start checking if the threshold is being met.                                                                               |
-|                       | Default is 100% (when media is finished). Use this to have threshold checks done earlier to stop a long-running transcode if not producing expected compression (threshold).  |
-+-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| include               | optional. Include options from one or more previously defined profiles. (see section on includes).                                                                            |
-+-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| audio                 | Audio track handling options. Include a list of **exclude_languages** to automatically remove tracks, or **include_languages** to only include them.                          |
-|                       | Removed default selections will be replaced with the given **default_language**.                                                                                              |
-+-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| subtitle              | See _audio_ above.                                                                                                                                                            |
-+-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| automap               | optional, defaults to "yes". If "yes" then auto calculate and insert *ffmpeg* **-map** options to preserve all audio and subtitle tracks.                                     |
-|                       | Overrides the Global setting, if any.                                                                                                                                         |
-+-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
++-------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Setting                 | Purpose                                                                                                                                                                       |
++====================--===+===============================================================================================================================================================================+
+| input_options           | Encoder options related to the input (see ffmpeg or HandBrakeCLI docs)                                                                                                        |
++-------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| output_options          | General encoder options related to the output (see ffmpeg or HandBrakeCLI docs).                                                                                              |
++-------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| output_options_video    | Video-specific encoder options. Works like output_options except this is mixin-enabled.                                                                                       |
++-------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| output_options_audio    | Audio-specific encoder options. Works like output_options except this is mixin-enabled.                                                                                       |
++-------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| output_options_subtitle | Subtitle-specific encoder options. Works like output_options except this is mixin-enabled.                                                                                    |
++-------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| extension               | Filename extension to use for the encoded file                                                                                                                                |
++-------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| queue                   | optional. Assign encodes for this profile to a specific queue (defined in *config* section)                                                                                   |
++-------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| processor               | optional, defaults to ffmpeg. Allows you to designate which encoder to use for this profile. Choices are ffmpeg or hbcli (for handbrake)                                      |
++-------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| threshold             | optional. If provided this number represents a minimum percentage compression savings for the encoded media.                                                                    | 
+|                       | If it does not meet this threshold the transcoded file is discarded and the source file remains as-is.                                                                          |
++-----------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| threshold_check       | optional. If provided this is the percent done to start checking if the threshold is being met.                                                                                 |
+|                       | Default is 100% (when media is finished). Use this to have threshold checks done earlier to stop a long-running transcode if not producing expected compression (threshold).    |
++-----------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| include               | optional. Include options from one or more previously defined profiles. (see section on includes).                                                                              |
++-----------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| audio                 | Audio track handling options. Include a list of **exclude_languages** to automatically remove tracks, or **include_languages** to only include them.                            |
+|                       | Removed default selections will be replaced with the given **default_language**.                                                                                                |
++-----------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| subtitle              | See _audio_ above.                                                                                                                                                              |
++-----------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| automap               | optional, defaults to "yes". If "yes" then auto calculate and insert *ffmpeg* **-map** options to preserve all audio and subtitle tracks.                                       |
+|                       | Overrides the Global setting, if any.                                                                                                                                           |
++-----------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 .. note::
     When transcoding from h264 on an Intel I5/I7 6th+ gen chip, *ffmpeg* will use detected extensions to basically perform hardware decoding for you. So if you configured hardware encoding you'll see low CPU use. On AMD there is no chip assistance on decoding.  So even if hardware encoding, the decoding process will load down your CPU. To fix this simply enable hardware decoding as an **input option**.

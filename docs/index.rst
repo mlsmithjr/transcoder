@@ -33,6 +33,7 @@ Features
    usage/running-local.rst
    usage/running-clustered.rst
    usage/includes.rst
+   usage/mixins.rst
 
 Indices and tables
 

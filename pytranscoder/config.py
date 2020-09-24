@@ -121,7 +121,7 @@ class ConfigFile:
         # start with output_options (not mixable)
         output_opt = profile.output_options.as_shell_params()
         mixin_profiles = self.find_mixins(mixins)
-        for section in ['audio', 'video']:
+        for section in ['audio', 'video', 'subtitle']:
             section_name = f'output_options_{section}'
             if section_name in profile.profile:
                 # we have a mixin-enabled section - see if there are mixins to apply
