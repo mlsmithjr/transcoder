@@ -413,7 +413,7 @@ folder as the source with the same name and a .tmp extension while being encoded
 | --dry-run             | Show what will happen without actually doing any work |
 | -v                    | Verbose output. Show more processing details, useful for debugging |
 | -c <name>             | Cluster mode. See Cluster.md for details |
-
+| -m name<,name...>     | Add named mixin(s) to the given profile (-p)
 
 ##### Examples:
 
@@ -428,7 +428,7 @@ To transcode 2 files using a specific profile:
     
 ```
 
-To use a profile but alter the audio track using another profile:
+To use a profile but alter the audio track using a mixin:
 ```bash
     pytranscoder -p hevc_cuda -m mp3_hq videofile.mp4
 ```

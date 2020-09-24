@@ -1,8 +1,9 @@
 
 ### Version History
 
-Version 2.1.1:
+Version 2.2:
     * Removed unportable is_mount detection. Now always default to any designated temp drive/path for transcoding.
+    * Added mixins as a better alternative to includes (see docs).
 
 Version 2.1.0:
     * Added experimental support for HandBrakeCLI.

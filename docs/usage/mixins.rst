@@ -2,7 +2,7 @@
 Using Mixins
 ============
 
-Mixins are new as of version 2.1 and are a more flexible way of reusing profiles. You don't have to refit your transcode.yaml to use mixins - profiles are still backward-compatible.
+Mixins are new as of version 2.2 and are a more flexible way of reusing profiles. You don't have to refit your transcode.yaml to use mixins - profiles are still backward-compatible.
 Simply put, a mixin is a profile fragment used, at runtime, to "mix-in" to an existing profiles.
 
 There are 2 requirements to use them:
