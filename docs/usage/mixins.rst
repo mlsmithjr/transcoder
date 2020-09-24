@@ -7,7 +7,7 @@ Simply put, a mixin is a profile fragment used, at runtime, to "mix-in" to an ex
 
 There are 2 requirements to use them:
 
-1. Your profiles must be mixin-enabled, meaning you need to split your current output_options into output_options, output_video, output_audio, and output_subtitle (or whichever ones you intend to use for mixins).
+1. Your profiles must be mixin-enabled, meaning you need to split your current output_options into output_options, output_options_video, output_options_audio, and output_options_subtitle (or whichever ones you intend to use for mixins).
 2. The output_options section should be limited to general, non-encoding options. But you may continue to put, for example, subtitle options there.  You just can't use a subtitle mixin later if you do.
 3. Define mixin profiles.
 4. Specify mixins from the command line as needed (using -m).
@@ -34,13 +34,13 @@ Multiple mixins may be specified, separated with a comma (no spaces allowed).
           output_options:
             - "-f matroska"
 
-          output_video:
+          output_options_video:
             - "-c:v copy" 
 
-          output_audio:
+          output_options_audio:
             - "-c:a copy" 
 
-          output_subtitle:
+          output_options_subtitle:
             - "-c:s copy" 
 
           threshold: 20
@@ -49,7 +49,7 @@ Multiple mixins may be specified, separated with a comma (no spaces allowed).
 
         # this is a mixin
         aac_hq:
-          output_audio:
+          output_options_audio:
             - "-c:a libfdk_aac"
             - "-b:a 384k"
 
@@ -59,7 +59,7 @@ Another, more practical example. I do mostly cuda/hevc encoding but depending on
 .. code-block:: yaml
 
   typical:
-      output_video:		# defaults to high quality
+      output_options_video:	# defaults to high quality
         - "-cq:v 21"            # crf option passed to CUDA engine
         - "-rc vbr_hq"          # variable bit-rate, high quality
         - "-rc-lookahead 20"
@@ -70,9 +70,9 @@ Another, more practical example. I do mostly cuda/hevc encoding but depending on
         - "-c:v hevc_nvenc"
         - "-preset slow"
         - "-pix_fmt yuv420p"
-      output_audio:
+      output_options_audio:
         - "-c:a copy"       # copy all audio as-is
-      output_subtitle:
+      output_options_subtitle:
         - "-c:s copy"       # copy all subtitles as-is
       output_options:
         - "-f matroska"     # mkv format
@@ -83,7 +83,7 @@ Another, more practical example. I do mostly cuda/hevc encoding but depending on
 
   # mixin to allow me to override the higher quality of the profile above, at runtime
   medium:
-      output_video:
+      output_options_video:
       - "-cq:v 23"
       - "-bufsize 3M"
       - "-b:v 5M"
@@ -92,7 +92,7 @@ Another, more practical example. I do mostly cuda/hevc encoding but depending on
       - "-preset medium"
 
   aac_hq:
-    output_audio:
+    output_options_audio:
       - "-c:a libfdk_aac"
       - "-b:a 384k"
 

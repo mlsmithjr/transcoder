@@ -83,11 +83,10 @@ profiles:
     # ffmpeg output-related options
     # 
     output_options:
-        - "-preset slow"    # use slow for better quality
-        - "-c:s copy"       # copy all subtitles as-is
-        - "-profile:v main"
         - "-f matroska"     # mkv format
         - "-max_muxing_queue_size 1024"
+    output_options_subtitle:
+        - "-c:s copy"       # copy all subtitles as-is
     output_options_audio:
         - "-c:a copy"       # copy all audio as-is
     extension: '.mkv'
@@ -121,7 +120,7 @@ profiles:
   cuda:
       input_options:
         # optionally you can enable hardware decoding here
-      output_options:
+      output_options_video:
         - "-cq:v 19"            # crf option passed to CUDA engine
         - "-rc vbr_hq"          # variable bit-rate, high quality
         - "-rc-lookahead 20"
@@ -161,12 +160,13 @@ profiles:
       - "-hwaccel vaapi"
       - "-hwaccel_output_format vaapi"
       - "-hwaccel_device intel"
-    output_options:
+    output_options_video:
       - "-vf format=vaapi,hwupload"
       - "-preset slow"
       - "-rc_mode 1"
       - "-qp 20"
       - "-b:v 7M"
+    output_options_subtitle:
       - "-c:s copy"
     output_options_audio:
       - "-c:a copy"
@@ -176,7 +176,7 @@ profiles:
   ###############################################
   hevc_qsv:
     include: "base qsv"
-    output_options:
+    output_options_video:
         - "-c:v hevc_vaapi"
         - "-max_muxing_queue_size 1024"
     queue: 'qsv'
@@ -186,7 +186,7 @@ profiles:
   ###############################################
   x264_qsv:
     include: "base qsv"
-    output_options: 
+    output_options_video:
       - "-c:v h264_vaapi"
     queue: 'qsv'
     threshold: 20
@@ -199,20 +199,25 @@ profiles:
   #
   x264_mp4:
       include: "base"
-      output_options: 
+      output_options:
+        - "-f mp4"
+      output_options_video:
         - "-threads 4"
         - "-c:v h264"
         - "-crf 18"
+      output_options_audio:
         - "-c:a copy"
+      output_options_subtitle:
         - "-c:s copy"
-        - "-f mp4"
       threshold: 15
       threshold_check: 30
 
   copy_mp4: # mostly used to fix badly formatted files
-      output_options: 
+      output_options_video:
         - "-c:v copy"
+      output_options_audio:
         - "-c:a copy"
+      output_options_subtitle:
         - "-c:s copy"
         - "-f mp4"
       extension: '.mp4'
