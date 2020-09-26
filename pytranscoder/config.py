@@ -68,6 +68,8 @@ class ConfigFile:
 
     def find_mixins(self, mixins: List[str]) -> List[Profile]:
         profiles = []
+        if mixins is None:
+            return profiles
         for mixin in mixins:
             p = self.get_profile(mixin)
             if p:
