@@ -1,6 +1,7 @@
 """
     Cluster support
 """
+import ast
 import datetime
 import os
 import shutil
@@ -57,6 +58,22 @@ class RemoteHostProperties:
     @property
     def host_type(self):
         return self.props['type']
+
+    @property
+    def remote_copy_cmd(self) -> [str]:
+        if 'remote_copy_cmd' not in self.props:
+            return ['scp', '-T']
+
+        if self.props['remote_copy_cmd'][0] == '[':
+            try:
+                cmd = ast.literal_eval(self.props['remote_copy_cmd'])
+            except SyntaxError:
+                print(f'failed to parse {self.props["remote_copy_cmd"]} as python list')
+                sys.exit(1)
+        else:
+            cmd = self.props['remote_copy_cmd'].split()
+
+        return cmd
 
     def get_processor(self) -> Processor:
         # match first available processor (for info parsing use only)
@@ -367,7 +384,9 @@ class StreamingManagedHost(ManagedHost):
                     # trick to make scp work on the Windows side
                     target_dir = '/' + remote_working_dir
 
-                scp = ['scp', inpath, self.props.user + '@' + self.props.ip + ':"' + target_dir + '"']
+                cp_cmd = self.props.remote_copy_cmd
+
+                scp = [*cp_cmd, inpath, self.props.user + '@' + self.props.ip + ':"' + target_dir + '"']
                 self.log(' '.join(scp))
 
                 code, output = run(scp)
@@ -412,7 +431,7 @@ class StreamingManagedHost(ManagedHost):
                 # copy results back to local
                 #
                 retrieved_copy_name = os.path.join(gettempdir(), os.path.basename(remote_outpath))
-                cmd = ['scp', '-T', self.props.user + '@' + self.props.ip + ':"' + remote_outpath + '"',
+                cmd = [*cp_cmd, self.props.user + '@' + self.props.ip + ':"' + remote_outpath + '"',
                        retrieved_copy_name]
                 self.log(' '.join(cmd))
 
