@@ -333,12 +333,12 @@ class StreamingManagedHost(ManagedHost):
                 if _profile.is_ffmpeg:
                     if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
                         ooutput = ooutput + job.media_info.ffmpeg_streams(_profile)
-                    cmd = ['-y', *oinput, '-i', self.converted_path(remote_inpath),
-                           *ooutput, self.converted_path(remote_outpath)]
+                    cmd = ['-y', *oinput, '-i', f'"{self.converted_path(remote_inpath)}"',
+                           *ooutput, f'"{self.converted_path(remote_outpath)}"']
                     processor_cmd = self.props.ffmpeg_path
                 else:
-                    cmd = ['-i', self.converted_path(remote_inpath), *oinput,
-                           *ooutput, '-o', self.converted_path(remote_outpath)]
+                    cmd = ['-i', f'"{self.converted_path(remote_inpath)}"', *oinput,
+                           *ooutput, '-o', f'"{self.converted_path(remote_outpath)}']
                     processor_cmd = self.props.hbcli_path
 
                 cli = [*ssh_cmd, processor_cmd, *cmd]
@@ -367,7 +367,7 @@ class StreamingManagedHost(ManagedHost):
                     # trick to make scp work on the Windows side
                     target_dir = '/' + remote_working_dir
 
-                scp = ['scp', inpath, self.props.user + '@' + self.props.ip + ':' + target_dir]
+                scp = ['scp', inpath, self.props.user + '@' + self.props.ip + ':"' + target_dir + '"']
                 self.log(' '.join(scp))
 
                 code, output = run(scp)
@@ -412,7 +412,8 @@ class StreamingManagedHost(ManagedHost):
                 # copy results back to local
                 #
                 retrieved_copy_name = os.path.join(gettempdir(), os.path.basename(remote_outpath))
-                cmd = ['scp', self.props.user + '@' + self.props.ip + ':' + remote_outpath, retrieved_copy_name]
+                cmd = ['scp', '-T', self.props.user + '@' + self.props.ip + ':"' + remote_outpath + '"',
+                       retrieved_copy_name]
                 self.log(' '.join(cmd))
 
                 code, output = run(cmd)
@@ -445,11 +446,11 @@ class StreamingManagedHost(ManagedHost):
                 if self.props.is_windows():
                     remote_outpath = self.converted_path(remote_outpath)
                     remote_inpath = self.converted_path(remote_inpath)
-                    self.run_process([*ssh_cmd, f'"del {remote_outpath}"'])
-                    self.run_process([*ssh_cmd, f'"del {remote_inpath}"'])
+                    self.run_process([*ssh_cmd, 'del', f'"{remote_outpath}"'])
+                    self.run_process([*ssh_cmd, 'del', f'"{remote_inpath}"'])
                 else:
-                    self.run_process([*ssh_cmd, f'"rm {remote_outpath}"'])
-                    self.run_process([*ssh_cmd, f'"rm {remote_inpath}"'])
+                    self.run_process([*ssh_cmd, 'rm', f'"{remote_outpath}"'])
+                    self.run_process([*ssh_cmd, 'rm', f'"{remote_inpath}"'])
 
             finally:
                 self.queue.task_done()
