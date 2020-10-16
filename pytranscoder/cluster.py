@@ -335,11 +335,13 @@ class StreamingManagedHost(ManagedHost):
                         ooutput = ooutput + job.media_info.ffmpeg_streams(_profile)
                     cmd = ['-y', *oinput, '-i', self.converted_path(remote_inpath),
                            *ooutput, self.converted_path(remote_outpath)]
+                    processor_cmd = self.props.ffmpeg_path
                 else:
                     cmd = ['-i', self.converted_path(remote_inpath), *oinput,
                            *ooutput, '-o', self.converted_path(remote_outpath)]
+                    processor_cmd = self.props.hbcli_path
 
-                cli = [*ssh_cmd, *cmd]
+                cli = [*ssh_cmd, processor_cmd, *cmd]
 
                 #
                 # display useful information
