@@ -7,7 +7,7 @@ import sys
 from pathlib import Path, PurePath
 from typing import Set, List, Optional
 
-from queue import Queue
+from queue import Queue, Empty
 from threading import Thread, Lock
 import crayons
 
@@ -113,7 +113,12 @@ class QueueThread(Thread):
 
                 def log_callback(stats):
                     pct_done, pct_comp = calculate_progress(job.info, stats)
-                    self.log(f'{basename}: speed: {stats["speed"]}x, comp: {pct_comp}%, done: {pct_done:3}%')
+                    pytranscoder.status_queue.put({ 'host': 'local',
+                                                    'file': basename,
+                                                    'speed': stats['speed'],
+                                                    'comp': pct_comp,
+                                                    'done': pct_done})
+                    #self.log(f'{basename}: speed: {stats["speed"]}x, comp: {pct_comp}%, done: {pct_done:3}%')
                     if job.profile.threshold_check < 100:
                         if pct_done >= job.profile.threshold_check and pct_comp < job.profile.threshold:
                             # compression goal (threshold) not met, kill the job and waste no more time...
@@ -206,9 +211,26 @@ class LocalHost:
                 jobs.append(t)
                 t.start()
 
+        busy = True
+        while busy:
+            try:
+                report = pytranscoder.status_queue.get(block=True, timeout=2)
+                basename = report['file']
+                speed = report['speed']
+                comp = report['comp']
+                done = report['done']
+                print(f'{basename}: speed: {speed}x, comp: {comp}%, done: {done:3}%')
+                sys.stdout.flush()
+                pytranscoder.status_queue.task_done()
+            except Empty:
+                busy = False
+                for job in jobs:
+                    if job.is_alive():
+                        busy = True
+
         # wait for all queues to drain and all jobs to complete
-        for _, queue in self.queues.items():
-            queue.join()
+#        for _, queue in self.queues.items():
+#            queue.join()
 
     def enqueue_files(self, files: list):
         """Add requested files to the appropriate queue
@@ -395,7 +417,7 @@ def start():
                     if cluster is None:
                         files.append((f, profile, mixins))
                     else:
-                        files.append((f, cluster, profile))
+                        files.append((f, cluster, profile, mixins))
             arg += 1
 
     if configfile is None:

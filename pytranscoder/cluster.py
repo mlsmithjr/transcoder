@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import PureWindowsPath, PosixPath
-from queue import Queue
+from queue import Queue, Empty
 from tempfile import gettempdir
 from threading import Thread, Lock
 from typing import Dict, List, Optional
@@ -16,7 +16,7 @@ import crayons
 
 import pytranscoder
 
-from pytranscoder import verbose, utils
+from pytranscoder import verbose
 from pytranscoder.config import ConfigFile
 from pytranscoder.ffmpeg import FFmpeg
 from pytranscoder.handbrake import Handbrake
@@ -156,10 +156,11 @@ class EncodeJob:
     media_info: MediaInfo
     profile_name: str
 
-    def __init__(self, inpath: str, info: MediaInfo, profile_name: str):
+    def __init__(self, inpath: str, info: MediaInfo, profile_name: str, mixins: List[str]):
         self.inpath = os.path.abspath(inpath)
         self.media_info = info
         self.profile_name = profile_name
+        self.mixins = mixins
 
 
 class ManagedHost(Thread):
@@ -327,7 +328,8 @@ class StreamingManagedHost(ManagedHost):
                 # build remote commandline
                 #
                 oinput = _profile.input_options.as_shell_params()
-                ooutput = _profile.output_options.as_shell_params()
+                ooutput = self._manager.config.output_from_profile(_profile, job.mixins)
+#                ooutput = _profile.output_options.as_shell_params()
 
                 processor = self.props.get_processor_by_name(_profile.processor)
                 if _profile.is_ffmpeg:
@@ -379,7 +381,12 @@ class StreamingManagedHost(ManagedHost):
 
                 def log_callback(stats):
                     pct_done, pct_comp = calculate_progress(job.media_info, stats)
-                    self.log(f'{basename}: speed: {stats["speed"]}x, comp: {pct_comp}%, done: {pct_done:3}%')
+                    pytranscoder.status_queue.put({ 'host': 'local',
+                                                    'file': basename,
+                                                    'speed': stats['speed'],
+                                                    'comp': pct_comp,
+                                                    'done': pct_done})
+#                    self.log(f'{basename}: speed: {stats["speed"]}x, comp: {pct_comp}%, done: {pct_done:3}%')
                     if _profile.threshold_check < 100:
                         if pct_done >= _profile.threshold_check and pct_comp < _profile.threshold:
                             # compression goal (threshold) not met, kill the job and waste no more time...
@@ -479,6 +486,7 @@ class MountedManagedHost(ManagedHost):
                 job: EncodeJob = self.queue.get()
                 inpath = job.inpath
 
+
                 #
                 # Got to do the rule matching again.
                 # This time we narrow down the available profiles based on host definition
@@ -505,8 +513,10 @@ class MountedManagedHost(ManagedHost):
                 #
                 # build command line
                 #
+
                 oinput = _profile.input_options.as_shell_params()
-                ooutput = _profile.output_options.as_shell_params()
+                ooutput = self._manager.config.output_from_profile(_profile, job.mixins)
+#                ooutput = _profile.output_options.as_shell_params()
 
                 remote_inpath = self.converted_path(remote_inpath)
                 remote_outpath = self.converted_path(remote_outpath)
@@ -539,7 +549,13 @@ class MountedManagedHost(ManagedHost):
 
                 def log_callback(stats):
                     pct_done, pct_comp = calculate_progress(job.media_info, stats)
-                    self.log(f'{basename}: speed: {stats["speed"]}x, comp: {pct_comp}%, done: {pct_done:3}%')
+                    pytranscoder.status_queue.put({ 'host': 'local',
+                                                    'file': basename,
+                                                    'speed': stats['speed'],
+                                                    'comp': pct_comp,
+                                                    'done': pct_done})
+
+#                    self.log(f'{basename}: speed: {stats["speed"]}x, comp: {pct_comp}%, done: {pct_done:3}%')
                     if _profile.threshold_check < 100:
                         if pct_done >= _profile.threshold_check and pct_comp < _profile.threshold:
                             # compression goal (threshold) not met, kill the job and waste no more time...
@@ -674,7 +690,13 @@ class LocalHost(ManagedHost):
 
                 def log_callback(stats):
                     pct_done, pct_comp = calculate_progress(job.media_info, stats)
-                    self.log(f'{basename}: speed: {stats["speed"]}x, comp: {pct_comp}%, done: {pct_done:3}%')
+                    pytranscoder.status_queue.put({ 'host': 'local',
+                                                    'file': basename,
+                                                    'speed': stats['speed'],
+                                                    'comp': pct_comp,
+                                                    'done': pct_done})
+
+#                    self.log(f'{basename}: speed: {stats["speed"]}x, comp: {pct_comp}%, done: {pct_done:3}%')
                     if _profile.threshold_check < 100:
                         if pct_done >= _profile.threshold_check and pct_comp < _profile.threshold:
                             # compression goal (threshold) not met, kill the job and waste no more time...
@@ -854,7 +876,7 @@ class Cluster(Thread):
                 print(crayons.red('Error: ') +
                       f'Queue "{queue_name}" referenced in profile "{profile.name}" not defined in any host')
                 exit(1)
-            job = EncodeJob(file, media_info, profile.name)
+            job = EncodeJob(file, media_info, profile.name, None)
             self.queues[queue_name].put(job)
             return queue_name, job
         return None, None
@@ -897,7 +919,7 @@ def manage_clusters(files, config: ConfigFile, testing=False) -> List:
     clusters = dict()
     for name, this_config in cluster_config.items():
         for item in files:
-            filepath, target_cluster, profile_name = item
+            filepath, target_cluster, profile_name, mixins = item
             if target_cluster != name:
                 continue
             if target_cluster not in clusters:
@@ -915,10 +937,29 @@ def manage_clusters(files, config: ConfigFile, testing=False) -> List:
             cluster.start()
 
     if not testing:
+
+        busy = True
+        while busy:
+            try:
+                report = pytranscoder.status_queue.get(block=True, timeout=2)
+                host = report['host']
+                basename = report['file']
+                speed = report['speed']
+                comp = report['comp']
+                done = report['done']
+                print(f'{host:10}|{basename}: speed: {speed}x, comp: {comp}%, done: {done:3}%')
+                sys.stdout.flush()
+                pytranscoder.status_queue.task_done()
+            except Empty:
+                busy = False
+                for _, cluster in clusters.items():
+                    if cluster.is_alive():
+                        busy = True
+
         #
         # wait for each cluster thread to complete
         #
-        for _, cluster in clusters.items():
-            cluster.join()
-            completed.extend(cluster.completed)
+#        for _, cluster in clusters.items():
+#            cluster.join()
+#            completed.extend(cluster.completed)
     return completed
