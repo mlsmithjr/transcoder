@@ -179,7 +179,7 @@ class TranscoderTests(unittest.TestCase):
         self.assertIsNotNone(rule, 'Expected a matched profile')
 
     def test_loc_os(self):
-        self.assertEqual(get_local_os_type(), 'linux', 'Expected linux as os type')
+        self.assertNotEqual(get_local_os_type(), 'unknown', 'Expected other than "unknown" as os type')
 
     def test_path_substitutions(self):
         config: Dict = self.get_setup()

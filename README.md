@@ -1,14 +1,14 @@
 ## pytranscoder
-Python wrapper for ffmpeg for batch, concurrent, or clustered transcoding
+Python wrapper for ffmpeg for batch, concurrent, or clustered transcoding using defined profiles and optional rules engine
+for automation.
 
 [Read The Docs](https://pytranscoder.readthedocs.io/en/latest/)
 
 
 #### News
-Pytranscoder is getting a rules engine makeover in order to better support transcoding needs. You will be able to define profiles as today, but also
-optionally break them down by audio and video. So using rules you can mix and match video and audio profiles for better transcoding control. There will
-also be a commandline means of selecting profiles as "mixins".
-Hopefully this will drop by the end of October, depending on my other workload.
+Pytranscoder now supports better profiles.  Existing ones are backward-compatible unless you try to use mixings.
+The mixin feature allows you to create pieces of profiles and combine them into another profile on the commandline at runtime.
+This negates the need to create many unique permutations of a profile just for simple variances.
 
 
 #### What it is
@@ -113,7 +113,7 @@ Sample
 config:
   default_queue_file:   '/path/to/default/list/of/files/if/none/given'
   ffmpeg:               '/usr/bin/ffmpeg'       # path to ffmpeg for this config
-  ssh:                '/usr/bin/ssh'    # used only in cluster mode
+  ssh:                '/usr/bin/ssh'    # used only in cluster mode (optional)
   queues:
     qsv:                1                   # sequential encodes
     cuda:               2                   # maximum of 2 encodes at a time
@@ -140,7 +140,7 @@ profiles:
 
   # some common, reusable settings to keep things tidy
   common:
-    output_options:
+    output_options_subtitles:
       - "-c:s copy"
        - "-f matroska"
     output_options_audio:
@@ -152,18 +152,16 @@ profiles:
     threshold_check: 30
 
   #
-  # Sample Intel QSV transcode setup (note to customize -hwaccel_device param for your environment)
+  # Sample Intel QSV transcode setup (note to customize options for your environment)
   #
   hevc_qsv:
     include: common
-    input_options:
-      - "-hwaccel vaapi"
-      - "-hwaccel_device /dev/dri/renderD129"
-      - "-hwaccel_output_format vaapi"
     output_options_video:         # mixin-enabled section - overrides common
-      - "-vf scale_vaapi=format=p010"
-      - "-c:v hevc_vaapi"
-
+      - "-c:v hevc_qsv"
+      - "-preset medium"
+      - "-qp 21"
+      - "-b:v 7M"
+    
   #
   # Sample nVidia transcode setup
   #
@@ -413,7 +411,7 @@ folder as the source with the same name and a .tmp extension while being encoded
 | --dry-run             | Show what will happen without actually doing any work |
 | -v                    | Verbose output. Show more processing details, useful for debugging |
 | -c <name>             | Cluster mode. See Cluster.md for details |
-| -m name<,name...>     | Add named mixin(s) to the given profile (-p)
+| -m name{,name...}     | Add named mixin(s) to the given profile (-p)
 
 ##### Examples:
 

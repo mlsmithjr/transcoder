@@ -22,7 +22,7 @@ setuptools.setup(
     description='A ffmpeg workflow manager for transcoding',
     long_description = long_description,
     long_description_content_type = 'text/markdown',
-    extras_require={'with_plexapi': ['plexapi>=3.1.0']},
+#    extras_require={'with_plexapi': ['plexapi>=3.1.0']},
     url='https://github.com/mlsmithjr/transcoder',
     data_files=[('share/doc/pytranscoder', ['README.md', 'Cluster.md', 'transcode.yml', 'simple.yml'])],
     packages=['pytranscoder'],

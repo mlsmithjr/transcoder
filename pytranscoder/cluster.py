@@ -657,7 +657,8 @@ class LocalHost(ManagedHost):
                 # build command line
                 #
                 oinput = _profile.input_options.as_shell_params()
-                ooutput = _profile.output_options.as_shell_params()
+                ooutput = self._manager.config.output_from_profile(_profile, job.mixins)
+#                ooutput = _profile.output_options.as_shell_params()
 
                 remote_inpath = self.converted_path(inpath)
                 remote_outpath = self.converted_path(outpath)
