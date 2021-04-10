@@ -381,7 +381,7 @@ class StreamingManagedHost(ManagedHost):
 
                 def log_callback(stats):
                     pct_done, pct_comp = calculate_progress(job.media_info, stats)
-                    pytranscoder.status_queue.put({ 'host': 'local',
+                    pytranscoder.status_queue.put({ 'host': self.hostname,
                                                     'file': basename,
                                                     'speed': stats['speed'],
                                                     'comp': pct_comp,
@@ -549,7 +549,7 @@ class MountedManagedHost(ManagedHost):
 
                 def log_callback(stats):
                     pct_done, pct_comp = calculate_progress(job.media_info, stats)
-                    pytranscoder.status_queue.put({ 'host': 'local',
+                    pytranscoder.status_queue.put({ 'host': self.hostname,
                                                     'file': basename,
                                                     'speed': stats['speed'],
                                                     'comp': pct_comp,
@@ -948,7 +948,7 @@ def manage_clusters(files, config: ConfigFile, testing=False) -> List:
                 speed = report['speed']
                 comp = report['comp']
                 done = report['done']
-                print(f'{host:10}|{basename}: speed: {speed}x, comp: {comp}%, done: {done:3}%')
+                print(f'{host:20}|{basename}: speed: {speed}x, comp: {comp}%, done: {done:3}%')
                 sys.stdout.flush()
                 pytranscoder.status_queue.task_done()
             except Empty:
