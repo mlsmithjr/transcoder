@@ -59,7 +59,7 @@ def calculate_progress(info: MediaInfo, stats: Dict) -> (int, int):
 
 def run(cmd):
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
-    output = p.communicate()[0].decode('utf-8')
+    output = p.communicate()[0].decode('utf-8', errors='replace')
     return p.returncode, output
 
 
