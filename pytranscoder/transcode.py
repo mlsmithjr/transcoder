@@ -219,8 +219,11 @@ class LocalHost:
                 speed = report['speed']
                 comp = report['comp']
                 done = report['done']
+
+                self.lock.acquire()
                 print(f'{basename}: speed: {speed}x, comp: {comp}%, done: {done:3}%')
                 sys.stdout.flush()
+                self.lock.release()
                 pytranscoder.status_queue.task_done()
             except Empty:
                 busy = False
