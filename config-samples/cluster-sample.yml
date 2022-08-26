@@ -1,0 +1,214 @@
+####
+# This clustering sample defines some hosts and only 1 profile, for simplicity
+####
+
+
+##
+# global configuration
+##
+config:
+  ffmpeg: '/home/mark/bin/ffmpeg'
+  queues:
+    qsv: 1
+    cuda: 1
+  colorize: yes
+  fls_path: '/tmp'
+
+  # 
+  # Sample cluster definition with a few hosts in a home network.  Each of these hosts are used to transcode files for a job until all files processed
+  #
+  clusters:
+    home:
+      homeserver:
+        os: linux
+        type: local
+        ffmpeg: '/home/mark/bin/ffmpeg'
+        queues:
+          qsv: 1
+        profiles:
+          - hevc_qsv
+        status: enabled
+        working_dir: '/tmp'
+
+      workpc:
+        os: linux
+        type: mounted
+        working_dir: /tmp
+        ip: 192.168.2.70
+        user: mark
+        ffmpeg: '/usr/bin/ffmpeg'
+        queues:
+          cuda: 1
+          qsv: 1
+        profiles:
+          - hevc_qsv
+        
+        # you must specify how a paths on the fileserver side maps to the client(host) side if using a "mounted" host type
+
+        path-substitutions:
+          - '/mnt/merger/media/ /mnt/homeserver/media/'
+          - '/mnt/downloads/ /mnt/homeserver/downloads/'
+        status: disabled
+
+      winpc:
+        os: win10
+        type: mounted
+        ip: 192.168.2.61
+        user: mark
+        ffmpeg: 'c:\ffmpeg\bin\ffmpeg.exe'
+        profiles:
+          - hevc_qsv
+          - hevc_qsv_medium
+        queues:
+          qsv: 1
+        working_dir: 'c:\temp'
+
+        # you must specify how a paths on the fileserver side maps to the client(host) side if using a "mounted" host type
+
+        path-substitutions:
+          - '/mnt/merger/media/video/Television/ m:video\Television\'
+          - '/mnt/merger/media/video/ m:video\'
+          - '/mnt/downloads/ z:\'
+        status: disabled
+
+      workstation:
+        os: linux
+        type: mounted
+        working_dir: /tmp
+        ip: 192.168.2.63
+        user: mark
+        ffmpeg: '/home/mark/bin/ffmpeg'
+        queues:
+          cuda: 1
+          qsv: 1
+        profiles:
+          - hevc_cuda
+          - hevc_cuda_medium
+          - hevc_qsv
+          - hevc_qsv_medium
+          - hevc_cuda_10bit
+
+        # you must specify how a paths on the fileserver side maps to the client(host) side if using a "mounted" host type
+
+        path-substitutions:
+
+          - '/mnt/merger/media/ /mnt/server/media/'
+          - '/mnt/downloads/ /mnt/server/downloads/'
+        status: enabled
+
+
+
+##
+# profile definitions.  You can model all your transcoding combinations here.
+##
+profiles:
+
+  # 
+  # define a common, base profile that others inherit from.  Optional, but handy to save time
+  #
+  base:
+    # 
+    # ffmpeg output-related options
+    # 
+    output_options:
+        - "-c:s copy"       # copy all subtitles as-is
+        - "-f matroska"     # mkv format
+        - "-max_muxing_queue_size 1024"
+    output_options_audio:
+        - "-c:a copy"       # copy all audio as-is
+    extension: '.mkv'
+    threshold: 10           # minimum of 18% compression required
+    threshold_check: 20     # start checking threshold at 20% complete
+
+    #
+    # audio handling
+    #
+    audio:
+        #
+        # Included languages take precedent. By default all languages are retained.
+        # Any specifically included languages here automatically discard all others.
+        #
+        include_languages:
+            - "eng"
+        default_language: eng
+    #
+    # subtitle handling
+    #
+    subtitle:
+        # see audio comment above
+        include_languages:
+            - "eng"
+        default_language: eng
+
+  ###
+  # Intel QSV common options.  Like "base" above, these are common to all QSV operations
+  ###
+  qsv:
+    input_options: 
+      # enable hardware decoding
+    output_options: 
+      - "-c:v hevc_qsv"
+      - "-preset medium"
+      - "-qp 21"
+      - "-c:s copy"
+    output_options_video:
+      - "-b:v 7000K"
+    output_options_audio:
+      - "-c:a copy"
+
+  ###
+  # Intel QSV (HEVC)
+  ###
+
+  # full quality
+  hevc_qsv:
+    include: "base qsv"		# Note we are including base and qsv defined above so we don't have to retype everything
+    output_options:
+    queue: 'qsv'
+
+  # medium quality
+  hevc_qsv_medium:
+    include: "base qsv"
+    output_options_video:
+      - "-b:v 4000K"
+    output_options_audio:
+      - "-c:a ac3"
+      - "-b:a 768k"
+    queue: 'qsv'
+
+#
+# Automatching happens when a profile isn't provided on the command line.  These rules are evalulated to find the
+# most appropriate profile for each video to be transcoded.
+#
+# Rules are evaluated in order.  First matching rule wins so order wisely.
+# Rules with a profile of "SKIP" mean to skip processing of the matched video
+#
+rules:
+
+  'skip video if already encoded in hevc/h265':
+      profile: SKIP
+      criteria:
+        vcodec: 'hevc'
+
+  'small enough already':
+      profile: SKIP
+      criteria:
+        filesize_mb: '<2300'
+        res_height: '721-1081'
+        runtime:  '30-65'
+
+  'small enough already-2':
+      profile: SKIP
+      criteria:
+        filesize_mb: '<1000'
+        res_height: '721-1081'
+        runtime:  '20-29'
+
+  'default HD':
+      profile: hevc_qsv
+      criteria:
+        res_height: '721-1081'
+        vcodec: '!hevc'
+        runtime: '>35'
+        filesize_mb: '>2300'
+

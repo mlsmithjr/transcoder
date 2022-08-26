@@ -7,12 +7,17 @@
 ##########################################
 config:
   default_queue_file: '/volume1/config/sonarr/transcode_queue.txt'
-  ffmpeg: '/usr/bin/ffmpeg'
+  ffmpeg: '/usr/local/bin/ffmpeg'
+  docker:
+    image: linuxserver/ffmpeg
+#    devices:
+#      - /dev/dir:/dev/dri
+
   queues:
     qsv: 1
     cuda: 1
-  colorize: yes
-  fls_path: '/tmp'
+  colorize: yes       # use colors for text output
+  fls_path: '/tmp'    # fast local storage for work files, ideally an SSD (optional)
 
   #
   # Cluster machine definitions (optional).
@@ -79,12 +84,13 @@ profiles:
   # (for include-use only)
   #
   base:
-    # 
+    #
     # ffmpeg output-related options
     # 
     output_options:
         - "-f matroska"     # mkv format
         - "-max_muxing_queue_size 1024"
+
     output_options_subtitle:
         - "-c:s copy"       # copy all subtitles as-is
     output_options_audio:
@@ -199,6 +205,7 @@ profiles:
   #
   x264_mp4:
       include: "base"
+      processor: docker
       output_options:
         - "-f mp4"
       output_options_video:

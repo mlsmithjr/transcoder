@@ -8,7 +8,6 @@
 # global configuration
 ##
 config:
-  default_queue_file: '/tmp/fileoffiles.txt'
   ffmpeg:             '/usr/bin/ffmpeg'
   colorize: yes
 
@@ -22,11 +21,11 @@ profiles:
   #
   h264:
     input_options:
-    output_options: 
+    output_options:
         - "-threads 4"
         - "-c:v x264 "
         - "-crf 20 "
-        - "-c:a copy" 
+        - "-c:a copy"
         - "-c:s copy "
         - "-f matroska"
     extension: '.mkv'
@@ -36,9 +35,9 @@ profiles:
   # Sample nVidia transcode setup, uses 'cuda' queue defined above
   #
   hevc_cuda:
-      input_options: 
+      input_options:
         -  "-hwaccel cuvid"
-      output_options: 
+      output_options:
         - "-cq:v 19"            # crf option passed to CUDA engine
         - "-rc vbr_hq"          # variable bit-rate, high quality
         - "-rc-lookahead 32"

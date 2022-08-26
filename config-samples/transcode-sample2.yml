@@ -1,0 +1,376 @@
+##
+# global configuration
+##
+config:
+  ffmpeg: '/home/mark/bin/ffmpeg'
+  queues:
+    qsv: 1
+    cuda: 1
+  colorize: yes
+  fls_path: '/tmp'
+
+
+##
+# profile definitions.  You can model all your transcoding combinations here.
+##
+profiles:
+
+  ############################################
+  # nVidia CUDA-specific common options
+  ############################################
+
+  base:
+    # 
+    # ffmpeg output-related options
+    # 
+    output_options:
+        - "-c:s copy"       # copy all subtitles as-is
+        - "-f matroska"     # mkv format
+        - "-max_muxing_queue_size 1024"
+
+    output_options_audio:
+        - "-c:a copy"       # copy all audio as-is
+
+    extension: '.mkv'
+    threshold: 10           # minimum of 18% compression required
+    threshold_check: 20     # start checking threshold at 20% complete
+
+    #
+    # audio handling
+    #
+    audio:
+        #
+        # Included languages take precedent. By default all languages are retained.
+        # Any specifically included languages here automatically discard all others.
+        #
+
+        include_languages:
+            - "eng"
+        default_language: eng
+
+    #
+    # subtitle handling
+    #
+    subtitle:
+        # see audio comment above
+        include_languages:
+            - "eng"
+        default_language: eng
+
+  ############################################
+  # nVidia CUDA-specific common options
+  # (for include-use only)
+  ############################################
+  cuda:
+      input_options: 
+#        - "-hwaccel cuvid"      # use hardware decoding
+#        - "-c:v h264_cuvid"     # only works if source is h264 !!
+      output_options_video:
+        - "-cq:v 21"            # crf option passed to CUDA engine
+        - "-rc vbr"          # variable bit-rate, high quality
+        - "-rc-lookahead 20"
+        - "-bufsize 5M"
+        - "-b:v 7M"
+        - "-profile:v main"
+        - "-maxrate:v 7M"
+        - "-c:v hevc_nvenc"
+        - "-preset slow"
+        - "-pix_fmt yuv420p"
+
+  cuda_medium:
+      output_options_video:
+        - "-cq:v 23"            # crf option passed to CUDA engine
+        - "-rc vbrq"          # variable bit-rate, high quality
+        - "-rc-lookahead 20"
+        - "-bufsize 3M"
+        - "-b:v 5M"
+        - "-profile:v main"
+        - "-maxrate:v 5M"
+        - "-c:v hevc_nvenc"
+        - "-preset medium"
+        - "-pix_fmt yuv420p"
+
+  ############################################
+  # nVidia CUDA-specific common options
+  # without hardware decoding
+  # (for include-use only)
+  ############################################
+  cuda_nohwd:
+      output_options:
+        - "-cq:v 23"            # crf option passed to CUDA engine
+        - "-rc vbr"          # variable bit-rate, high quality
+        - "-b:v 3M"
+        - "-maxrate:v 5M"
+        - "-c:v hevc_nvenc"
+        - "-profile:v main"
+
+
+  ##############################################
+  # nVidia CUDA-specific for 10bit video support
+  # (Pascal-based cards or newer)
+  ##############################################
+  hevc_cuda_10bit:
+    include: "base cuda"
+    output_options:
+      - "-pix_fmt yuv420p10le"
+      - "-profile:v main10"   # redefine the profile:v value from "base" options
+
+  ###############################################
+  # HEVC CUDA high quality, for just about
+  # everything.
+  ###############################################
+  hevc_cuda:
+      include: "base cuda" 	# include "base" and "cuda" definitions
+      output_options_video:
+      output_options_audio:
+      queue: 'cuda'
+
+  hevc_cuda_medium:
+    include: "base cuda"
+    output_options_video:
+      - "-b:v 4000K"
+    output_options_audio:
+      - "-c:a libfdk_aac"
+      - "-b:a 768k"
+    queue: 'qsv'
+
+  #
+  # MIXINS - snippets of configuration you can specific on the commandline to override what is defined in the selected profile
+  #
+  sdr:
+      output_options_video:
+        - "-vf zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p"
+
+  aac_hq:
+      output_options_audio:
+        - "-c:a libfdk_aac"
+        - "-b:a 384k"
+
+  aac_movie:
+      output_options_audio:
+        - "-c:a libfdk_aac"
+        - "-b:a 768k"
+
+  denoise:
+      output_options_video:
+        - "-vf nlmeans=p=5:r=11"
+
+
+  ###############################################
+  # Intel QSV common options
+  ###############################################
+  qsv:
+    input_options: 
+    output_options: 
+      - "-c:v hevc_qsv"
+      - "-preset medium"
+      - "-qp 21"
+      - "-c:s copy"
+    output_options_video:
+      - "-b:v 7000K"
+    output_options_audio:
+      - "-c:a copy"
+
+  ###############################################
+  # Intel QSV (HEVC)
+  ###############################################
+  # standard quality
+  hevc_qsv:
+    include: "base qsv"		# includes/inherts from base and qsv profiles
+    output_options:
+    queue: 'qsv'
+
+  # medium quality
+  hevc_qsv_medium:
+    include: "base qsv"
+    output_options_video:
+      - "-b:v 4000K"
+    output_options_audio:
+      - "-c:a ac3"
+      - "-b:a 768k"
+    queue: 'qsv'
+
+  # standard definition video
+  hevc_qsv_stddef:
+    include: "base qsv"
+    output_options_video:
+      - "-b:v 2000K"
+    output_options_audio:
+      - "-c:a ac3"
+      - "-b:a 512k"
+    queue: 'qsv'
+
+
+  # anime - keep Japanese subtitles
+  hevc_qsv_anime:
+    include: "base qsv"
+    output_options_video:
+      - "-b:v 3000K"
+    output_options_audio:
+      - "-c:a libfdk_aac"
+      - "-b:a 768k"
+    audio:
+      include_languages:
+          - "jpn"
+          - "eng"
+    subtitle:
+        include_languages:
+          - "eng"
+    queue: 'qsv'
+
+  ###############################################
+  # Intel QSV (x264)
+  ###############################################
+  x264_qsv:
+    include: "base qsv"
+    output_options: 
+      - "-c:v h264_vaapi"
+    queue: 'qsv'
+    threshold: 10
+
+  ###############################################
+  # Finally, come CPU-only profiles. Not sure
+  # why you would use if you have hardware
+  # support, but including for documentation.
+  ###############################################
+  #
+  x264_mp4:
+      include: "base"
+      output_options: 
+        - "-threads 4"
+        - "-c:v h264"
+        - "-crf 18"
+        - "-c:a copy"
+        - "-c:s copy"
+        - "-f mp4"
+      threshold: 15
+      threshold_check: 30
+
+  # just copy to a new mkv container and process subtitles based on "base" profile definition
+  copy_mkv:
+      include: "base"
+      output_options: 
+        - "-c:v copy"
+        - "-c:a copy"
+        - "-c:s copy"
+        - "-f mkv"
+      extension: '.mkv'
+
+  #################################################
+  # The following are scenario-specific profiles.
+  # They are examples of how to treat various
+  # media differently from the generic ones above.
+  #################################################
+
+  hevc_30fps:               # when movie source is just too big, cut down fps
+      include: "base cuda"
+      output_options:
+        - "-r 30"
+      queue: 'cuda'
+
+
+  x264_mp4:
+      output_options: 
+        - "-threads 4"
+        - "-c:v h264"
+        - "-crf 18"
+        - "-c:a copy"
+        - "-c:s copy"
+        - "-f mp4"
+      extension: '.mp4'
+      threshold: 15
+
+#
+# Automatching happens when a profile isn't provided on the command line.  These rules are evalulated to find the
+# most appropriate profile for each video to be transcoded.
+#
+# rule predicates:
+#
+#            vcodec         Video codec of the source ('ffmpeg -codecs' to see full list), may preceed with ! for not-equal test
+#            res_height     Source video resolution height, operators < and > allowed
+#            res_width      Source video resolution width, operators < and > allowed
+#            filesize_mb    Size of the source file (in megabytes), operators allowed
+#            runtime        Source runtime in minutes, operators allowed
+#            fps            Framerate of the source
+#            path           Full path of the source file. Value can be a regular expression (ie. '.*/Television/.*').
+#
+# Rules are evaluated in order.  First matching rule wins so order wisely.
+# Rules with a profile of "SKIP" mean to skip processing of the matched video
+#
+rules:
+
+  'skip video if already encoded in hevc/h265':
+      profile: SKIP
+      criteria:
+        vcodec: 'hevc'
+
+  'small enough already':
+      profile: SKIP
+      criteria:
+        filesize_mb: '<2300'
+        res_height: '721-1081'
+        runtime:  '30-65'
+
+  'small enough already-2':
+      profile: SKIP
+      criteria:
+        filesize_mb: '<1000'
+        res_height: '721-1081'
+        runtime:  '20-29'
+
+  'high frame rate':
+      profile: hevc_30fps
+      criteria:
+        fps: '>30'
+        filesize_mb: '>500'
+
+  'skip video if resolution < 700':
+      profile: SKIP
+      criteria:
+        res_height: '<700'
+
+  'content just too big and framey':
+      profile: hevc_hd_25fps
+      criteria:
+        runtime:      '<180'      # less than 3 hours
+        filesize_mb:  '>6000'  # ..and larger than 6 gigabytes
+        fps: '>25'
+
+  'special HD':
+      profile: SKIP
+      criteria:
+        path: 'Mandalorian|Walking|Expanse|Vikings|Westworld|Outlander'
+        filesize_mb:  '<3200'
+
+  # default HD profile for large files
+  'default HD':
+      profile: hevc_qsv
+      criteria:
+        res_height: '721-1081'
+        vcodec: '!hevc'
+        runtime: '>35'
+        filesize_mb: '>2300'
+
+  # default HD profile for files < 35 minutes runtime
+  'default HD 30':
+      profile: hevc_qsv
+      criteria:
+        res_height: '721-1081'
+        vcodec: '!hevc'
+        runtime: '<35'
+        filesize_mb: '>1000'
+
+  # default profile for low HD resolution
+  'default MQ':
+      profile: hevc_qsv_sd
+      criteria:
+        res_height: '720'
+        vcodec: '!hevc'
+
+  # default profile for standard definition files
+  'default SD':
+      profile: hevc_cuda_sd
+      criteria:
+        res_height: '<720'
+        vcodec: '!hevc'
+
