@@ -1,6 +1,9 @@
 
 ### Version History
 
+Version 2.2.4:
+    * Fixed issue where sometimes the wrong video stream is detected when there are multiple
+
 Version 2.2.3:
     * Minor issue with host name status during clustered transcoding
 

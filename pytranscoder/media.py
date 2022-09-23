@@ -212,8 +212,10 @@ class MediaInfo:
         minfo = { 'audio': [], 'subtitle': []}
         if 'streams' not in info:
             return minone
+        found_video = False     # used to detect first video stream (the real one)
         for stream in info['streams']:
-            if stream['codec_type'] == 'video':
+            if stream['codec_type'] == 'video' and not found_video:
+                found_video = True
                 minfo['path'] = _path
                 minfo['vcodec'] = stream['codec_name']
                 minfo['stream'] = str(stream['index'])
