@@ -138,6 +138,7 @@ config:
         user:   matt              # ssh login user
         working_dir: 'c:\temp'  # working folder on remote host, required for streaming type
         ffmpeg:      'c:/ffmpeg/bin/ffmpeg'
+        remote_copy_cmd: 'scp -T'  # command used to copy to and from remote machine
         profiles:               # profiles allowed on this host
           - hevc_cuda
           - hevc_qsv
@@ -175,6 +176,7 @@ config:
 | user          | User to log into this host as via ssh. The user must be pre-authenticated to the host so that a password is not required. See https://www.ssh.com/ssh/copy-id.  **[1]** |
 | ffmpeg        | Path on the host to ffmpeg. |
 | working_dir   | Indicates the temporary directory to use for encoding.  **[2]** |
+| remote_copy_cmd | Optional. Program used to copy files to and from the remote machine. Defaults to 'scp -T'. Values starting with '[' are interpreted as a python list of arguments (e.g. '["scp", "-T"]'), to allow for program path with spaces. Program must support the scp syntax (user@remote:/path/file) in both directions. Default value probably does not work with openssh versions older than January 2019. One alternative is 'rsync -e ssh'. |
 | profiles       | The allowed profiles to use for all encodes on this host. If not provided, assumes all. A video input matching a profile that is not assigned to a particular host will be run on a host that will, if any. This is how, for example, you restrict CPU-based encodings to hosts with no hardware acceleration - or vice versa. In other words, you control how each host is used by which profiles it supports. |
 | path-substitutions | Optional. Applicable only to *mounted* type hosts. Use when the server media files and host mount paths are different. |
 | queues   | Optional. You can define per-host queues to enable concurrent jobs on each host.  If not given, encoding jobs will run 1 at a time.  See README.md for further discussion of queues. |
