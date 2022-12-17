@@ -16,12 +16,6 @@ class Processor:
     def is_available(self) -> bool:
         return self.path is not None
 
-    def is_ffmpeg(self) -> bool:
-        return False
-
-    def is_hbcli(self) -> bool:
-        return False
-
     def fetch_details(self, _path: str) -> MediaInfo:
         return None
 

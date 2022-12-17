@@ -93,7 +93,7 @@ class TranscoderTests(unittest.TestCase):
         self.assertTrue(len(match.groups()) == 5, 'Expected 5 matches')
 
     def test_loadconfig(self):
-        config = ConfigFile('transcode.yml')
+        config = ConfigFile('config-samples/transcode.yml')
         self.assertIsNotNone(config.settings, 'Config object not loaded')
         self.assertEqual(len(config.queues), 2, 'Expected 2 queues')
 

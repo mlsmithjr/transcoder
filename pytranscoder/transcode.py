@@ -16,6 +16,7 @@ import pytranscoder
 from pytranscoder import __version__
 from pytranscoder.cluster import manage_clusters
 from pytranscoder.config import ConfigFile
+from pytranscoder.ffmpeg import FFmpeg
 from pytranscoder.media import MediaInfo
 from pytranscoder.profile import Profile
 from pytranscoder.utils import filter_threshold, files_from_file, calculate_progress, dump_stats
@@ -86,13 +87,9 @@ class QueueThread(Thread):
                 #
                 # check if we need to exclude any streams
                 #
-                processor = self.config.get_processor_by_name(job.profile.processor)
-                if job.profile.is_ffmpeg:
-                    if job.info.is_multistream() and self.config.automap and job.profile.automap:
-                        output_opt = output_opt + job.info.ffmpeg_streams(job.profile)
-                    cli = ['-y', *input_opt, '-i', str(job.inpath), *output_opt, str(outpath)]
-                else:
-                    cli = ['-i', str(job.inpath), *input_opt, *output_opt, '-o', str(outpath)]
+                if job.info.is_multistream() and self.config.automap and job.profile.automap:
+                    output_opt = output_opt + job.info.ffmpeg_streams(job.profile)
+                cli = ['-y', *input_opt, '-i', str(job.inpath), *output_opt, str(outpath)]
 
                 #
                 # display useful information
@@ -131,10 +128,7 @@ class QueueThread(Thread):
                     return False
 
                 job_start = datetime.datetime.now()
-                if processor.is_ffmpeg():
-                    code = processor.run(cli, log_callback)
-                else:
-                    code = processor.run(cli, hbcli_callback)
+                code = self.ffmpeg.run(cli, log_callback)
                 job_stop = datetime.datetime.now()
                 elapsed = job_stop - job_start
 
@@ -161,8 +155,8 @@ class QueueThread(Thread):
                     else:
                         self.log(crayons.yellow(f'Finished {outpath}, original file unchanged'))
                 elif code is not None:
-                    self.log(f' Did not complete normally: {processor.last_command}')
-                    self.log(f'Output can be found in {processor.log_path}')
+                    self.log(f' Did not complete normally: {self.ffmpeg.last_command}')
+                    self.log(f'Output can be found in {self.ffmpeg.log_path}')
                     try:
                         outpath.unlink()
                     except:
@@ -196,7 +190,7 @@ class LocalHost:
         jobs = list()
         for name, queue in self.queues.items():
 
-            # determine the number of threads to allocate for each queue, minimum of defined max and queued jobs
+            # determine the number of threads to allocate for each queue, minimum of defined max or queued jobs
 
             if name == '_default_':
                 concurrent_max = 1
@@ -241,7 +235,7 @@ class LocalHost:
         :param files: list of (path,profile) tuples
         :return:
         """
-
+        ffmpeg = FFmpeg(self.configfile.ffmpeg_path)
         for path, forced_profile, mixins in files:
             #
             # do some prechecks...
@@ -257,15 +251,10 @@ class LocalHost:
                 print(crayons.red('file not found, skipping: ' + path))
                 continue
 
-            processor_name = 'ffmpeg'
-
             if forced_profile:
                 the_profile = self.configfile.get_profile(forced_profile)
-                if not the_profile.is_ffmpeg:
-                    processor_name = 'hbcli'
 
-            processor = self.configfile.get_processor_by_name(processor_name)
-            media_info = processor.fetch_details(path)
+            media_info = ffmpeg.fetch_details(path)
 
             if media_info is None:
                 print(crayons.red(f'File not found: {path}'))

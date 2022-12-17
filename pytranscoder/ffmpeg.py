@@ -25,9 +25,6 @@ class FFmpeg(Processor):
         super().__init__(ffmpeg_path)
         self.monitor_interval = 30
 
-    def is_ffmpeg(self) -> bool:
-        return True
-
     def fetch_details(self, _path: str) -> MediaInfo:
         """Use ffmpeg to get media information
 
