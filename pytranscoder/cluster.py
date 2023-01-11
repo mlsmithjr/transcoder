@@ -8,6 +8,7 @@ import subprocess
 import sys
 from pathlib import PureWindowsPath, PosixPath
 from queue import Queue, Empty
+import socket
 from tempfile import gettempdir
 from threading import Thread, Lock
 from typing import Dict, List, Optional
@@ -245,6 +246,134 @@ class ManagedHost(Thread):
                 return None
             job.profile_name = rule.profile
         return self._manager.profiles[job.profile_name]
+
+
+class AgentManagedHost(ManagedHost):
+    """Implementation of a agent host worker thread"""
+
+    def __init__(self, hostname, props: RemoteHostProperties, queue: Queue, cluster):
+        super().__init__(hostname, props, queue, cluster)
+
+    #
+    # initiate tests through here to avoid a new thread
+    #
+    def testrun(self):
+        self.go()
+
+    #
+    # normal threaded entry point
+    #
+    def run(self):
+        # todo - add agent test
+        self.go()
+
+    def go(self):
+
+        while not self.queue.empty():
+            try:
+                job: EncodeJob = self.queue.get()
+                inpath = job.inpath
+
+
+                #
+                # Got to do the rule matching again.
+                # This time we narrow down the available profiles based on host definition
+                #
+                if pytranscoder.verbose:
+                    self.log('matching ' + inpath)
+
+                _profile: Profile = self.match_profile(job, self.name)
+                if _profile is None:
+                    continue
+
+                #
+                # build command line
+                #
+
+                oinput = _profile.input_options.as_shell_params()
+                ooutput = self._manager.config.output_from_profile(_profile, job.mixins)
+
+                remote_inpath = inpath
+
+                if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
+                    ooutput = ooutput + job.media_info.ffmpeg_streams(_profile)
+                cmd = [self.props.ffmpeg_path, '-y', *oinput, '-i', '{FILENAME}', *ooutput]
+
+                #
+                # display useful information
+                #
+                self.lock.acquire()
+                try:
+                    print('-' * 40)
+                    print(f'Host     : {self.hostname} (agent)')
+                    print('Filename : ' + crayons.green(os.path.basename(remote_inpath)))
+                    print(f'Profile  : {_profile.name}')
+                    print('Command  : ' + ' '.join(cmd) + '\n')
+                finally:
+                    self.lock.release()
+
+                if pytranscoder.dry_run:
+                    continue
+
+                basename = os.path.basename(job.inpath)
+
+                def log_callback(stats):
+                    pct_done, pct_comp = calculate_progress(job.media_info, stats)
+                    pytranscoder.status_queue.put({ 'host': self.hostname,
+                                                    'file': basename,
+                                                    'speed': stats['speed'],
+                                                    'comp': pct_comp,
+                                                    'done': pct_done})
+
+                    if _profile.threshold_check < 100:
+                        if pct_done >= _profile.threshold_check and pct_comp < _profile.threshold:
+                            # compression goal (threshold) not met, kill the job and waste no more time...
+                            self.log(f'Encoding of {basename} cancelled and skipped due to threshold not met')
+                            return True
+                    # continue
+                    return False
+
+                #
+                # Send to agent
+                #
+                job_start = datetime.datetime.now()
+                s = socket.socket()
+
+                print(f"connect to '{self.props.ip}'")
+                s.connect((self.props.ip, 9567))
+                inputsize = os.path.getsize(inpath)
+                tmpdir = self.props.working_dir
+                cmd_str = "$".join(cmd)
+                hello = f"HELLO|{inputsize}|{tmpdir}|{basename}|{cmd_str}"
+                print(f"sending '{hello}'")
+
+                s.send(bytes(hello.encode()))
+                rsp = s.recv(1024).decode()
+                if rsp != hello:
+                    self.log("Received unexpected response from agent: " + rsp)
+                    continue
+                # send the file
+                with open(inpath, "rb") as f:
+                    while True:
+                        buf = f.read(4096)
+                        s.send(buf)
+                        if len(buf) < 4096:
+                            break
+                # file sent, how wait on output
+                while True:
+                    c = s.recv(100).decode()
+                    if len(c) == 0:
+                        continue
+                    if "\0" in c:
+                        break
+                    print(c)
+
+                ## TO-DO
+
+            except Exception as ex:
+                self.log(ex)
+            finally:
+                self.queue.task_done()
 
 
 class StreamingManagedHost(ManagedHost):
@@ -775,6 +904,17 @@ class Cluster(Thread):
                     #
                     for slot in range(0, slots):
                         _h = StreamingManagedHost(host, hostprops, self.queues[host_queue], self)
+                        if not _h.validate_settings():
+                            sys.exit(1)
+                        self.hosts.append(_h)
+
+            elif hosttype == 'agent':
+                for host_queue, slots in host_queues.items():
+                    #
+                    # for each queue configured for this host create a dedicated thread for each slot
+                    #
+                    for slot in range(0, slots):
+                        _h = AgentManagedHost(host, hostprops, self.queues[host_queue], self)
                         if not _h.validate_settings():
                             sys.exit(1)
                         self.hosts.append(_h)
