@@ -6,6 +6,11 @@ for automation.
 
 
 #### News
+
+**Coming soon** - agent mode!
+That's right.  Due to a few issues around Windows 11 security and WSL2 networking changes I'm adding an agent to this tool so that you can skip the convoluted setup of ssh and exposing network shares on Windows 11.  This is in testing now and will be released after I update the docs.  What this means is you can run pytranscoder in 'agent' mode on any Windows machine without setting up ssh key sharing, hacking the registry to make OpenSSH see network shares, and setting up a proxy to make WSL2 allow ssh address resolution.  You can then use any Windows box as a transcoding agent apart from your main hub.  Of course, the agent will work on linux and macos too.
+
+
 Pytranscoder now supports better profiles.  Existing ones are backward-compatible unless you try to use mixings.
 The mixin feature allows you to create pieces of profiles and combine them into another profile on the commandline at runtime.
 This negates the need to create many unique permutations of a profile just for simple variances.
