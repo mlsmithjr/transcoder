@@ -264,8 +264,10 @@ class AgentManagedHost(ManagedHost):
     # normal threaded entry point
     #
     def run(self):
-        # todo - add agent test
-        self.go()
+        if self.host_ok():
+            self.go()
+        else:
+            self.log(f"{self.props.name} not available")
 
     def go(self):
 
@@ -336,44 +338,82 @@ class AgentManagedHost(ManagedHost):
                 #
                 # Send to agent
                 #
-                job_start = datetime.datetime.now()
                 s = socket.socket()
 
-                print(f"connect to '{self.props.ip}'")
+                if self._manager.verbose:
+                    self.log(f"connect to '{self.props.ip}'")
+
                 s.connect((self.props.ip, 9567))
                 inputsize = os.path.getsize(inpath)
                 tmpdir = self.props.working_dir
                 cmd_str = "$".join(cmd)
                 hello = f"HELLO|{inputsize}|{tmpdir}|{basename}|{cmd_str}"
-                print(f"sending '{hello}'")
-
+                if self._manager.verbose:
+                    self.log("handshaking")
                 s.send(bytes(hello.encode()))
                 rsp = s.recv(1024).decode()
                 if rsp != hello:
                     self.log("Received unexpected response from agent: " + rsp)
                     continue
                 # send the file
+                self.log(f"sending {inpath}")
                 with open(inpath, "rb") as f:
                     while True:
-                        buf = f.read(4096)
+                        buf = f.read(1_000_000)
                         s.send(buf)
-                        if len(buf) < 4096:
+                        if len(buf) < 1_000_000:
                             break
-                # file sent, how wait on output
-                while True:
-                    c = s.recv(100).decode()
-                    if len(c) == 0:
-                        continue
-                    if "\0" in c:
-                        break
-                    print(c)
 
-                ## TO-DO
+                job_start = datetime.datetime.now()
+                finished, stats = self.ffmpeg.monitor_agent_ffmpeg(s, log_callback, self.ffmpeg.monitor_agent)
+                job_stop = datetime.datetime.now()
+
+                try:
+                    if finished:
+                        parts = stats.split(r"|")
+                        if parts[0] == "DONE":
+                            s.send(bytes("ACK!".encode()))
+                            tag, exitcode, sfilesize = parts
+                            filesize = int(sfilesize)
+                            tmpfile = inpath + ".tmp"
+                            if self._manager.verbose:
+                                self.log(f"receiving results ({filesize} bytes)")
+
+                            with open(tmpfile, "wb") as out:
+                                while filesize > 0:
+                                    blk = s.recv(1_000_000)
+                                    out.write(blk)
+                                    filesize -= len(blk)
+
+                            if not pytranscoder.keep_source:
+                                os.unlink(inpath)
+                                os.rename(tmpfile, inpath)
+                            self.log(crayons.green(f'Finished {inpath}'))
+                        elif parts[0] == "ERR":
+                            self.log(f"Agent returned process error code '{parts[1]}'")
+                        else:
+                            self.log(f"Unknown process code from agent: '{parts[0]}'")
+                        self.complete(inpath, (job_stop - job_start).seconds)
+
+                except KeyboardInterrupt:
+                    s.send(bytes("STOP".encode()))
 
             except Exception as ex:
                 self.log(ex)
             finally:
                 self.queue.task_done()
+
+    def host_ok(self):
+        s = socket.socket()
+        s.connect((self.props.ip, 9567))
+        s.send(bytes("PING".encode()))
+        s.settimeout(5)
+        try:
+            results = s.recv(4)
+            return results == "PONG"
+        except Exception:
+            return False
+
 
 
 class StreamingManagedHost(ManagedHost):
@@ -495,10 +535,6 @@ class StreamingManagedHost(ManagedHost):
                     # continue
                     return False
 
-                def hb_log_callback(stats):
-                    self.log(f'{basename}: avg fps: {stats["fps"]}, ETA: {stats["eta"]}')
-                    return False
-
                 #
                 # Start remote
                 #
@@ -522,6 +558,12 @@ class StreamingManagedHost(ManagedHost):
                 #
                 # process completed, check results and finish
                 #
+                if code is None:
+                    # was vetoed by threshold checker, clean up
+                    self.complete(inpath, (job_stop - job_start).seconds)
+                    os.remove(retrieved_copy_name)
+                    continue
+
                 if code == 0:
                     if not filter_threshold(_profile, inpath, retrieved_copy_name):
                         self.log(
@@ -657,10 +699,6 @@ class MountedManagedHost(ManagedHost):
                     # continue
                     return False
 
-                def hb_log_callback(stats):
-                    self.log(f'{basename}: avg fps: {stats["fps"]}, ETA: {stats["eta"]}')
-                    return False
-
                 #
                 # Start remote
                 #
@@ -671,6 +709,12 @@ class MountedManagedHost(ManagedHost):
                 #
                 # process completed, check results and finish
                 #
+                if code is None:
+                    # was vetoed by threshold checker, clean up
+                    self.complete(inpath, (job_stop - job_start).seconds)
+                    os.remove(outpath)
+                    continue
+
                 if code == 0:
                     if not filter_threshold(_profile, inpath, outpath):
                         self.log(
@@ -791,10 +835,6 @@ class LocalHost(ManagedHost):
                             return True
                     return False
 
-                def hb_log_callback(stats):
-                    self.log(f'{basename}: avg fps: {stats["fps"]}, ETA: {stats["eta"]}')
-                    return False
-
                 #
                 # Start process
                 #
@@ -805,6 +845,12 @@ class LocalHost(ManagedHost):
                 #
                 # process completed, check results and finish
                 #
+                if code is None:
+                    # was vetoed by threshold checker, clean up
+                    self.complete(inpath, (job_stop - job_start).seconds)
+                    os.remove(outpath)
+                    continue
+
                 if code == 0:
                     if not filter_threshold(_profile, inpath, outpath):
                         self.log(

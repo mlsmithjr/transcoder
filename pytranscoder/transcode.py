@@ -49,6 +49,7 @@ class QueueThread(Thread):
         self.queue = queue
         self.config = configfile
         self._manager = manager
+        self.ffmpeg = FFmpeg(self.config.ffmpeg_path)
 
     @property
     def lock(self):
@@ -122,10 +123,6 @@ class QueueThread(Thread):
                             # compression goal (threshold) not met, kill the job and waste no more time...
                             self.log(f'Encoding of {basename} cancelled and skipped due to threshold not met')
                             return True
-                    return False
-
-                def hbcli_callback(stats):
-                    self.log(f'{basename}: avg fps: {stats["fps"]}, ETA: {stats["eta"]}')
                     return False
 
                 job_start = datetime.datetime.now()
