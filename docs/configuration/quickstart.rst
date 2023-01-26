@@ -9,7 +9,7 @@ For simple commandline help
     pytranscoder -h
 
 
-To get started right away without wading through the volumes of documentation, start with this configuration:
+To get started right away, start with this configuration:
 
 .. code-block:: yaml
 
@@ -19,23 +19,24 @@ To get started right away without wading through the volumes of documentation, s
         colorize:           yes
 
     profiles:
-        x264:               # h264 encoding
-            input_options: 
+        x264:               # h264 encoding (CPU only)
+            input_options:
             output_options:
-            - "-crf 20"
-            - "-c:a copy"
-            - "-c:s copy"
-            - "-f matroska"
-            - "-c:v x264"
+                - "-crf 20"
+                - "-c:a copy"
+                - "-c:s copy"
+                - "-f matroska"
+                - "-c:v x264"
             threshold: 20
             threshold_check: 60
             extension: '.mkv'
 
+        # may be out of date by now
         hevc_cuda:                  # nVidia CUDA HEVC encoding
             input_options:
                 - "-hwaccel cuvid"        # REQUIRED for CUDA
                 - "-c:v h264_cuvid"       # hardware decoding too
-            output_options:         
+            output_options:
                 - "-crf 20"
                 - "-c:a copy"
                 - "-c:s copy"
@@ -47,27 +48,8 @@ To get started right away without wading through the volumes of documentation, s
             threshold: 20
             threshold_check: 60
 
-        h264_cuda_anime:
-            input_options:
-            output_options:
-                - "-crf 20"
-                - "-c:a copy"
-                - "-c:s copy"
-                - "-f matroska"
-                - "-c:v h264_nvenc"
-                - "-tune animation"
-            extension: '.mkv'
-            threshold: 20
-            threshold_check: 60
-
     rules:
-        'anime to h264 using tuning':
-            profile: h264_cuda_anime
-            criteria:
-                filesize_mb: '>2500'   # larger than 2.5g
-                vcodec: '!hevc'            # not encoded with hevc 
-                path: '/media/anime/.*'  # in a anime folder (regex)
-        
+
         'half-hour videos':
             profile: 'x264'             # use profile called "x264"
             criteria:

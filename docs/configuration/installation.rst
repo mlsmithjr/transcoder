@@ -6,12 +6,11 @@ Installation
 Requirements
 ############
 
-* Linux or MacOS, Windows 10. For Windows, WSL (Ubuntu) recommended.
+* Linux or MacOS, Windows 10, 11. For Windows, WSL (Ubuntu) recommended.
 * latest *ffmpeg* (3.4.3-2 or higher, lower versions may still work)
 * nVidia graphics card with latest nVidia CUDA drivers (*optional*)
 * Intel CPU with QSV enabled (*optional*)
 * Python 3 (3.6 or higher)
-* Python PlexAPI package (*optional*).  Install with `pip3 install --user plexapi`
 
 
 #######
@@ -27,7 +26,7 @@ Installation
 
 There are a few possible ways to install a python app - one of these should work for you.
 
-**Linux**
+**Linux (Ubuntu & others)**
 
 The confusion is due to the fact that not all distributions or OS's install pip3 by default. Either way, pytranscoder is available in the **pypi** repo.
 
@@ -35,10 +34,16 @@ The confusion is due to the fact that not all distributions or OS's install pip3
 
   pip3 install --user pytranscoder-ffmpeg
   # or...
-  python3 -m pip install --user pytranscoder-ffmpeg 
+  python3 -m pip install --user pytranscoder-ffmpeg
 
 
 **Windows (WSL - Ubuntu)**
+
+####
+NOTE (2023)
+####
+*I no longer recommend using this tool under WSL2.  Unfortunately too many things have changed that require lots of hacking to get around.
+Namely, access to a GPU from WSL2 and exposure of WSL for ssh access.*
 
 Windows Subsystem for Linux is the best option, but requires a couple of maintenance steps first if you don't have pip3:
 

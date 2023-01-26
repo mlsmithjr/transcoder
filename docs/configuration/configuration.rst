@@ -3,7 +3,7 @@ Configuration
 =============
 
 Since pytranscoder can be run in a variety of ways it is easy to customize your workflow to your liking.  You an choose more detailed
-control at the commandline or use the rules engine to help you be efficient. But at a minimum you need a configuration file as 
+control at the commandline or use the rules engine to help you be efficient. But at a minimum you need a configuration file as
 described below. You can either specific the config file on the commandline with the **-y** flag or you can put it in the default
 location, in a file called **.transcode.yml** in your home folder.
 
@@ -36,8 +36,6 @@ These options apply globally to pytranscoder.
 | default_queue_file    | A queue file is just a text file listing out all the media you want to encode. It is not required, but useful when automating a workflow. You can always indicate a queue file on the command line. This just sets the default, if any.   |
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | ffmpeg                | Full path to *ffmpeg* on this host                                                                                                                                                                                                        |
-+-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| hbcli                 | Full path to *HandBrakeCLI* on this host (optional)                                                                                                                                                                                       |
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | ssh                   | Full path to *ssh* on this host, used only in cluster mode.                                                                                                                                                                               |
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -117,16 +115,16 @@ to select the appropriate one for your needs. Alternatively, you can define rule
                 - "-profile:v main"
                 - "-preset medium"
             queue: cuda		# manage this encode in the 'cuda' queue defined globally
-            
+
             # optionally you can filter out audio/subtitle tracks you don't need.
             # these can also be moved to the "common" profile.
 
         x264:                        # simple h264
             include: common
-            input_options: 
+            input_options:
             output_options_video:
                 - "-c:v x264"
-                
+
         h264_cuda_anime:            # h264 with animation tuning
             include: common
             input_options:
@@ -138,16 +136,6 @@ to select the appropriate one for your needs. Alternatively, you can define rule
                     - "eng"
                     - "jpn"
 
-          handbrake_qsv_hevc:
-            processor: hbcli
-            output_options:
-              - "-f av_mkv"
-              - "-q 20.0"
-              - "-B 256"
-              - "-e qsv_h265"
-            extension: '.mkv'
-            queue: 'qsv'
-
 
 Take a look over this sample.  Most of what you need is here.  Of special note is the **include** directive, which literally includes
 one or more other profiles to create a new, combined one. Use this to isolate common flags to keep new profile definitions simpler.
@@ -155,9 +143,9 @@ one or more other profiles to create a new, combined one. Use this to isolate co
 +-------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | Setting                 | Purpose                                                                                                                                                                       |
 +====================--===+===============================================================================================================================================================================+
-| input_options           | Encoder options related to the input (see ffmpeg or HandBrakeCLI docs)                                                                                                        |
+| input_options           | Encoder options related to the input (see ffmpeg docs)                                                                                                        |
 +-------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| output_options          | General encoder options related to the output (see ffmpeg or HandBrakeCLI docs).                                                                                              |
+| output_options          | General encoder options related to the output (see ffmpeg docs).                                                                                              |
 +-------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | output_options_video    | Video-specific encoder options. Works like output_options except this is mixin-enabled.                                                                                       |
 +-------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -169,9 +157,7 @@ one or more other profiles to create a new, combined one. Use this to isolate co
 +-------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | queue                   | optional. Assign encodes for this profile to a specific queue (defined in *config* section)                                                                                   |
 +-------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| processor               | optional, defaults to ffmpeg. Allows you to designate which encoder to use for this profile. Choices are ffmpeg or hbcli (for handbrake)                                      |
-+-------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| threshold             | optional. If provided this number represents a minimum percentage compression savings for the encoded media.                                                                    | 
+| threshold             | optional. If provided this number represents a minimum percentage compression savings for the encoded media.                                                                    |
 |                       | If it does not meet this threshold the transcoded file is discarded and the source file remains as-is.                                                                          |
 +-----------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | threshold_check       | optional. If provided this is the percent done to start checking if the threshold is being met.                                                                                 |
@@ -192,7 +178,7 @@ one or more other profiles to create a new, combined one. Use this to isolate co
     When transcoding from h264 on an Intel I5/I7 6th+ gen chip, *ffmpeg* will use detected extensions to basically perform hardware decoding for you. So if you configured hardware encoding you'll see low CPU use. On AMD there is no chip assistance on decoding.  So even if hardware encoding, the decoding process will load down your CPU. To fix this simply enable hardware decoding as an **input option**.
 
 -----
-Rules
+Rules (optional)
 -----
 
 Simple expressions to match video files with the appropriate profile. They are evaluated top-down so
@@ -233,9 +219,9 @@ rule. If there are no matches, the *default* rule is selected.
             profile: h264_cuda_anime
             criteria:
                 filesize_mb: '>2500'    # larger than 2.5g
-                vcodec: '!hevc'         # not encoded with hevc 
+                vcodec: '!hevc'         # not encoded with hevc
                 path: '/media/anime/.*' # in a anime folder (regex)
-        
+
         'half-hour videos':
             profile: 'x264'             # use profile called "x264"
             criteria:

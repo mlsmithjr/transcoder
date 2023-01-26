@@ -86,7 +86,7 @@ profiles:
   base:
     #
     # ffmpeg output-related options
-    # 
+    #
     output_options:
         - "-f matroska"     # mkv format
         - "-max_muxing_queue_size 1024"
@@ -138,6 +138,31 @@ profiles:
         - "-preset slow"
         - "-pix_fmt yuv420p"
 
+  hevc_cuda
+    include: "base cuda"
+    output_options_video:
+      - "-b:v 4000K"
+    output_options_audio:
+      - "-c:a ac3"
+      - "-b:a 768k"
+    queue: 'cuda'
+
+  hevc_cuda_anime:
+    include: "base cuda"
+    output_options_video:
+      - "-b:v 3000K"
+    output_options_audio:
+      - "-c:a ac3"
+      - "-b:a 768k"
+    audio:
+      include_languages:
+          - "jpn"
+          - "eng"
+    subtitle:
+        include_languages:
+          - "eng"
+    queue: 'cuda'
+
   ##############################################
   # nVidia CUDA-specific for 10bit video support
   # (Pascal-based cards or newer)
@@ -147,14 +172,6 @@ profiles:
       output_options:
         - "-pix_fmt yuv420p10le"
         - "-profile:v main10"   # redefine the profile:v value from "base" options
-
-  ###############################################
-  # HEVC CUDA high quality, for just about
-  # everything.
-  ###############################################
-  hevc_cuda:
-      include: "base cuda"  # include "base" and "cuda" definitions
-      queue: 'cuda'
 
   ###############################################
   # Intel QSV common options
@@ -205,7 +222,6 @@ profiles:
   #
   x264_mp4:
       include: "base"
-      processor: docker
       output_options:
         - "-f mp4"
       output_options_video:
@@ -219,7 +235,7 @@ profiles:
       threshold: 15
       threshold_check: 30
 
-  copy_mp4: # mostly used to fix badly formatted files
+  copy_mp4: # mostly used to fix badly formatted containers
       output_options_video:
         - "-c:v copy"
       output_options_audio:
@@ -247,36 +263,6 @@ profiles:
   # They are examples of how to treat various
   # media differently from the generic ones above.
   #################################################
-
-  #
-  # For the series Dark, don't transcode but do
-  # strip out non-preferred languages
-  # 
-  dark_passthru:
-      output_options:
-        - "-c:v copy"
-        - "-c:a copy"
-        - "-c:s copy"
-        - "-f matroska"
-      audio:
-        include_languages:
-            - "ger"
-            - "eng"
-      subtitle:
-          include_languages:
-            - "eng"
-      extension: ".mkv"
-
-  #
-  # Anime - keep Japanese language track and English subtitles
-  # English subtitles already included in base profile
-  #
-  anime:
-      include: "base cuda"
-      audio:
-          include_languages:
-              - "eng"
-              - "jpn"
 
   #
   # When you get those oddball encodes with a stupid high
@@ -338,7 +324,7 @@ rules:
         res_height: '<700'
 
   'anime':
-      profile: anime
+      profile: hevc_cuda_anime
       criteria:
           path: '.*/anime/.*'
 
