@@ -587,8 +587,11 @@ class StreamingManagedHost(ManagedHost):
 
                 # self.log(f'Removing temporary media copies from {remote_working_dir}')
                 if self.props.is_windows():
-                    remote_outpath = self.converted_path(remote_outpath)
-                    remote_inpath = self.converted_path(remote_inpath)
+#                    remote_outpath = self.converted_path(remote_outpath)
+#                    remote_inpath = self.converted_path(remote_inpath)
+                    if get_local_os_type() == "linux":
+                        remote_outpath = remote_outpath.replace(r"\\", "\\")
+                        remote_inpath = remote_inpath.replace(r"\\", "\\")
                     self.run_process([*ssh_cmd, f'"del {remote_outpath}"'])
                     self.run_process([*ssh_cmd, f'"del {remote_inpath}"'])
                 else:
