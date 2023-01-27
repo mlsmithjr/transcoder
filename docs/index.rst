@@ -9,15 +9,14 @@ Welcome to PyTranscoder
 ========
 Features
 ========
-* Sequential or concurrent transcoding. 
+* Sequential or concurrent transcoding.
 * Concurrent mode allows you to make maximum use of your nVidia CUDA-enabled graphics card or Intel accelerated video (QSV)
-* Preserves all streams but allows for filtering by audio and subtitle language.
+* Preserves all streams but allows for filtering by audio and subtitle languages.
 * Configurable transcoding profiles
 * Configurable rules and criteria to auto-match a video file to a transcoding profile
 * Transcode from a list of files (queue) or all on the command line
 * Cluster mode allows use of other machines See `Link Cluster.md <https://github.com/mlsmithjr/transcoder/blob/master/Cluster.md>`_ for details.
 * On-the-fly compression monitoring and optional early job termination if not compressing as expected.
-* Experimental support for HandBrakeCLI
 
 
 .. toctree::
@@ -29,7 +28,6 @@ Features
    configuration/configuration
    configuration/concurrency
    configuration/cluster
-   usage/running-hbcli.rst
    usage/running-local.rst
    usage/running-clustered.rst
    usage/includes.rst

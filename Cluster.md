@@ -25,52 +25,17 @@ MacOS, being based on BSD, is also natively supported.  See Linux section. Check
 There are 2 ways to enable SSH access for Windows. Each method is further complicated depending on which ffmpeg you use.  These instructions assume a certain level of proficiency with Windows and optionally WSL.
 
 **Windows SSH**:
-> This method will only allow streaming cluster support due to Windows OpenSSH not being able to access network shares or drives consistently. Avoid if you can.
+> This method will only allow streaming cluster support due to Windows OpenSSH not being able to access network shares.
 
-> * Install OpenSSH server
-* Set server to auto-start (delayed)
+> * Enable OpenSSH server
+* Enable your OpenSSH server via the Windows Services control panel.
 * Start server
-* Copy RSA key from *cluster manager* 
 
-> Install openssh server via `Settings > Apps > manage optional features > Add a Feature > OpenSSH Server > Install`
->
->You cannot use `ssh-copy-id` to authenticate to openssh on Windows. Instead, in the home folder of the user account create
-a directory called **.ssh**.  Then from your *cluster manager* copy your **$HOME/.ssh/id_rsa.pub** to **c:/Users/*username*/.ssh/authorized_keys** on Windows.
->
->In the search bar type **services* and click on **Services Desktop App**.  Scroll down to OpenSSH Server and
-right-click to select Properties. Change the startup type to *Automatic* then OK. Now right-click
-again and select *Start*. The service is now running and set to start automatically after each reboot.
+> In the home folder of the user account create a directory called **.ssh**.  Then from your *cluster manager* copy your **$HOME/.ssh/id_rsa.pub** to **c:/Users/*username*/.ssh/authorized_keys** on Windows.
 >
 >Finally, if you have a supported nVidia card download the nVidia CUDA drivers and install if you plan on using CUDA encoding.
 It's a large download. Choose Custom install and deselect all the documentation and other things you don't need if you want to
 minimize space usage.
-
-**WSL (Ubuntu) OpenSSH**
-> This is the better method but requires more fiddling around at the shell. By installing Windows Subsystem for Linux you enable
-> a more standard bash experience and can use **mount** on network share drive mappings and enable **mounted* mode (faster).  I will cover the highlights but the details are yours to research. Some helpful details [here](https://www.reddit.com/r/bashonubuntuonwindows/comments/5gh4c8/ssh_to_bash_on_wsl/).
-
-> * From the Windows Store search for and install Ubuntu.
-> * On the search bar search for "Enable Features" and click on *Turn Windows features on and off*. Scroll down to Windows Subsystem for Linux and enable.
-> * Launch Ubuntu and create your new user as prompted.
-> * From *bash* you must uninstall and reinstall openssh-server (to fix a problem with the Microsoft-provided distribution):
->     * `sudo apt remove --purge openssh-server`
->     * `sudo rm -rf /etc/ssh`
->     * `sudo apt install openssh-server`
-> * Try to ssh to your Windows machine now.
-> * From your *cluster manager* host, use `ssh-copy-id` to setup password-less ssh to your Windows host.
-> * Back on Windows, map a drive letter to your network media share (ex. *Z:*).
-> * This is where it gets more confusing:
-    * **(easiest)** If installing the Windows [ffmpeg package](https://www.ffmpeg.org/):
-         * Download and install now.
-         * NOTE that your path mappings for pytranscoder will use *Z:* since the ffmpeg you are running is still a Windows program and expects commandline parameters to be Windows-like.
-    * If installing the Ubuntu ffmpeg package:
-        * In *bash*: `sudo apt install ffmpeg`
-        * Create a folder under /mnt representing your media folder mount point.
-        * Now test mount your mapped drive (ie. `sudo mount -t drvfs 'z:' /mnt/media`)
-        * If /mnt/media is mounted to your shared media server you are good to proceed.
-        * Finally, make the mount permanent by adding it to /etc/fstab:
-            `z: /mnt/media drvfs defaults 0 0`
-         * NOTE that your path mappings for pytranscoder will use */mnt/media/*, not *Z:*
 
 When pytranscoder starts it will verify that it can ssh to each host using the provided configuration before continuing.
 
@@ -79,24 +44,24 @@ When pytranscoder starts it will verify that it can ssh to each host using the p
 
 If you skipped right to this documentation you need to read the [README](https://github.com/mlsmithjr/transcoder/blob/master/README.md) first.
 
-Each of your hosts can be designated as *mounted* or *streaming*. 
+Each of your hosts can be designated as *mounted*, *streaming*, or *agent*. 
 A *mounted* host is one that has network access to the same media you are transcoding via a NFS or Samba/CIFS mount. This is the ideal configuration since files need not be copied to and from a host - they are already shared.
 A *streaming* host is one that does not have network access to the media. This most likely will be due to not having the ability to setup a network share on that host. Each file to be encoded is copied to that host using **scp** (ssh), encoded, then the output copied back to your *cluster manager*. This is very inefficient, but works.
+A *agent* host has pytranscoder installed and performs the encoding operations for the *cluster manager* (no ssh enablement required).
 
-
-There is a new section in the transcode.yml file, under the global *config* section, called *clusters*. A cluster is a
+There is a section in the transcode.yml file, under the global *config* section, called *clusters*. A cluster is a
 group of one or more host machines you will use for encoding.  You may define multiple clusters if you have a large
 network of machines at your disposal. **Note**: all hosts in the cluster do not need to be available at runtime - they
 will simply be ignored and other hosts in the cluster used.
 
-Add an **ssh** item to your global configuration, then define the cluster:
+Add an **ssh** item to your global configuration (location of your *cluster manager* ssh client), then define the cluster:
 
 Sample
 ```yaml
 config:
-  ...
+  
   ssh:                '/usr/bin/ssh'    # used only in cluster mode
-  ...
+  
   ###################### 
   # cluster definitions
   ###################### 
@@ -149,27 +114,24 @@ config:
       ################################# 
       # Spare family machine
       ################################# 
-      family:                   # machine configured to use WSL ssh server
-        type:  mounted
+      family:
+        type:  agent
         os:    win10
         ip:    192.168.2.66
         user:  chris
-        ffmpeg: /mnt/c/ffmpeg/bin/ffmpeg.exe  # using Windows ffmpeg.exe build
-        path-substitutions:     # how to map media paths on source to destination mount point
-          - '/volume1/media  Z:'   # use quotes here because of : and \
-          - '/downloads/   Y:'         # use quotes here because of : and \
+        ffmpeg: c:/ffmpeg/bin/ffmpeg.exe  # using Windows ffmpeg.exe build
         profiles:               # profiles allowed on this host
           - hevc_cuda
           - hevc_cuda_10bit
         queues:
           qsv: 1
-          cuda: 2
+          cuda: 1
         status: enabled
 ```
 
 | setting      | purpose |
 | -----------   | ----------- |
-| type          | Host type, either *mounted* or *streaming*. There can be one host in all clusters with type *local*. A *mounted* type indicates the input media files are accessible via a shared filesystem mounted on the host. A *streaming* type indicates no sharing, and each media file being encoded is copied to that host, encoded, then copied back.  A *local* type is used to also include the *cluster manager* machine (system running pytranscoder) in the cluster so it won't sit idle, and is  optional. There are fewer required configuration attributes for this type.
+| type          | Host type, either *mounted*, *streaming*, or *agent*. There can be one host in all clusters with type *local*. A *mounted* type indicates the input media files are accessible via a shared filesystem mounted on the host. A *streaming* type indicates no sharing, and each media file being encoded is copied to that host, encoded, then copied back.  A *local* type is used to also include the *cluster manager* machine (system running pytranscoder) in the cluster so it won't sit idle, and is  optional. There are fewer required configuration attributes for this type. |
 | os      | One of linux,macos, or win10. **[1]** |
 | ip            | Address or host name of the host.  **[1]**  |
 | user          | User to log into this host as via ssh. The user must be pre-authenticated to the host so that a password is not required. See https://www.ssh.com/ssh/copy-id.  **[1]** |

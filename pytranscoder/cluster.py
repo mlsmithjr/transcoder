@@ -4,10 +4,12 @@
 import datetime
 import os
 import shutil
+import signal
 import subprocess
 import sys
 from pathlib import PureWindowsPath, PosixPath
 from queue import Queue, Empty
+import socket
 from tempfile import gettempdir
 from threading import Thread, Lock
 from typing import Dict, List, Optional
@@ -246,6 +248,176 @@ class ManagedHost(Thread):
             job.profile_name = rule.profile
         return self._manager.profiles[job.profile_name]
 
+    def terminate(self):
+        pass
+
+
+class AgentManagedHost(ManagedHost):
+    """Implementation of a agent host worker thread"""
+
+    def __init__(self, hostname, props: RemoteHostProperties, queue: Queue, cluster):
+        super().__init__(hostname, props, queue, cluster)
+
+    #
+    # initiate tests through here to avoid a new thread
+    #
+    def testrun(self):
+        self.go()
+
+    #
+    # normal threaded entry point
+    #
+    def run(self):
+        if self.host_ok():
+            self.go()
+        else:
+            self.log(f"{self.props.name} not available")
+
+    def go(self):
+
+        while not self.queue.empty():
+            try:
+                job: EncodeJob = self.queue.get()
+                inpath = job.inpath
+
+
+                #
+                # Got to do the rule matching again.
+                # This time we narrow down the available profiles based on host definition
+                #
+                if pytranscoder.verbose:
+                    self.log('matching ' + inpath)
+
+                _profile: Profile = self.match_profile(job, self.name)
+                if _profile is None:
+                    continue
+
+                #
+                # build command line
+                #
+
+                oinput = _profile.input_options.as_shell_params()
+                ooutput = self._manager.config.output_from_profile(_profile, job.mixins)
+
+                remote_inpath = inpath
+
+                if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
+                    ooutput = ooutput + job.media_info.ffmpeg_streams(_profile)
+                cmd = [self.props.ffmpeg_path, '-y', *oinput, '-i', '{FILENAME}', *ooutput]
+
+                #
+                # display useful information
+                #
+                self.lock.acquire()
+                try:
+                    print('-' * 40)
+                    print(f'Host     : {self.hostname} (agent)')
+                    print('Filename : ' + crayons.green(os.path.basename(remote_inpath)))
+                    print(f'Profile  : {_profile.name}')
+                    print('Command  : ' + ' '.join(cmd) + '\n')
+                finally:
+                    self.lock.release()
+
+                if pytranscoder.dry_run:
+                    continue
+
+                basename = os.path.basename(job.inpath)
+
+                def log_callback(stats):
+                    pct_done, pct_comp = calculate_progress(job.media_info, stats)
+                    pytranscoder.status_queue.put({ 'host': self.hostname,
+                                                    'file': basename,
+                                                    'speed': stats['speed'],
+                                                    'comp': pct_comp,
+                                                    'done': pct_done})
+
+                    if _profile.threshold_check < 100:
+                        if pct_done >= _profile.threshold_check and pct_comp < _profile.threshold:
+                            # compression goal (threshold) not met, kill the job and waste no more time...
+                            self.log(f'Encoding of {basename} cancelled and skipped due to threshold not met')
+                            return True
+                    # continue
+                    return False
+
+                #
+                # Send to agent
+                #
+                s = socket.socket()
+
+                if self._manager.verbose:
+                    self.log(f"connect to '{self.props.ip}'")
+
+                s.connect((self.props.ip, 9567))
+                inputsize = os.path.getsize(inpath)
+                tmpdir = self.props.working_dir
+                cmd_str = "$".join(cmd)
+                hello = f"HELLO|{inputsize}|{tmpdir}|{basename}|{cmd_str}"
+                if self._manager.verbose:
+                    self.log("handshaking")
+                s.send(bytes(hello.encode()))
+                rsp = s.recv(1024).decode()
+                if rsp != hello:
+                    self.log("Received unexpected response from agent: " + rsp)
+                    continue
+                # send the file
+                self.log(f"sending {inpath}")
+                with open(inpath, "rb") as f:
+                    while True:
+                        buf = f.read(1_000_000)
+                        s.send(buf)
+                        if len(buf) < 1_000_000:
+                            break
+
+                job_start = datetime.datetime.now()
+                finished, stats = self.ffmpeg.monitor_agent_ffmpeg(s, log_callback, self.ffmpeg.monitor_agent)
+                job_stop = datetime.datetime.now()
+
+                try:
+                    if finished:
+                        parts = stats.split(r"|")
+                        if parts[0] == "DONE":
+                            s.send(bytes("ACK!".encode()))
+                            tag, exitcode, sfilesize = parts
+                            filesize = int(sfilesize)
+                            tmpfile = inpath + ".tmp"
+                            if self._manager.verbose:
+                                self.log(f"receiving results ({filesize} bytes)")
+
+                            with open(tmpfile, "wb") as out:
+                                while filesize > 0:
+                                    blk = s.recv(1_000_000)
+                                    out.write(blk)
+                                    filesize -= len(blk)
+
+                            if not pytranscoder.keep_source:
+                                os.unlink(inpath)
+                                os.rename(tmpfile, inpath)
+                            self.log(crayons.green(f'Finished {inpath}'))
+                        elif parts[0] == "ERR":
+                            self.log(f"Agent returned process error code '{parts[1]}'")
+                        else:
+                            self.log(f"Unknown process code from agent: '{parts[0]}'")
+                        self.complete(inpath, (job_stop - job_start).seconds)
+
+                except KeyboardInterrupt:
+                    s.send(bytes("STOP".encode()))
+
+            except Exception as ex:
+                self.log(ex)
+            finally:
+                self.queue.task_done()
+
+    def host_ok(self):
+        s = socket.socket()
+        s.connect((self.props.ip, 9567))
+        s.send(bytes("PING".encode()))
+        s.settimeout(5)
+        try:
+            results = s.recv(4)
+            return results == "PONG"
+        except Exception:
+            return False
+
 
 class StreamingManagedHost(ManagedHost):
     """Implementation of a streaming host worker thread"""
@@ -366,10 +538,6 @@ class StreamingManagedHost(ManagedHost):
                     # continue
                     return False
 
-                def hb_log_callback(stats):
-                    self.log(f'{basename}: avg fps: {stats["fps"]}, ETA: {stats["eta"]}')
-                    return False
-
                 #
                 # Start remote
                 #
@@ -377,9 +545,9 @@ class StreamingManagedHost(ManagedHost):
                 code = self.ffmpeg.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, log_callback)
                 job_stop = datetime.datetime.now()
 
-                if code != 0:
-                    self.log(crayons.red('Unknown error encoding on remote'))
-                    continue
+#                if code != 0:
+#                    self.log(crayons.red('Unknown error encoding on remote'))
+#                    continue
 
                 #
                 # copy results back to local
@@ -393,6 +561,12 @@ class StreamingManagedHost(ManagedHost):
                 #
                 # process completed, check results and finish
                 #
+                if code is None:
+                    # was vetoed by threshold checker, clean up
+                    self.complete(inpath, (job_stop - job_start).seconds)
+                    os.remove(retrieved_copy_name)
+                    continue
+
                 if code == 0:
                     if not filter_threshold(_profile, inpath, retrieved_copy_name):
                         self.log(
@@ -416,10 +590,13 @@ class StreamingManagedHost(ManagedHost):
 
                 # self.log(f'Removing temporary media copies from {remote_working_dir}')
                 if self.props.is_windows():
-                    remote_outpath = self.converted_path(remote_outpath)
-                    remote_inpath = self.converted_path(remote_inpath)
-                    self.run_process([*ssh_cmd, f'"del {remote_outpath}"'])
-                    self.run_process([*ssh_cmd, f'"del {remote_inpath}"'])
+#                    remote_outpath = self.converted_path(remote_outpath)
+#                    remote_inpath = self.converted_path(remote_inpath)
+                    if get_local_os_type() == "linux":
+                        remote_outpath = remote_outpath.replace(r"\\", "\\")
+                        remote_inpath = remote_inpath.replace(r"\\", "\\")
+                    self.run_process([*ssh_cmd, f'del {remote_outpath}'])
+                    self.run_process([*ssh_cmd, f'del {remote_inpath}'])
                 else:
                     self.run_process([*ssh_cmd, f'"rm {remote_outpath}"'])
                     self.run_process([*ssh_cmd, f'"rm {remote_inpath}"'])
@@ -528,10 +705,6 @@ class MountedManagedHost(ManagedHost):
                     # continue
                     return False
 
-                def hb_log_callback(stats):
-                    self.log(f'{basename}: avg fps: {stats["fps"]}, ETA: {stats["eta"]}')
-                    return False
-
                 #
                 # Start remote
                 #
@@ -542,6 +715,12 @@ class MountedManagedHost(ManagedHost):
                 #
                 # process completed, check results and finish
                 #
+                if code is None:
+                    # was vetoed by threshold checker, clean up
+                    self.complete(inpath, (job_stop - job_start).seconds)
+                    os.remove(outpath)
+                    continue
+
                 if code == 0:
                     if not filter_threshold(_profile, inpath, outpath):
                         self.log(
@@ -662,10 +841,6 @@ class LocalHost(ManagedHost):
                             return True
                     return False
 
-                def hb_log_callback(stats):
-                    self.log(f'{basename}: avg fps: {stats["fps"]}, ETA: {stats["eta"]}')
-                    return False
-
                 #
                 # Start process
                 #
@@ -676,6 +851,12 @@ class LocalHost(ManagedHost):
                 #
                 # process completed, check results and finish
                 #
+                if code is None:
+                    # was vetoed by threshold checker, clean up
+                    self.complete(inpath, (job_stop - job_start).seconds)
+                    os.remove(outpath)
+                    continue
+
                 if code == 0:
                     if not filter_threshold(_profile, inpath, outpath):
                         self.log(
@@ -779,6 +960,17 @@ class Cluster(Thread):
                             sys.exit(1)
                         self.hosts.append(_h)
 
+            elif hosttype == 'agent':
+                for host_queue, slots in host_queues.items():
+                    #
+                    # for each queue configured for this host create a dedicated thread for each slot
+                    #
+                    for slot in range(0, slots):
+                        _h = AgentManagedHost(host, hostprops, self.queues[host_queue], self)
+                        if not _h.validate_settings():
+                            sys.exit(1)
+                        self.hosts.append(_h)
+
             else:
                 print(crayons.red(f'Unknown cluster host type "{hosttype}" - skipping'))
 
@@ -853,6 +1045,10 @@ class Cluster(Thread):
             host.join()
             self.completed.extend(host.completed)
 
+    def terminate(self):
+        for host in self.hosts:
+            host.terminate()
+
     @property
     def profiles(self):
         return self.config.profiles
@@ -888,6 +1084,14 @@ def manage_clusters(files, config: ConfigFile, testing=False) -> List:
             cluster.testrun()
         else:
             cluster.start()
+
+    def sig_handler(signal, frame):
+        for _, acluster in clusters.items():
+            if acluster.is_alive():
+                acluster.terminate()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, sig_handler)
 
     if not testing:
 

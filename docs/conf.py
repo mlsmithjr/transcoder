@@ -18,11 +18,11 @@
 # -- Project information -----------------------------------------------------
 
 project = 'pytranscoder'
-copyright = '2019, Marshall L Smith Jr'
+copyright = '2019-2023, Marshall L Smith Jr'
 author = 'Marshall L Smith Jr'
 
 # The full version, including alpha/beta/rc tags
-release = '2.0.1'
+release = '2.2.5'
 
 
 # -- General configuration ---------------------------------------------------

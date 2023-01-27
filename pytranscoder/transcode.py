@@ -14,6 +14,7 @@ import crayons
 import pytranscoder
 
 from pytranscoder import __version__
+from pytranscoder.agent import Agent
 from pytranscoder.cluster import manage_clusters
 from pytranscoder.config import ConfigFile
 from pytranscoder.ffmpeg import FFmpeg
@@ -48,6 +49,7 @@ class QueueThread(Thread):
         self.queue = queue
         self.config = configfile
         self._manager = manager
+        self.ffmpeg = FFmpeg(self.config.ffmpeg_path)
 
     @property
     def lock(self):
@@ -121,10 +123,6 @@ class QueueThread(Thread):
                             # compression goal (threshold) not met, kill the job and waste no more time...
                             self.log(f'Encoding of {basename} cancelled and skipped due to threshold not met')
                             return True
-                    return False
-
-                def hbcli_callback(stats):
-                    self.log(f'{basename}: avg fps: {stats["fps"]}, ETA: {stats["eta"]}')
                     return False
 
                 job_start = datetime.datetime.now()
@@ -336,11 +334,12 @@ def main():
 def start():
 
     if len(sys.argv) == 2 and sys.argv[1] == '-h':
-        print(f'pytrancoder (ver {__version__})')
-        print('usage: pytrancoder [OPTIONS]')
-        print('  or   pytrancoder [OPTIONS] --from-file <filename>')
-        print('  or   pytrancoder [OPTIONS] file ...')
-        print('  or   pytrancoder -c <cluster> file... [--host <name>] -c <cluster> file...')
+        print(f'pytranscoder (ver {__version__})')
+        print('usage: pytranscoder [OPTIONS]')
+        print('  or   pytranscoder [OPTIONS] --from-file <filename>')
+        print('  or   pytranscoder [OPTIONS] file ...')
+        print('  or   pytranscoder --agent')
+        print('  or   pytranscoder -c <cluster> file... [--host <name>] -c <cluster> file...')
         print('No parameters indicates to process the default queue files using profile matching rules.')
         print(
             'The --from-file filename is a file containing a list of full paths to files for transcoding. ')
@@ -360,10 +359,12 @@ def start():
         sys.exit(0)
 
     install_sigint_handler()
+
     files = list()
     profile = None
     mixins = None
     queue_path = None
+    agent_mode = False
     cluster = None
     configfile: Optional[ConfigFile] = None
     host_override = None
@@ -400,6 +401,9 @@ def start():
             elif sys.argv[arg] == '-m':                 # mixins
                 mixins = sys.argv[arg + 1].split(',')
                 arg += 1
+            elif sys.argv[arg] == "--agent":            # agent/server mode
+                agent_mode = True
+                arg += 1
             else:
                 if os.name == "nt":
                     expanded_files: List = glob.glob(sys.argv[arg])     # handle wildcards in Windows
@@ -411,6 +415,11 @@ def start():
                     else:
                         files.append((f, cluster, profile, mixins))
             arg += 1
+
+    if agent_mode:
+        agent = Agent()
+        agent.run()
+        sys.exit(0)
 
     if configfile is None:
         configfile = ConfigFile(DEFAULT_CONFIG)

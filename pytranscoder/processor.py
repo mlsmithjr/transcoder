@@ -42,6 +42,17 @@ class Processor:
                         return None
             return p.returncode
 
+    def monitor_agent_ffmpeg(self, sock, event_callback, monitor):
+        for stats in monitor(sock):
+            if isinstance(stats, str):
+                break
+            if event_callback is not None:
+                veto = event_callback(stats)
+                if veto:
+                    sock.send(bytes("VETO".encode()))
+                    return False, stats
+        return True, stats
+
     def remote_execute_and_monitor(self, sshcli: str, user: str, ip: str, params: list, event_callback, monitor) -> Optional[int]:
         cli = [sshcli, '-v', user + '@' + ip, self.path, *params]
         self.last_command = ' '.join(cli)
@@ -60,3 +71,4 @@ class Processor:
                 return p.returncode
             except KeyboardInterrupt:
                 p.kill()
+        return None
