@@ -4,6 +4,7 @@
 import datetime
 import os
 import shutil
+import signal
 import subprocess
 import sys
 from pathlib import PureWindowsPath, PosixPath
@@ -247,6 +248,9 @@ class ManagedHost(Thread):
             job.profile_name = rule.profile
         return self._manager.profiles[job.profile_name]
 
+    def terminate(self):
+        pass
+
 
 class AgentManagedHost(ManagedHost):
     """Implementation of a agent host worker thread"""
@@ -415,7 +419,6 @@ class AgentManagedHost(ManagedHost):
             return False
 
 
-
 class StreamingManagedHost(ManagedHost):
     """Implementation of a streaming host worker thread"""
 
@@ -542,9 +545,9 @@ class StreamingManagedHost(ManagedHost):
                 code = self.ffmpeg.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, log_callback)
                 job_stop = datetime.datetime.now()
 
-                if code != 0:
-                    self.log(crayons.red('Unknown error encoding on remote'))
-                    continue
+#                if code != 0:
+#                    self.log(crayons.red('Unknown error encoding on remote'))
+#                    continue
 
                 #
                 # copy results back to local
@@ -592,8 +595,8 @@ class StreamingManagedHost(ManagedHost):
                     if get_local_os_type() == "linux":
                         remote_outpath = remote_outpath.replace(r"\\", "\\")
                         remote_inpath = remote_inpath.replace(r"\\", "\\")
-                    self.run_process([*ssh_cmd, f'"del {remote_outpath}"'])
-                    self.run_process([*ssh_cmd, f'"del {remote_inpath}"'])
+                    self.run_process([*ssh_cmd, f'del {remote_outpath}'])
+                    self.run_process([*ssh_cmd, f'del {remote_inpath}'])
                 else:
                     self.run_process([*ssh_cmd, f'"rm {remote_outpath}"'])
                     self.run_process([*ssh_cmd, f'"rm {remote_inpath}"'])
@@ -1042,6 +1045,10 @@ class Cluster(Thread):
             host.join()
             self.completed.extend(host.completed)
 
+    def terminate(self):
+        for host in self.hosts:
+            host.terminate()
+
     @property
     def profiles(self):
         return self.config.profiles
@@ -1077,6 +1084,14 @@ def manage_clusters(files, config: ConfigFile, testing=False) -> List:
             cluster.testrun()
         else:
             cluster.start()
+
+    def sig_handler(signal, frame):
+        for _, acluster in clusters.items():
+            if acluster.is_alive():
+                acluster.terminate()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, sig_handler)
 
     if not testing:
 

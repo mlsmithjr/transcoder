@@ -10,7 +10,7 @@ class Agent:
         s = socket.socket()
         port = 9567
 
-        s.bind(("192.168.2.64", port))
+        s.bind(("", port))
 
         s.listen(1)
 

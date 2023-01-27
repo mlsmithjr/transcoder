@@ -71,3 +71,4 @@ class Processor:
                 return p.returncode
             except KeyboardInterrupt:
                 p.kill()
+        return None
