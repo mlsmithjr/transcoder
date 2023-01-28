@@ -9,7 +9,7 @@ for automation.
 
 **Coming soon**
 
-Version 3 will include an alternate means of configuring your setup.  Let's face it, all that JSON is confusing.
+Version 3 will include an alternate means of configuring your setup.  Let's face it, all that YAML is confusing.
 The new version will use templating and be far simpler and very much smaller -- all my converted profiles fit on one screen now.
 Existing profile support will remain indefinitely for users with more complicated setups, but templates will appeal more to most users.
 
