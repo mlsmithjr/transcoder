@@ -1,0 +1,32 @@
+
+config:
+  ffmpeg:             '/usr/bin/ffmpeg'
+  colorize: yes
+
+
+new_config:
+
+  template: "{input-options} -i {input-file} {video-codec} {audio-codec} {subtitles} {output-file}"
+
+  models:
+    qsv:
+      template:
+        video-codec: "-c:v hevc_qsv -preset medium -qp 21 -b:v 7000K"
+        audio-codec: "-c:a copy"
+      subtitles: "-c:s copy"
+      queue: "qsv"
+
+    qsv_medium:
+      template:
+        video-codec: "-c:v hevc_qsv -preset medium -qp 21 -b:v 4000K"
+        audio-codec: "-c:a ac3 -b:a 768k"
+      queue: "qsv"
+
+    qsv_anime:
+      template:
+        video-codec: "-c:v hevc_qsv -preset medium -qp 21 -b:v 3000K"
+        audio-codec: "-c:a ac3 -b:a 768k"
+      audio: "eng jpn"
+      subtitle: eng
+      queue: "qsv"
+

@@ -138,7 +138,7 @@ profiles:
         - "-preset slow"
         - "-pix_fmt yuv420p"
 
-  hevc_cuda
+  hevc_cuda:
     include: "base cuda"
     output_options_video:
       - "-b:v 4000K"
