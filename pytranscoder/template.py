@@ -2,28 +2,8 @@
 from __future__ import annotations
 from typing import Dict, List, Optional, Any
 
+from pytranscoder.profile import Directives
 
-class Directives:
-    def name(self) -> str:
-        pass
-
-    def extension(self) -> str:
-        pass
-
-    def input_options(self) -> List[str]:
-        pass
-
-    def output_options(self, mixins = None) -> List[str]:
-        pass
-
-    def threshold_check(self) -> int:
-        pass
-
-    def queue_name(self) -> str:
-        pass
-
-    def threshold(self) -> int:
-        pass
 
 class Options:
     def __init__(self, opts: List = None):
@@ -83,64 +63,53 @@ class Options:
         return z
 
 
-class Profile(Directives):
-    def __init__(self, name: str, profile: Optional[Dict] = None):
-        self.profile: Dict[str, Any] = profile
+class Template(Directives):
+    def __init__(self, name: str, template: Optional[Dict] = None):
+        self.template: Dict[str, Any] = template
         self.name = name
 
-        if not profile:
-            self.profile: Dict[str, Any] = dict()
+        if not template:
+            self.template: Dict[str, Any] = dict()
 
-        if "input_options" in self.profile:
-            self.profile["input_options"] = Options(profile["input_options"])
-        else:
-            self.profile["input_options"] = Options()
+        if "cli" not in template:
+            print(f'Template error ({name}: missing "cli" section')
+            exit(1)
 
-        if "output_options" in self.profile:
-            self.profile["output_options"] = Options(profile["output_options"])
-        else:
-            self.profile["output_options"] = Options()
+        self.cli = template["cli"]
 
-        for section in ['audio', 'video', 'subtitle']:
-            section_name = f'output_options_{section}'
-            if section_name in self.profile:
-                self.profile[section_name] = Options(profile[section_name])
+    def input_options(self) -> List[str]:
+        opt = self.cli.get("input-options", None)
+        return opt or []
+
+    def output_options(self, mixins: Optional = None) -> List[str]:
+        opts = []
+        vopt = self.cli.get("video-codec", None) or ""
+        opts.append(*vopt.split(" "))
+        aopt = self.cli.get("audio-codec", None) or ""
+        opts.append(*aopt.split(" "))
+        sopt = self.cli.get("subtitles", None) or ""
+        opts.append(*sopt.split(" "))
+
+        return opts
 
 
     def get(self, key: str):
-        return self.profile.get(key, None)
-
-    @property
-    def input_options(self) -> Options:
-        return self.profile["input_options"]
-
-    @property
-    def output_options(self) -> Options:
-        return self.profile["output_options"]
-
-    @property
-    def output_options_audio(self) -> Options:
-        return self.profile.get("output_options_audio", None)
-
-    @property
-    def output_options_video(self) -> Options:
-        return self.profile.get("output_options_video", None)
-
-    @property
-    def output_options_subtitle(self) -> Options:
-        return self.profile.get("output_options_subtitle", None)
+        return self.template.get(key, None)
 
     def extension(self) -> str:
-        return self.profile['extension']
+        return self.template['extension']
+
+    def name(self) -> str:
+        return self.name
 
     def queue_name(self) -> str:
-        return self.profile.get('queue', None)
+        return self.template.get('queue', None)
 
     def threshold(self) -> int:
-        return self.profile.get('threshold', 0)
+        return self.template.get('threshold', 0)
 
     def threshold_check(self) -> int:
-        return self.profile.get('threshold_check', 100)
+        return self.template.get('threshold_check', 100)
 
     @property
     def include_profiles(self) -> List[str]:

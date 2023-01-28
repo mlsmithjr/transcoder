@@ -3,18 +3,18 @@ import math
 import os
 import platform
 import subprocess
-from typing import Dict, List
+from typing import Dict
 
 import pytranscoder
 from pytranscoder.media import MediaInfo
-from pytranscoder.profile import Profile
+from pytranscoder.profile import Directives
 
 
-def filter_threshold(profile: Profile, inpath, outpath):
-    if profile.threshold > 0:
+def filter_threshold(profile: Directives, inpath, outpath):
+    if profile.threshold() > 0:
         orig_size = os.path.getsize(inpath)
         new_size = os.path.getsize(outpath)
-        return is_exceeded_threshold(profile.threshold, orig_size, new_size)
+        return is_exceeded_threshold(profile.threshold(), orig_size, new_size)
     return True
 
 
