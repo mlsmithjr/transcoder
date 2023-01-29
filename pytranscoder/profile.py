@@ -25,6 +25,10 @@ class Directives:
     def threshold(self) -> int:
         pass
 
+    def stream_map(self, video_stream: str, audio: List, subtitle: List) -> List[str]:
+        pass
+
+
 class Options:
     def __init__(self, opts: List = None):
         self.options = list()
@@ -207,3 +211,69 @@ class Profile(Directives):
         if subtitle_section is None:
             return None
         return subtitle_section.get('default_language', [])
+
+    def _map_streams(self, stream_type: str, streams: List, excludes: list, includes: list, defl: str) -> list:
+        if excludes is None:
+            excludes = []
+        if not includes:
+            includes = None
+        seq_list = list()
+        mapped = list()
+        default_reassign = False
+        for s in streams:
+            stream_lang = s.get('lang', 'none')
+            #
+            # includes take precedence over excludes
+            #
+            if includes is not None and stream_lang not in includes:
+                if s.get('default', None) is not None:
+                    default_reassign = True
+                continue
+
+            if stream_lang in excludes:
+                if s.get('default', None) is not None:
+                    default_reassign = True
+                continue
+
+            # if we got here, map the stream
+            mapped.append(s)
+            seq = s['stream']
+            seq_list.append('-map')
+            seq_list.append(f'0:{seq}')
+
+        if default_reassign:
+            if defl is None:
+                print('Warning: A default stream will be removed but no default language specified to replace it')
+            else:
+                for i, s in enumerate(mapped):
+                    if s.get('lang', None) == defl:
+                        seq_list.append(f'-disposition:{stream_type}:{i}')
+                        seq_list.append('default')
+        return seq_list
+
+    def stream_map(self, video_stream: str, audio: List, subtitle: List) -> list:
+        excl_audio = self.excluded_audio()
+        excl_subtitle = self.excluded_subtitles()
+        incl_audio = self.included_audio()
+        incl_subtitle = self.included_subtitles()
+
+        defl_audio = self.default_audio()
+        defl_subtitle = self.default_subtitle()
+
+        if excl_audio is None:
+            excl_audio = []
+        if excl_subtitle is None:
+            excl_subtitle = []
+        #
+        # if no inclusions or exclusions just map everything
+        #
+        if len(incl_audio) == 0 and len(excl_audio) == 0 and len(incl_subtitle) == 0 and len(excl_subtitle) == 0:
+            return ['-map', '0']
+
+        seq_list = list()
+        seq_list.append('-map')
+        seq_list.append(f'0:{video_stream}')
+        audio_streams = self._map_streams("a", audio, excl_audio, incl_audio, defl_audio)
+        subtitle_streams = self._map_streams("s", subtitle, excl_subtitle, incl_subtitle, defl_subtitle)
+        return seq_list + audio_streams + subtitle_streams
+

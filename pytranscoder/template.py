@@ -5,68 +5,10 @@ from typing import Dict, List, Optional, Any
 from pytranscoder.profile import Directives
 
 
-class Options:
-    def __init__(self, opts: List = None):
-        self.options = list()
-        if opts:
-            if isinstance(opts, str):
-                self.options.append(opts)
-            else:
-                self.merge(opts)
-
-    def merge(self, parent):
-        pdict = {}
-        child: List = self.options
-        if isinstance(parent, List):
-            parent: List = parent
-        else:
-            parent: List = parent.options
-        # prep the parent list for easy search/replace
-        for p in parent:
-            tmp = p.split()
-            if len(tmp) == 2:
-                pdict[tmp[0]] = tmp[1]
-            else:
-                pdict[tmp[0]] = None
-
-        # check child options against parent, replacing as needed
-        for child_opt in child:
-            tmp = child_opt.split()
-            if len(tmp) == 2:
-                if tmp[1]:
-                    pdict[tmp[0]] = tmp[1]
-            else:
-                pdict[tmp[0]] = None
-
-        new_opts = []
-        for k, v in pdict.items():
-            if v:
-                new_opts.append(k + ' ' + v)
-            else:
-                new_opts.append(k)
-        self.options = new_opts
-
-    def remove(self, opt: str):
-        for o in self.options:
-            if o.split()[0] == opt:
-                self.options.remove(o)
-                break
-
-    def as_list(self):
-        return list(self.options)
-
-    def as_shell_params(self) -> List:
-        z = []
-        for o in self.options:
-            for t in o.split():
-                z.append(t)
-        return z
-
-
 class Template(Directives):
     def __init__(self, name: str, template: Optional[Dict] = None):
         self.template: Dict[str, Any] = template
-        self.name = name
+        self._name = name
 
         if not template:
             self.template: Dict[str, Any] = dict()
@@ -84,14 +26,13 @@ class Template(Directives):
     def output_options(self, mixins: Optional = None) -> List[str]:
         opts = []
         vopt = self.cli.get("video-codec", None) or ""
-        opts.append(*vopt.split(" "))
+        opts.extend(vopt.split(" "))
         aopt = self.cli.get("audio-codec", None) or ""
-        opts.append(*aopt.split(" "))
+        opts.extend(aopt.split(" "))
         sopt = self.cli.get("subtitles", None) or ""
-        opts.append(*sopt.split(" "))
+        opts.extend(sopt.split(" "))
 
         return opts
-
 
     def get(self, key: str):
         return self.template.get(key, None)
@@ -100,7 +41,7 @@ class Template(Directives):
         return self.template['extension']
 
     def name(self) -> str:
-        return self.name
+        return self._name
 
     def queue_name(self) -> str:
         return self.template.get('queue', None)
@@ -111,68 +52,61 @@ class Template(Directives):
     def threshold_check(self) -> int:
         return self.template.get('threshold_check', 100)
 
-    @property
-    def include_profiles(self) -> List[str]:
-        alist: str = self.profile.get('include', None)
-        if alist is None:
-            return []
-        return alist.split()
-
-    def include(self, parent):      # accepts dict or Profile object
-        # overlay this profile settings on top of parent profile to make a new one
-        if isinstance(parent, dict):
-            p = dict(parent)
+    def _map_streams(self, stream_type: str, streams: List) -> list:
+        seq_list = list()
+        mapped = list()
+        default_reassign = False
+        includes = None
+        if stream_type == "a":
+            includes = self.template.get("audio-lang", None)
+        elif stream_type == "s":
+            includes = self.template.get("subtitle-lang", None)
+        if includes:
+            includes = includes.split(" ")
         else:
-            p = dict(parent.profile)
-        for k, v in p.items():
-            if k in self.profile:
-                if isinstance(v, Options):
-                    if isinstance(self.profile[k], Options):
-                        # merge existing key values
-                        self.profile[k].merge(v)
-                    else:
-                        # replace
-                        self.profile[k] = v
+            includes = []
+
+        for s in streams:
+            stream_lang = s.get('lang', 'none')
+
+            if len(includes) > 0 and stream_lang not in includes:
+                if s.get('default', None) is not None:
+                    default_reassign = True
+                continue
+
+            # if we got here, map the stream
+            mapped.append(s)
+            seq = s['stream']
+            seq_list.append('-map')
+            seq_list.append(f'0:{seq}')
+
+        if default_reassign:
+            defl = None
+            if len(includes) > 1:
+                # find the default, if any
+                for i in includes:
+                    if i[0] == "*":
+                        defl = i[1:]
+                        break
                 else:
-                    # keep child value
-                    continue
+                    print('Warning: A default stream will be removed but no default language specified to replace it')
             else:
-                self.profile[k] = v
+                defl = includes[0][1:] if includes[0][0] == '*' else includes[0]
+                for i, s in enumerate(mapped):
+                    if s.get('lang', None) == defl:
+                        seq_list.append(f'-disposition:{stream_type}:{i}')
+                        seq_list.append('default')
+        return seq_list
 
-        return self
+    def stream_map(self, video_stream: str, audio: List, subtitle: List) -> List[str]:
 
-    def included_audio(self) -> list:
-        audio_section = self.profile.get('audio')
-        if audio_section is None:
-            return []
-        return audio_section.get('include_languages', [])
+        if len(self.template.get("audio-lang", "")) == 0 and len(self.template.get("subtitle-lang", "")) == 0:
+            # default to map everything
+            return ['-map', '0']
 
-    def excluded_audio(self) -> list:
-        audio_section = self.profile.get('audio')
-        if audio_section is None:
-            return []
-        return audio_section.get('exclude_languages', [])
-
-    def included_subtitles(self) -> list:
-        subtitle_section = self.profile.get('subtitle')
-        if subtitle_section is None:
-            return []
-        return subtitle_section.get('include_languages', [])
-
-    def excluded_subtitles(self) -> list:
-        subtitle_section = self.profile.get('subtitle')
-        if subtitle_section is None:
-            return []
-        return subtitle_section.get('exclude_languages', [])
-
-    def default_audio(self) -> Optional[str]:
-        audio_section = self.profile.get('audio')
-        if audio_section is None:
-            return None
-        return audio_section.get('default_language', [])
-
-    def default_subtitle(self) -> Optional[str]:
-        subtitle_section = self.profile.get('subtitle')
-        if subtitle_section is None:
-            return None
-        return subtitle_section.get('default_language', [])
+        seq_list = list()
+        seq_list.append('-map')
+        seq_list.append(f'0:{video_stream}')
+        audio_streams = self._map_streams("a", audio)
+        subtitle_streams = self._map_streams("s", subtitle)
+        return seq_list + audio_streams + subtitle_streams

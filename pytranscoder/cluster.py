@@ -302,7 +302,7 @@ class AgentManagedHost(ManagedHost):
                 remote_inpath = inpath
 
                 if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
-                    ooutput = ooutput + job.media_info.ffmpeg_streams(_profile)
+                    ooutput = ooutput + job.media_info.stream_map(_profile)
                 cmd = [self.props.ffmpeg_path, '-y', *oinput, '-i', '{FILENAME}', *ooutput]
 
                 #
@@ -480,7 +480,7 @@ class StreamingManagedHost(ManagedHost):
 #                ooutput = _profile.output_options.as_shell_params()
 
                 if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
-                    ooutput = ooutput + job.media_info.ffmpeg_streams(_profile)
+                    ooutput = ooutput + job.media_info.stream_map(_profile)
                 cmd = ['-y', *oinput, '-i', self.converted_path(remote_inpath),
                        *ooutput, self.converted_path(remote_outpath)]
 
@@ -667,7 +667,7 @@ class MountedManagedHost(ManagedHost):
                 remote_outpath = self.converted_path(remote_outpath)
 
                 if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
-                    ooutput = ooutput + job.media_info.ffmpeg_streams(_profile)
+                    ooutput = ooutput + job.media_info.stream_map(_profile)
                 cmd = ['-y', *oinput, '-i', f'"{remote_inpath}"', *ooutput, f'"{remote_outpath}"']
 
                 #
@@ -804,7 +804,7 @@ class LocalHost(ManagedHost):
                 remote_outpath = self.converted_path(outpath)
 
                 if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
-                    ooutput = ooutput + job.media_info.ffmpeg_streams(_profile)
+                    ooutput = ooutput + job.media_info.stream_map(_profile)
                 cli = ['-y', *oinput, '-i', remote_inpath, *ooutput, remote_outpath]
 
                 #

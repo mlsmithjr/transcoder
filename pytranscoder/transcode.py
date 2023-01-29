@@ -85,7 +85,10 @@ class QueueThread(Thread):
                 else:
                     outpath = job.inpath.with_suffix(job.directives.extension() + '.tmp')
 
-                cli = ['-y', *job.directives.input_options(), '-i', str(job.inpath), *job.directives.output_options(job.mixins), str(outpath)]
+                stream_map = []
+                if job.info.is_multistream() and self.config.automap:
+                    stream_map = job.directives.stream_map(job.info.stream, job.info.audio, job.info.subtitle)
+                cli = ['-y', *job.directives.input_options(), '-i', str(job.inpath), *job.directives.output_options(job.mixins), *stream_map, str(outpath)]
 
                 #
                 # display useful information
@@ -93,9 +96,9 @@ class QueueThread(Thread):
                 self.lock.acquire()  # used to synchronize threads so multiple threads don't create a jumble of output
                 try:
                     print('-' * 40)
-                    print('Filename : ' + crayons.green(os.path.basename(str(job.inpath))))
-                    print(f'Profile  : {job.directives.name()}')
-                    print('{:<6}   : ffmpeg ' + ' '.join(cli) + '\n')
+                    print( 'Filename : ' + crayons.green(os.path.basename(str(job.inpath))))
+                    print(f'Directive: {job.directives.name()}')
+                    print( 'ffmpeg   :' + ' '.join(cli) + '\n')
                 finally:
                     self.lock.release()
 
@@ -223,16 +226,16 @@ class LocalHost:
     def enqueue_files(self, files: list):
         """Add requested files to the appropriate queue
 
-        :param files: list of (path,profile) tuples
+        :param files: list of (path,directives) tuples
         :return:
         """
         ffmpeg = FFmpeg(self.configfile.ffmpeg_path)
-        for path, forced_profile, mixins in files:
+        for path, forced_directive, mixins in files:
             #
             # do some prechecks...
             #
-            if forced_profile is not None and not self.configfile.has_profile(forced_profile):
-                print(f'profile "{forced_profile}" referenced from command line not found')
+            if forced_directive is not None and not self.configfile.has_directive(forced_directive):
+                print(f'"{forced_directive}" referenced from command line not found')
                 sys.exit(1)
 
             if len(path) == 0:
@@ -242,8 +245,8 @@ class LocalHost:
                 print(crayons.red('file not found, skipping: ' + path))
                 continue
 
-            if forced_profile:
-                the_profile = self.configfile.get_profile(forced_profile)
+            if forced_directive:
+                the_profile = self.configfile.get_directive(forced_directive)
 
             media_info = ffmpeg.fetch_details(path)
 
@@ -256,38 +259,38 @@ class LocalHost:
                 if pytranscoder.verbose:
                     print(str(media_info))
 
-                if forced_profile is None:
+                if forced_directive is None:
                     rule = self.configfile.match_rule(media_info)
                     if rule is None:
-                        print(crayons.green(os.path.basename(path)), crayons.yellow(f'No matching profile found - skipped'))
+                        print(crayons.green(os.path.basename(path)), crayons.yellow(f'No matching profile or template found - skipped'))
                         continue
                     if rule.is_skip():
                         print(crayons.green(os.path.basename(path)), f'SKIPPED ({rule.name})')
                         self.complete.append((path, 0))
                         continue
-                    profile_name = rule.profile
+                    directive_name = rule.profile
                 else:
                     #
                     # looks good, add this file to the thread queue
                     #
-                    profile_name = forced_profile
+                    directive_name = forced_directive
 
-                the_profile = self.configfile.get_profile(profile_name)
-                qname = the_profile.queue_name
+                the_directive = self.configfile.get_directive(directive_name)
+                qname = the_directive.queue_name()
                 if pytranscoder.verbose:
-                    print('Matched with profile {profile_name}')
+                    print('Matched with {the_directive}')
                 if qname is not None:
-                    if not self.configfile.has_queue(the_profile.queue_name):
+                    if not self.configfile.has_queue(the_directive.queue_name()):
                         print(crayons.red(
-                            f'Profile "{profile_name}" indicated queue "{qname}" that has not been defined')
+                            f'Profile "{the_directive}" indicated queue "{qname}" that has not been defined')
                         )
                         sys.exit(1)
                     else:
-                        self.queues[qname].put(LocalJob(path, the_profile, mixins, media_info))
+                        self.queues[qname].put(LocalJob(path, the_directive, mixins, media_info))
                         if pytranscoder.verbose:
                             print('Added to queue {qname}')
                 else:
-                    self.queues['_default_'].put(LocalJob(path, the_profile, mixins, media_info))
+                    self.queues['_default_'].put(LocalJob(path, the_directive, mixins, media_info))
 
 
 def cleanup_queuefile(queue_path: str, completed: Set):

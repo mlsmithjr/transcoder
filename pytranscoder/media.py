@@ -86,7 +86,7 @@ class MediaInfo:
                         seq_list.append('default')
         return seq_list
 
-    def ffmpeg_streams(self, profile: Profile) -> list:
+    def stream_map(self, profile: Profile) -> list:
         excl_audio = profile.excluded_audio()
         excl_subtitle = profile.excluded_subtitles()
         incl_audio = profile.included_audio()
