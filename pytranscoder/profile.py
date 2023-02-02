@@ -10,10 +10,10 @@ class Directives:
     def extension(self) -> str:
         pass
 
-    def input_options(self) -> List[str]:
+    def input_options_list(self) -> List[str]:
         pass
 
-    def output_options(self, mixins = None) -> List[str]:
+    def output_options_list(self, config, mixins=None) -> List[str]:
         pass
 
     def threshold_check(self) -> int:
@@ -90,7 +90,7 @@ class Options:
 class Profile(Directives):
     def __init__(self, name: str, profile: Optional[Dict] = None):
         self.profile: Dict[str, Any] = profile
-        self.name = name
+        self._name = name
 
         if not profile:
             self.profile: Dict[str, Any] = dict()
@@ -113,18 +113,16 @@ class Profile(Directives):
     def get(self, key: str):
         return self.profile.get(key, None)
 
-    # def input_options(self) -> List[str]:
-    #     return self.profile["input_options"].as_shell_params()
+    def name(self) -> str:
+        return self._name
 
-    #oinput = _profile.input_options.as_shell_params()
+    def input_options_list(self) -> List[str]:
+        return self.profile["input_options"].as_shell_params()
+
     #ooutput = self._manager.config.output_from_profile(_profile, job.mixins)
 
     @property
-    def input_options(self) -> Options:
-        return self.profile["input_options"]
-
-    @property
-    def output_options(self, mixins=None) -> Options:
+    def output_options(self) -> Options:
         return self.profile["output_options"]
 
     @property
@@ -282,3 +280,28 @@ class Profile(Directives):
         subtitle_streams = self._map_streams("s", subtitle, excl_subtitle, incl_subtitle, defl_subtitle)
         return seq_list + audio_streams + subtitle_streams
 
+    @staticmethod
+    def find_mixin_section(mixins: List[Profile], mixin_type: str):
+        for mixin in mixins:
+            section_name = f'output_options_{mixin_type}'
+            if section_name in mixin.profile:
+                section = mixin.profile[section_name]
+                # mixins only allow one override, so take the first we find
+                return section.as_shell_params()
+        return []
+
+    def output_options_list(self, config, mixins=None) -> List[str]:
+        # start with output_options (not mixable)
+        output_opt = self.output_options.as_shell_params()
+        mixin_profiles = config.find_mixins(mixins)
+        for section in ['audio', 'video', 'subtitle']:
+            section_name = f'output_options_{section}'
+            if section_name in self.profile:
+                # we have a mixin-enabled section - see if there are mixins to apply
+                options = self.find_mixin_section(mixin_profiles, section)
+                if len(options) > 0:
+                    output_opt.extend(options)
+                else:
+                    # no mixin override, just use the section in the profile
+                    output_opt.extend(self.profile[section_name].as_shell_params())
+        return output_opt

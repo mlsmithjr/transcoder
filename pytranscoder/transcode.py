@@ -88,7 +88,7 @@ class QueueThread(Thread):
                 stream_map = []
                 if job.info.is_multistream() and self.config.automap:
                     stream_map = job.directives.stream_map(job.info.stream, job.info.audio, job.info.subtitle)
-                cli = ['-y', *job.directives.input_options(), '-i', str(job.inpath), *job.directives.output_options(job.mixins), *stream_map, str(outpath)]
+                cli = ['-y', *job.directives.input_options_list(), '-i', str(job.inpath), *job.directives.output_options_list(self.config, job.mixins), *stream_map, str(outpath)]
 
                 #
                 # display useful information
@@ -278,7 +278,7 @@ class LocalHost:
                 the_directive = self.configfile.get_directive(directive_name)
                 qname = the_directive.queue_name()
                 if pytranscoder.verbose:
-                    print('Matched with {the_directive}')
+                    print(f'Matched with {the_directive}')
                 if qname is not None:
                     if not self.configfile.has_queue(the_directive.queue_name()):
                         print(crayons.red(
@@ -288,7 +288,7 @@ class LocalHost:
                     else:
                         self.queues[qname].put(LocalJob(path, the_directive, mixins, media_info))
                         if pytranscoder.verbose:
-                            print('Added to queue {qname}')
+                            print(f'Added to queue {qname}')
                 else:
                     self.queues['_default_'].put(LocalJob(path, the_directive, mixins, media_info))
 

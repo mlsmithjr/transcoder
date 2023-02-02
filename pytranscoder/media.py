@@ -41,7 +41,7 @@ class MediaInfo:
         audio = '(' + ','.join(audios) + ')'
         subs = [s['stream'] + ':' + s['lang'] + ':' + s['default'] for s in self.subtitle]
         sub = '(' + ','.join(subs) + ')'
-        buf = f"MediaInfo: {self.path}, {self.filesize_mb}mb, {self.fps} fps, cs={self.colorspace}, {self.res_width}x{self.res_height}, {runtime}, c:v={self.vcodec}, audio={audio}, sub={sub}"
+        buf = f"{self.path}, {self.filesize_mb}mb, {self.fps} fps, {self.res_width}x{self.res_height}, {runtime}, c:v={self.vcodec}, audio={audio}, sub={sub}"
         return buf
 
     def is_multistream(self) -> bool:

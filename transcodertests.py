@@ -75,7 +75,7 @@ class TranscoderTests(unittest.TestCase):
         self.assertEqual(p2.get("one"), 11, 'expected 11 for "one"')
         self.assertEqual(p2.get("two"), 2, 'expected 2 for "two"')
         self.assertEqual(p2.get("six"), 6, 'expected 6 for "six"')
-        op2 = sorted(p2.input_options.as_list())
+        op2 = sorted(p2.input_options_list.as_list())
         expected = sorted(["three", "four", "five", "seven"])
         self.assertEqual(op2, expected, "Unexpected input_options merger")
 
@@ -143,8 +143,8 @@ class TranscoderTests(unittest.TestCase):
         p: Profile = setup.get_directive('hevc_cuda_8bit')
         self.assertEqual(p.threshold, 0, 'Threshold should be 0')
         self.assertEqual(p.threshold_check, 100, 'Threshold check should be 100')
-        self.assertIn("-cq:v 21", p.output_options.as_list(), 'Expected -cq:v 21')
-        self.assertIn('-pix_fmt yuv420p', p.output_options.as_list(), 'expected pix_fmt')
+        self.assertIn("-cq:v 21", p.output_options_list.as_list(), 'Expected -cq:v 21')
+        self.assertIn('-pix_fmt yuv420p', p.output_options_list.as_list(), 'expected pix_fmt')
 
     def test_default_profile(self):
         info = TranscoderTests.make_media(None, None, None, 720, 45, 3000, 25, None, [], [])

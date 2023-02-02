@@ -224,7 +224,7 @@ class ManagedHost(Thread):
             remote_cmd = 'dir' if self.props.is_windows() else 'ls'
             # remote_cmd = 'ls'
             sshtest = subprocess.run([*self.ssh_cmd(), remote_cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                     shell=False, timeout=5)
+                                     shell=False, timeout=10)
             if sshtest.returncode != 0:
                 self.log('ssh test failed with the following output: ' + str(sshtest.stderr))
                 return False
@@ -296,8 +296,8 @@ class AgentManagedHost(ManagedHost):
                     stream_map = job.directive.stream_map(job.media_info.stream, job.media_info.audio,
                                                           job.media_info.subtitle)
 
-                cmd = [self.props.ffmpeg_path, '-y', *job.directive.input_options(), '-i', '{FILENAME}',
-                       *job.directive.output_options(job.mixins), *stream_map]
+                cmd = [self.props.ffmpeg_path, '-y', *job.directive.input_options_list(), '-i', '{FILENAME}',
+                       *job.directive.output_options_list(self._manager.config, job.mixins), *stream_map]
 
                 #
                 # display useful information
@@ -464,8 +464,9 @@ class StreamingManagedHost(ManagedHost):
                     stream_map = job.directive.stream_map(job.media_info.stream, job.media_info.audio,
                                                           job.media_info.subtitle)
 
-                cmd = ['-y', *job.directive.input_options(), '-i', self.converted_path(remote_inpath),
-                       *job.directive.output_options(job.mixins), *stream_map, self.converted_path(remote_outpath)]
+                cmd = ['-y', *job.directive.input_options_list(), '-i', self.converted_path(remote_inpath),
+                       *job.directive.output_options_list(self._manager.config, job.mixins), *stream_map,
+                       self.converted_path(remote_outpath)]
                 cli = [*ssh_cmd, *cmd]
 
                 #
@@ -634,8 +635,9 @@ class MountedManagedHost(ManagedHost):
                 if job.media_info.is_multistream() and self._manager.config.automap:
                     stream_map = job.directive.stream_map(job.media_info.stream, job.media_info.audio,
                                                           job.media_info.subtitle)
-                cmd = ['-y', *job.directive.input_options(), '-i', f'"{remote_inpath}"',
-                       *job.directive.output_options(job.mixins), *stream_map, f'"{remote_outpath}"']
+                cmd = ['-y', *job.directive.input_options_list(), '-i', f'"{remote_inpath}"',
+                       *job.directive.output_options_list(self._manager.config, job.mixins), *stream_map,
+                       f'"{remote_outpath}"']
 
                 #
                 # display useful information
@@ -757,8 +759,9 @@ class LocalHost(ManagedHost):
                 if job.media_info.is_multistream() and self._manager.config.automap:
                     stream_map = job.directive.stream_map(job.media_info.stream, job.media_info.audio,
                                                           job.media_info.subtitle)
-                cli = ['-y', *job.directive.input_options(), '-i', remote_inpath,
-                       *job.directive.output_options(job.mixins), *stream_map, remote_outpath]
+                cli = ['-y', *job.directive.input_options_list(), '-i', remote_inpath,
+                       *job.directive.output_options_list(self._manager.config, job.mixins), *stream_map,
+                       remote_outpath]
 
                 #
                 # display useful information

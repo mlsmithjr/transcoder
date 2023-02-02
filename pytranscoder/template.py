@@ -19,11 +19,11 @@ class Template(Directives):
 
         self.cli = template["cli"]
 
-    def input_options(self) -> List[str]:
+    def input_options_list(self) -> List[str]:
         opt = self.cli.get("input-options", None)
         return opt or []
 
-    def output_options(self, mixins: Optional = None) -> List[str]:
+    def output_options_list(self, config, mixins: Optional = None) -> List[str]:
         opts = []
         vopt = self.cli.get("video-codec", None) or ""
         opts.extend(vopt.split(" "))
