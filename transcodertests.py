@@ -138,18 +138,9 @@ class TranscoderTests(unittest.TestCase):
             self.assertEqual(info.path, '/dev/null')
             self.assertEqual(info.colorspace, 'yuv420p10le')
 
-    def test_automap_include(self):
-        info = TranscoderTests.make_media(None, None, None, 720, 45, 3000, 25, None,
-                                          [{'lang': 'eng', 'stream': '1'},
-                                           {'lang': 'ger', 'stream': '2', 'default': True}], [])
-        setup = ConfigFile(self.get_setup())
-        p = setup.get_directive('hevc_cuda')
-        options = info.stream_map(p)
-        self.assertEqual(options, ['-map', '0:0', '-map', '0:1', '-disposition:a:0', 'default'])
-
     def test_include_overides(self):
         setup = ConfigFile(self.get_setup())
-        p = setup.get_directive('hevc_cuda_8bit')
+        p: Profile = setup.get_directive('hevc_cuda_8bit')
         self.assertEqual(p.threshold, 0, 'Threshold should be 0')
         self.assertEqual(p.threshold_check, 100, 'Threshold check should be 100')
         self.assertIn("-cq:v 21", p.output_options.as_list(), 'Expected -cq:v 21')

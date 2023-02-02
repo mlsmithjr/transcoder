@@ -110,13 +110,15 @@ class Profile(Directives):
             if section_name in self.profile:
                 self.profile[section_name] = Options(profile[section_name])
 
-
     def get(self, key: str):
         return self.profile.get(key, None)
 
+    def input_options(self) -> List[str]:
+        pass
+
     @property
     def input_options(self) -> Options:
-        return self.profile["input_options"]
+        return self.profile["input_options"].as_shell_params()
 
     @property
     def output_options(self) -> Options:
