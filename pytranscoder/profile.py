@@ -113,15 +113,18 @@ class Profile(Directives):
     def get(self, key: str):
         return self.profile.get(key, None)
 
-    def input_options(self) -> List[str]:
-        pass
+    # def input_options(self) -> List[str]:
+    #     return self.profile["input_options"].as_shell_params()
+
+    #oinput = _profile.input_options.as_shell_params()
+    #ooutput = self._manager.config.output_from_profile(_profile, job.mixins)
 
     @property
     def input_options(self) -> Options:
-        return self.profile["input_options"].as_shell_params()
+        return self.profile["input_options"]
 
     @property
-    def output_options(self) -> Options:
+    def output_options(self, mixins=None) -> Options:
         return self.profile["output_options"]
 
     @property
