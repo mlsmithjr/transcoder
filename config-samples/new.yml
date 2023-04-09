@@ -1,0 +1,76 @@
+
+config:
+  ffmpeg:             '/usr/bin/ffmpeg'
+  colorize: yes
+  queues:
+    qsv: 1
+    cuda: 1
+  fls_path: '/tmp'    # fast local storage for work files, ideally an SSD (optional)
+
+  clusters:
+    home:
+      workstation:
+        type: mounted
+        os: linus
+        ffmpeg: '/usr/bin/ffmpeg'
+        working_dir: /tmp
+        queues:
+          qsv: 1
+          cuda: 1
+        templates:
+          - qsv
+          - qsv_medium
+          - qsv_anime
+        status: 'enabled'
+
+      homeserver:
+        os: linux
+        type: mounted
+        ffmpeg: '/usr/bin/ffmpeg'
+        working_dir: /tmp
+        ip: 192.168.2.61
+        user: mark
+        queues:
+          cuda: 1
+        templates:
+          - qsv
+          - qsv_medium
+          - qsv_anime
+        status: 'enabled'
+
+
+#  {input-options} {video-codec} {audio-codec} {subtitles}
+
+templates:
+  qsv:
+    cli:
+      video-codec: "-c:v hevc_qsv -preset medium -qp 21 -b:v 7000K"
+      audio-codec: "-c:a copy"
+      subtitles: "-c:s copy"
+    threshold: 15
+    threshold_check: 30
+    queue: "qsv"
+    extension: '.mkv'
+
+  qsv_medium:
+    cli:
+      video-codec: "-c:v hevc_qsv -preset medium -qp 21 -b:v 4000K"
+      audio-codec: "-c:a ac3 -b:a 768k"
+      subtitles: "-c:s copy"
+    threshold: 15
+    threshold_check: 30
+    queue: "qsv"
+    extension: '.mkv'
+
+  qsv_anime:
+    cli:
+      video-codec: "-c:v hevc_qsv -preset medium -qp 21 -b:v 3000K"
+      audio-codec: "-c:a ac3 -b:a 768k"
+      subtitles: "-c:s copy"
+    audio-lang: "eng jpn"
+    subtitle-lang: eng
+    threshold: 15
+    threshold_check: 30
+    queue: "qsv"
+    extension: '.mkv'
+

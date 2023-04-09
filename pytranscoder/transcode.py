@@ -19,7 +19,8 @@ from pytranscoder.cluster import manage_clusters
 from pytranscoder.config import ConfigFile
 from pytranscoder.ffmpeg import FFmpeg
 from pytranscoder.media import MediaInfo
-from pytranscoder.profile import Profile
+from pytranscoder.profile import Profile, Directives
+from pytranscoder.template import Template
 from pytranscoder.utils import filter_threshold, files_from_file, calculate_progress, dump_stats
 
 DEFAULT_CONFIG = os.path.expanduser('~/.transcode.yml')
@@ -28,9 +29,9 @@ DEFAULT_CONFIG = os.path.expanduser('~/.transcode.yml')
 class LocalJob:
     """One file with matched profile to be encoded"""
 
-    def __init__(self, inpath: str, profile: Profile, mixins: List[str], info: MediaInfo):
+    def __init__(self, inpath: str, directives: Directives, mixins: List[str], info: MediaInfo):
         self.inpath = Path(os.path.abspath(inpath))
-        self.profile = profile
+        self.directives = directives
         self.info = info
         self.mixins = mixins
 
@@ -75,23 +76,19 @@ class QueueThread(Thread):
         while not self.queue.empty():
             try:
                 job: LocalJob = self.queue.get()
-                input_opt = job.profile.input_options.as_shell_params()
-                output_opt = self.config.output_from_profile(job.profile, job.mixins)
 
                 fls = False
                 if self.config.fls_path():
                     # lets write output to local storage, for efficiency
-                    outpath = PurePath(self.config.fls_path(), job.inpath.with_suffix(job.profile.extension).name)
+                    outpath = PurePath(self.config.fls_path(), job.inpath.with_suffix(job.directives.extension()).name)
                     fls = True
                 else:
-                    outpath = job.inpath.with_suffix(job.profile.extension + '.tmp')
+                    outpath = job.inpath.with_suffix(job.directives.extension() + '.tmp')
 
-                #
-                # check if we need to exclude any streams
-                #
-                if job.info.is_multistream() and self.config.automap and job.profile.automap:
-                    output_opt = output_opt + job.info.ffmpeg_streams(job.profile)
-                cli = ['-y', *input_opt, '-i', str(job.inpath), *output_opt, str(outpath)]
+                stream_map = []
+                if job.info.is_multistream() and self.config.automap:
+                    stream_map = job.directives.stream_map(job.info.stream, job.info.audio, job.info.subtitle)
+                cli = ['-y', *job.directives.input_options_list(), '-i', str(job.inpath), *job.directives.output_options_list(self.config, job.mixins), *stream_map, str(outpath)]
 
                 #
                 # display useful information
@@ -99,9 +96,9 @@ class QueueThread(Thread):
                 self.lock.acquire()  # used to synchronize threads so multiple threads don't create a jumble of output
                 try:
                     print('-' * 40)
-                    print('Filename : ' + crayons.green(os.path.basename(str(job.inpath))))
-                    print(f'Profile  : {job.profile.name}')
-                    print('{:<6}   : '.format(job.profile.processor) + ' '.join(cli) + '\n')
+                    print( 'Filename : ' + crayons.green(os.path.basename(str(job.inpath))))
+                    print(f'Directive: {job.directives.name()}')
+                    print( 'ffmpeg   :' + ' '.join(cli) + '\n')
                 finally:
                     self.lock.release()
 
@@ -117,9 +114,8 @@ class QueueThread(Thread):
                                                     'speed': stats['speed'],
                                                     'comp': pct_comp,
                                                     'done': pct_done})
-                    #self.log(f'{basename}: speed: {stats["speed"]}x, comp: {pct_comp}%, done: {pct_done:3}%')
-                    if job.profile.threshold_check < 100:
-                        if pct_done >= job.profile.threshold_check and pct_comp < job.profile.threshold:
+                    if job.directives.threshold_check() < 100:
+                        if pct_done >= job.directives.threshold_check() and pct_comp < job.directives.threshold():
                             # compression goal (threshold) not met, kill the job and waste no more time...
                             self.log(f'Encoding of {basename} cancelled and skipped due to threshold not met')
                             return True
@@ -131,7 +127,7 @@ class QueueThread(Thread):
                 elapsed = job_stop - job_start
 
                 if code == 0:
-                    if not filter_threshold(job.profile, str(job.inpath), outpath):
+                    if not filter_threshold(job.directives, str(job.inpath), outpath):
                         # oops, this transcode didn't do so well, lets keep the original and scrap this attempt
                         self.log(f'Transcoded file {job.inpath} did not meet minimum savings threshold, skipped')
                         self.complete(job.inpath, (job_stop - job_start).seconds)
@@ -145,9 +141,9 @@ class QueueThread(Thread):
                         job.inpath.unlink()
 
                         if fls:
-                            shutil.move(outpath, job.inpath.with_suffix(job.profile.extension))
+                            shutil.move(outpath, job.inpath.with_suffix(job.directives.extension()))
                         else:
-                            outpath.rename(job.inpath.with_suffix(job.profile.extension))
+                            outpath.rename(job.inpath.with_suffix(job.directives.extension()))
 
                         self.log(crayons.green(f'Finished {job.inpath}'))
                     else:
@@ -230,16 +226,16 @@ class LocalHost:
     def enqueue_files(self, files: list):
         """Add requested files to the appropriate queue
 
-        :param files: list of (path,profile) tuples
+        :param files: list of (path,directives) tuples
         :return:
         """
         ffmpeg = FFmpeg(self.configfile.ffmpeg_path)
-        for path, forced_profile, mixins in files:
+        for path, forced_directive, mixins in files:
             #
             # do some prechecks...
             #
-            if forced_profile is not None and not self.configfile.has_profile(forced_profile):
-                print(f'profile "{forced_profile}" referenced from command line not found')
+            if forced_directive is not None and not self.configfile.has_directive(forced_directive):
+                print(f'"{forced_directive}" referenced from command line not found')
                 sys.exit(1)
 
             if len(path) == 0:
@@ -249,8 +245,8 @@ class LocalHost:
                 print(crayons.red('file not found, skipping: ' + path))
                 continue
 
-            if forced_profile:
-                the_profile = self.configfile.get_profile(forced_profile)
+            if forced_directive:
+                the_profile = self.configfile.get_directive(forced_directive)
 
             media_info = ffmpeg.fetch_details(path)
 
@@ -263,38 +259,38 @@ class LocalHost:
                 if pytranscoder.verbose:
                     print(str(media_info))
 
-                if forced_profile is None:
+                if forced_directive is None:
                     rule = self.configfile.match_rule(media_info)
                     if rule is None:
-                        print(crayons.green(os.path.basename(path)), crayons.yellow(f'No matching profile found - skipped'))
+                        print(crayons.green(os.path.basename(path)), crayons.yellow(f'No matching profile or template found - skipped'))
                         continue
                     if rule.is_skip():
                         print(crayons.green(os.path.basename(path)), f'SKIPPED ({rule.name})')
                         self.complete.append((path, 0))
                         continue
-                    profile_name = rule.profile
+                    directive_name = rule.profile
                 else:
                     #
                     # looks good, add this file to the thread queue
                     #
-                    profile_name = forced_profile
+                    directive_name = forced_directive
 
-                the_profile = self.configfile.get_profile(profile_name)
-                qname = the_profile.queue_name
+                the_directive = self.configfile.get_directive(directive_name)
+                qname = the_directive.queue_name()
                 if pytranscoder.verbose:
-                    print('Matched with profile {profile_name}')
+                    print('Matched with {the_directive}')
                 if qname is not None:
-                    if not self.configfile.has_queue(the_profile.queue_name):
+                    if not self.configfile.has_queue(the_directive.queue_name()):
                         print(crayons.red(
-                            f'Profile "{profile_name}" indicated queue "{qname}" that has not been defined')
+                            f'Profile "{the_directive}" indicated queue "{qname}" that has not been defined')
                         )
                         sys.exit(1)
                     else:
-                        self.queues[qname].put(LocalJob(path, the_profile, mixins, media_info))
+                        self.queues[qname].put(LocalJob(path, the_directive, mixins, media_info))
                         if pytranscoder.verbose:
                             print('Added to queue {qname}')
                 else:
-                    self.queues['_default_'].put(LocalJob(path, the_profile, mixins, media_info))
+                    self.queues['_default_'].put(LocalJob(path, the_directive, mixins, media_info))
 
 
 def cleanup_queuefile(queue_path: str, completed: Set):
@@ -353,7 +349,9 @@ def start():
             'name and .tmp extension')
         print('  -y <file>  Full path to configuration file.  Default is ~/.transcode.yml')
         print('  -p         profile to use. If used with --from-file, applies to all listed media in <filename>')
+        print('  -t         template to use, simpler alternative to profiles')
         print('  -m         Add mixins to profile. Separate multiples with a comma')
+        print('  --agent    Start in agent mode on a host and listen for transcode requests from other pytranscoder.')
         print('\n** PyPi Repo: https://pypi.org/project/pytranscoder-ffmpeg/')
         print('** Read the docs at https://pytranscoder.readthedocs.io/en/latest/')
         sys.exit(0)
@@ -362,6 +360,7 @@ def start():
 
     files = list()
     profile = None
+    template = None
     mixins = None
     queue_path = None
     agent_mode = False
@@ -382,6 +381,9 @@ def start():
                     files.extend([(f, cluster) for f in tmpfiles])
             elif sys.argv[arg] == '-p':                 # specific profile
                 profile = sys.argv[arg + 1]
+                arg += 1
+            elif sys.argv[arg] == '-t':                 # specific template
+                template = sys.argv[arg + 1]
                 arg += 1
             elif sys.argv[arg] == '-y':                 # specify yaml config file
                 arg += 1
@@ -411,9 +413,9 @@ def start():
                     expanded_files = [sys.argv[arg]]
                 for f in expanded_files:
                     if cluster is None:
-                        files.append((f, profile, mixins))
+                        files.append((f, profile or template, mixins))
                     else:
-                        files.append((f, cluster, profile, mixins))
+                        files.append((f, cluster, profile or template, mixins))
             arg += 1
 
     if agent_mode:
@@ -436,9 +438,9 @@ def start():
         tmpfiles = files_from_file(configfile.default_queue_file)
         queue_path = configfile.default_queue_file
         if cluster is None:
-            files.extend([(f, profile, mixins) for f in tmpfiles])
+            files.extend([(f, profile or template, mixins) for f in tmpfiles])
         else:
-            files.extend([(f, cluster, profile) for f in tmpfiles])
+            files.extend([(f, cluster, profile or template) for f in tmpfiles])
 
     if len(files) == 0:
         print(crayons.yellow(f'Nothing to do'))

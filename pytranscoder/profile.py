@@ -3,6 +3,32 @@ from __future__ import annotations
 from typing import Dict, List, Optional, Any
 
 
+class Directives:
+    def name(self) -> str:
+        pass
+
+    def extension(self) -> str:
+        pass
+
+    def input_options_list(self) -> List[str]:
+        pass
+
+    def output_options_list(self, config, mixins=None) -> List[str]:
+        pass
+
+    def threshold_check(self) -> int:
+        pass
+
+    def queue_name(self) -> str:
+        pass
+
+    def threshold(self) -> int:
+        pass
+
+    def stream_map(self, video_stream: str, audio: List, subtitle: List) -> List[str]:
+        pass
+
+
 class Options:
     def __init__(self, opts: List = None):
         self.options = list()
@@ -61,10 +87,10 @@ class Options:
         return z
 
 
-class Profile:
+class Profile(Directives):
     def __init__(self, name: str, profile: Optional[Dict] = None):
         self.profile: Dict[str, Any] = profile
-        self.name = name
+        self._name = name
 
         if not profile:
             self.profile: Dict[str, Any] = dict()
@@ -84,21 +110,16 @@ class Profile:
             if section_name in self.profile:
                 self.profile[section_name] = Options(profile[section_name])
 
-
     def get(self, key: str):
         return self.profile.get(key, None)
 
-    @property
-    def is_ffmpeg(self) -> bool:
-        return self.processor == 'ffmpeg'
+    def name(self) -> str:
+        return self._name
 
-    @property
-    def processor(self) -> str:
-        return self.profile.get('processor', 'ffmpeg')
+    def input_options_list(self) -> List[str]:
+        return self.profile["input_options"].as_shell_params()
 
-    @property
-    def input_options(self) -> Options:
-        return self.profile["input_options"]
+    #ooutput = self._manager.config.output_from_profile(_profile, job.mixins)
 
     @property
     def output_options(self) -> Options:
@@ -116,45 +137,17 @@ class Profile:
     def output_options_subtitle(self) -> Options:
         return self.profile.get("output_options_subtitle", None)
 
-    @property
     def extension(self) -> str:
         return self.profile['extension']
 
-    @extension.setter
-    def extension(self, ext: str):
-        self.profile["extension"] = ext
-
-    @property
     def queue_name(self) -> str:
         return self.profile.get('queue', None)
 
-    @queue_name.setter
-    def queue_name(self, name: str):
-        self.profile["queue"] = name
-
-    @property
     def threshold(self) -> int:
         return self.profile.get('threshold', 0)
 
-    @threshold.setter
-    def threshold(self, val):
-        self.profile["threshold"] = val
-
-    @property
     def threshold_check(self) -> int:
         return self.profile.get('threshold_check', 100)
-
-    @threshold_check.setter
-    def threshold_check(self, val):
-        self.profile["threshold_check"] = val
-
-    @property
-    def automap(self) -> bool:
-        return self.profile.get('automap', True)
-
-    @automap.setter
-    def automap(self, val: bool):
-        self.profile["automap"] = val
 
     @property
     def include_profiles(self) -> List[str]:
@@ -221,3 +214,94 @@ class Profile:
         if subtitle_section is None:
             return None
         return subtitle_section.get('default_language', [])
+
+    def _map_streams(self, stream_type: str, streams: List, excludes: list, includes: list, defl: str) -> list:
+        if excludes is None:
+            excludes = []
+        if not includes:
+            includes = None
+        seq_list = list()
+        mapped = list()
+        default_reassign = False
+        for s in streams:
+            stream_lang = s.get('lang', 'none')
+            #
+            # includes take precedence over excludes
+            #
+            if includes is not None and stream_lang not in includes:
+                if s.get('default', None) is not None:
+                    default_reassign = True
+                continue
+
+            if stream_lang in excludes:
+                if s.get('default', None) is not None:
+                    default_reassign = True
+                continue
+
+            # if we got here, map the stream
+            mapped.append(s)
+            seq = s['stream']
+            seq_list.append('-map')
+            seq_list.append(f'0:{seq}')
+
+        if default_reassign:
+            if defl is None:
+                print('Warning: A default stream will be removed but no default language specified to replace it')
+            else:
+                for i, s in enumerate(mapped):
+                    if s.get('lang', None) == defl:
+                        seq_list.append(f'-disposition:{stream_type}:{i}')
+                        seq_list.append('default')
+        return seq_list
+
+    def stream_map(self, video_stream: str, audio: List, subtitle: List) -> list:
+        excl_audio = self.excluded_audio()
+        excl_subtitle = self.excluded_subtitles()
+        incl_audio = self.included_audio()
+        incl_subtitle = self.included_subtitles()
+
+        defl_audio = self.default_audio()
+        defl_subtitle = self.default_subtitle()
+
+        if excl_audio is None:
+            excl_audio = []
+        if excl_subtitle is None:
+            excl_subtitle = []
+        #
+        # if no inclusions or exclusions just map everything
+        #
+        if len(incl_audio) == 0 and len(excl_audio) == 0 and len(incl_subtitle) == 0 and len(excl_subtitle) == 0:
+            return ['-map', '0']
+
+        seq_list = list()
+        seq_list.append('-map')
+        seq_list.append(f'0:{video_stream}')
+        audio_streams = self._map_streams("a", audio, excl_audio, incl_audio, defl_audio)
+        subtitle_streams = self._map_streams("s", subtitle, excl_subtitle, incl_subtitle, defl_subtitle)
+        return seq_list + audio_streams + subtitle_streams
+
+    @staticmethod
+    def find_mixin_section(mixins: List[Profile], mixin_type: str):
+        for mixin in mixins:
+            section_name = f'output_options_{mixin_type}'
+            if section_name in mixin.profile:
+                section = mixin.profile[section_name]
+                # mixins only allow one override, so take the first we find
+                return section.as_shell_params()
+        return []
+
+    def output_options_list(self, config, mixins=None) -> List[str]:
+        # start with output_options (not mixable)
+        output_opt = self.output_options.as_shell_params()
+        mixin_profiles = config.find_mixins(mixins)
+        for section in ['audio', 'video', 'subtitle']:
+            section_name = f'output_options_{section}'
+            if section_name in self.profile:
+                # we have a mixin-enabled section - see if there are mixins to apply
+                options = self.find_mixin_section(mixin_profiles, section)
+                if len(options) > 0:
+                    output_opt.extend(options)
+                else:
+                    # no mixin override, just use the section in the profile
+                    output_opt.extend(self.profile[section_name].as_shell_params())
+        return output_opt

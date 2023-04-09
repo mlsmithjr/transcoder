@@ -13,80 +13,55 @@ To get started right away, start with this configuration:
 
 .. code-block:: yaml
 
+
     config:
-        default_queue_file: '/tmp/queue.txt'
         ffmpeg:             '/usr/bin/ffmpeg'
         colorize:           yes
 
-    profiles:
-        x264:               # h264 encoding (CPU only)
-            input_options:
-            output_options:
-                - "-crf 20"
-                - "-c:a copy"
-                - "-c:s copy"
-                - "-f matroska"
-                - "-c:v x264"
-            threshold: 20
-            threshold_check: 60
+    templates:
+        qsv:            # high quality h265
+            cli:
+                video-codec: "-c:v hevc_qsv -preset medium -qp 21 -b:v 7000K -f matroska -max_muxing_queue_size 1024"
+                audio-codec: "-c:a copy"
+                subtitles: "-c:s copy"
+            audio-lang: eng
+            subtitle-lang: eng
+            threshold: 15
+            threshold_check: 30
             extension: '.mkv'
 
-        # may be out of date by now
-        hevc_cuda:                  # nVidia CUDA HEVC encoding
-            input_options:
-                - "-hwaccel cuvid"        # REQUIRED for CUDA
-                - "-c:v h264_cuvid"       # hardware decoding too
-            output_options:
-                - "-crf 20"
-                - "-c:a copy"
-                - "-c:s copy"
-                - "-f matroska"
-                - "-c:v hevc_nvenc"
-                - "-profile:v main"
-                - "-preset medium"
+        qsv_medium: # medium quality h265
+            cli:
+                video-codec: "-c:v hevc_qsv -preset medium -qp 21 -b:v 4000K -f matroska -max_muxing_queue_size 1024"
+                audio-codec: "-c:a ac3 -b:a 768k"
+                subtitles: "-c:s copy"
+            audio-lang: eng
+            subtitle-lang: eng
+            threshold: 15
+            threshold_check: 30
             extension: '.mkv'
-            threshold: 20
-            threshold_check: 60
 
-    rules:
+        qsv_anime:  # anime, medium quality h265 and keep both eng and jpn language tracks
+            cli:
+                video-codec: "-c:v hevc_qsv -preset medium -qp 21 -b:v 3000K -f matroska"
+                audio-codec: "-c:a ac3 -b:a 768k"
+                subtitles: "-c:s copy"
+            audio-lang: "eng jpn"
+            subtitle-lang: eng
+            threshold: 15
+            threshold_check: 30
+            extension: '.mkv'
 
-        'half-hour videos':
-            profile: 'x264'             # use profile called "x264"
-            criteria:
-                filesize_mb: '>500'     # 400mb file size or greater
-                runtime: '<31'          # 30 minutes or less runtime
-                vcodec: '!hevc'         # NOT hevc encoded video
-
-        'small enough already':       # skip if <2.5g size, between 720p and 1080p, and between 30 and 64 minutes long.
-            profile: SKIP             # transcoding these will probably cause a noticeable quality loss so skip.
-            criteria:
-                filesize_mb: '<2500'    # less than 2.5 gigabytes
-                res_height: '720-1081'  # 1080p, allowing for random oddball resolutions still in the HD range
-                runtime:  '35-65'       # between 35 and 65 minutes long
-
-        'default':
-            profile: hevc_cuda
-            criteria:
-                vcodec: '!hevc'
 
 
 Copy this file and save as **$HOME/.transcode.yml**, the default location pytranscoder will look for its configuration.
-Pick a video file to test with. Let's refer to it as "myvideo.mp4".
+Pick a video file to test with. Let's refer to it as "myvideo.mp4", using the "qsv" template defined above.
 
 .. code-block:: bash
 
-    pytranscoder --dry-run myvideo.mp4
+    pytranscoder --dry-run -t qsv myvideo.mp4
 
-You will see something like this:
-
-.. code-block:: bash
-
-    ----------------------------------------
-    Filename : myvideo.mp4
-    Profile  : hevc_cuda
-    ffmpeg   : -y -hwaccel cuvid -c:v h264_cuvid -i myvideo.mp4 -crf 20 -c:a copy -c:s copy -f matroska -c:v hevc_nvenc -profile:v main -preset medium myvideo.mkv.tmp
-
-This shows you the video to be encoded, the profile selected (from .transcoder.yml), and the ffmpeg command line to be used.
+You will see details of the ffmpeg command pytranscoder will use when you run for real.
 
 Use the **--dry-run** flag whenever you change your configuration to test that things work the way you intend. To run for real, omit --dry-run.  You'll see something like this:
 

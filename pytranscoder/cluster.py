@@ -22,7 +22,7 @@ from pytranscoder import verbose
 from pytranscoder.config import ConfigFile
 from pytranscoder.ffmpeg import FFmpeg
 from pytranscoder.media import MediaInfo
-from pytranscoder.profile import Profile
+from pytranscoder.profile import Directives
 from pytranscoder.utils import filter_threshold, get_local_os_type, calculate_progress, run
 
 
@@ -131,15 +131,20 @@ class RemoteHostProperties:
 
 class EncodeJob:
     """One file to be encoded"""
-    inpath:     str
+    inpath: str
     media_info: MediaInfo
-    profile_name: str
+    directive_name: str
 
-    def __init__(self, inpath: str, info: MediaInfo, profile_name: str, mixins: List[str]):
+    def __init__(self, inpath: str, info: MediaInfo, directive: Directives, mixins: Optional[List[str]]):
         self.inpath = os.path.abspath(inpath)
         self.media_info = info
-        self.profile_name = profile_name
+        self.directive = directive
         self.mixins = mixins
+
+    def should_abort(self, pct_comp) -> bool:
+        if self.directive.threshold_check() < 100:
+            return self.directive.threshold_check() <= pct_comp < self.directive.threshold()
+        return False
 
 
 class ManagedHost(Thread):
@@ -217,9 +222,9 @@ class ManagedHost(Thread):
     def ssh_test_ok(self):
         try:
             remote_cmd = 'dir' if self.props.is_windows() else 'ls'
-            #remote_cmd = 'ls'
+            # remote_cmd = 'ls'
             sshtest = subprocess.run([*self.ssh_cmd(), remote_cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                     shell=False, timeout=5)
+                                     shell=False, timeout=10)
             if sshtest.returncode != 0:
                 self.log('ssh test failed with the following output: ' + str(sshtest.stderr))
                 return False
@@ -238,15 +243,15 @@ class ManagedHost(Thread):
                 self.log(p.stderr)
         return p
 
-    def match_profile(self, job: EncodeJob, name: str) -> Optional[Profile]:
-        if job.profile_name is None:
-            rule = self.configfile.match_rule(job.media_info, restrict_profiles=self.props.profiles)
-            if rule is None:
-                self.log(crayons.yellow(
-                    f'Failed to match rule/profile for host {name} for file {job.inpath} - skipped'))
-                return None
-            job.profile_name = rule.profile
-        return self._manager.profiles[job.profile_name]
+    # def match_profile(self, job: EncodeJob, name: str) -> Optional[Profile]:
+    #     if job.directive_name is None:
+    #         rule = self.configfile.match_rule(job.media_info, restrict_profiles=self.props.profiles)
+    #         if rule is None:
+    #             self.log(crayons.yellow(
+    #                 f'Failed to match rule/profile for host {name} for file {job.inpath} - skipped'))
+    #             return None
+    #         job.directive_name = rule.profile
+    #     return self._manager.profiles[job.directive_name]
 
     def terminate(self):
         pass
@@ -280,30 +285,19 @@ class AgentManagedHost(ManagedHost):
                 job: EncodeJob = self.queue.get()
                 inpath = job.inpath
 
-
-                #
-                # Got to do the rule matching again.
-                # This time we narrow down the available profiles based on host definition
-                #
-                if pytranscoder.verbose:
-                    self.log('matching ' + inpath)
-
-                _profile: Profile = self.match_profile(job, self.name)
-                if _profile is None:
-                    continue
-
                 #
                 # build command line
                 #
 
-                oinput = _profile.input_options.as_shell_params()
-                ooutput = self._manager.config.output_from_profile(_profile, job.mixins)
-
                 remote_inpath = inpath
 
-                if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
-                    ooutput = ooutput + job.media_info.ffmpeg_streams(_profile)
-                cmd = [self.props.ffmpeg_path, '-y', *oinput, '-i', '{FILENAME}', *ooutput]
+                stream_map = []
+                if job.media_info.is_multistream() and self._manager.config.automap:
+                    stream_map = job.directive.stream_map(job.media_info.stream, job.media_info.audio,
+                                                          job.media_info.subtitle)
+
+                cmd = [self.props.ffmpeg_path, '-y', *job.directive.input_options_list(), '-i', '{FILENAME}',
+                       *job.directive.output_options_list(self._manager.config, job.mixins), *stream_map]
 
                 #
                 # display useful information
@@ -313,7 +307,7 @@ class AgentManagedHost(ManagedHost):
                     print('-' * 40)
                     print(f'Host     : {self.hostname} (agent)')
                     print('Filename : ' + crayons.green(os.path.basename(remote_inpath)))
-                    print(f'Profile  : {_profile.name}')
+                    print(f'Directive: {job.directive.name()}')
                     print('Command  : ' + ' '.join(cmd) + '\n')
                 finally:
                     self.lock.release()
@@ -325,18 +319,16 @@ class AgentManagedHost(ManagedHost):
 
                 def log_callback(stats):
                     pct_done, pct_comp = calculate_progress(job.media_info, stats)
-                    pytranscoder.status_queue.put({ 'host': self.hostname,
-                                                    'file': basename,
-                                                    'speed': stats['speed'],
-                                                    'comp': pct_comp,
-                                                    'done': pct_done})
+                    pytranscoder.status_queue.put({'host': self.hostname,
+                                                   'file': basename,
+                                                   'speed': stats['speed'],
+                                                   'comp': pct_comp,
+                                                   'done': pct_done})
 
-                    if _profile.threshold_check < 100:
-                        if pct_done >= _profile.threshold_check and pct_comp < _profile.threshold:
-                            # compression goal (threshold) not met, kill the job and waste no more time...
-                            self.log(f'Encoding of {basename} cancelled and skipped due to threshold not met')
-                            return True
-                    # continue
+                    if job.should_abort(pct_done):
+                        # compression goal (threshold) not met, kill the job and waste no more time...
+                        self.log(f'Encoding of {basename} cancelled and skipped due to threshold not met')
+                        return True
                     return False
 
                 #
@@ -458,14 +450,6 @@ class StreamingManagedHost(ManagedHost):
                 inpath = inpath.replace('\\ ', ' ')
 
                 #
-                # Got to do the rule matching again.
-                # This time we narrow down the available profiles based on host definition
-                #
-                _profile: Profile = self.match_profile(job, self.name)
-                if _profile is None:
-                    continue
-
-                #
                 # calculate full input and output paths
                 #
                 remote_working_dir = self.props.working_dir
@@ -475,15 +459,14 @@ class StreamingManagedHost(ManagedHost):
                 #
                 # build remote commandline
                 #
-                oinput = _profile.input_options.as_shell_params()
-                ooutput = self._manager.config.output_from_profile(_profile, job.mixins)
-#                ooutput = _profile.output_options.as_shell_params()
+                stream_map = []
+                if job.media_info.is_multistream() and self._manager.config.automap:
+                    stream_map = job.directive.stream_map(job.media_info.stream, job.media_info.audio,
+                                                          job.media_info.subtitle)
 
-                if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
-                    ooutput = ooutput + job.media_info.ffmpeg_streams(_profile)
-                cmd = ['-y', *oinput, '-i', self.converted_path(remote_inpath),
-                       *ooutput, self.converted_path(remote_outpath)]
-
+                cmd = ['-y', *job.directive.input_options_list(), '-i', self.converted_path(remote_inpath),
+                       *job.directive.output_options_list(self._manager.config, job.mixins), *stream_map,
+                       self.converted_path(remote_outpath)]
                 cli = [*ssh_cmd, *cmd]
 
                 #
@@ -494,7 +477,7 @@ class StreamingManagedHost(ManagedHost):
                     print('-' * 40)
                     print(f'Host     : {self.hostname} (streaming)')
                     print('Filename : ' + crayons.green(os.path.basename(remote_inpath)))
-                    print(f'Profile  : {job.profile_name}')
+                    print(f'Directive: {job.directive.name()}')
                     print('ssh      : ' + ' '.join(cli) + '\n')
                 finally:
                     self.lock.release()
@@ -524,18 +507,15 @@ class StreamingManagedHost(ManagedHost):
 
                 def log_callback(stats):
                     pct_done, pct_comp = calculate_progress(job.media_info, stats)
-                    pytranscoder.status_queue.put({ 'host': self.hostname,
-                                                    'file': basename,
-                                                    'speed': stats['speed'],
-                                                    'comp': pct_comp,
-                                                    'done': pct_done})
-#                    self.log(f'{basename}: speed: {stats["speed"]}x, comp: {pct_comp}%, done: {pct_done:3}%')
-                    if _profile.threshold_check < 100:
-                        if pct_done >= _profile.threshold_check and pct_comp < _profile.threshold:
-                            # compression goal (threshold) not met, kill the job and waste no more time...
-                            self.log(f'Encoding of {basename} cancelled and skipped due to threshold not met')
-                            return True
-                    # continue
+                    pytranscoder.status_queue.put({'host': self.hostname,
+                                                   'file': basename,
+                                                   'speed': stats['speed'],
+                                                   'comp': pct_comp,
+                                                   'done': pct_done})
+                    if job.should_abort(pct_done):
+                        # compression goal (threshold) not met, kill the job and waste no more time...
+                        self.log(f'Encoding of {basename} cancelled and skipped due to threshold not met')
+                        return True
                     return False
 
                 #
@@ -545,9 +525,9 @@ class StreamingManagedHost(ManagedHost):
                 code = self.ffmpeg.run_remote(self._manager.ssh, self.props.user, self.props.ip, cmd, log_callback)
                 job_stop = datetime.datetime.now()
 
-#                if code != 0:
-#                    self.log(crayons.red('Unknown error encoding on remote'))
-#                    continue
+                #                if code != 0:
+                #                    self.log(crayons.red('Unknown error encoding on remote'))
+                #                    continue
 
                 #
                 # copy results back to local
@@ -568,7 +548,7 @@ class StreamingManagedHost(ManagedHost):
                     continue
 
                 if code == 0:
-                    if not filter_threshold(_profile, inpath, retrieved_copy_name):
+                    if not filter_threshold(job.directive, inpath, retrieved_copy_name):
                         self.log(
                             f'Transcoded file {inpath} did not meet minimum savings threshold, skipped')
                         self.complete(inpath, (job_stop - job_start).seconds)
@@ -590,13 +570,15 @@ class StreamingManagedHost(ManagedHost):
 
                 # self.log(f'Removing temporary media copies from {remote_working_dir}')
                 if self.props.is_windows():
-#                    remote_outpath = self.converted_path(remote_outpath)
-#                    remote_inpath = self.converted_path(remote_inpath)
+                    #                    remote_outpath = self.converted_path(remote_outpath)
+                    #                    remote_inpath = self.converted_path(remote_inpath)
+                    remote_outpath = remote_outpath.replace("/", "\\")
+                    remote_inpath = remote_inpath.replace("/", "\\")
                     if get_local_os_type() == "linux":
                         remote_outpath = remote_outpath.replace(r"\\", "\\")
                         remote_inpath = remote_inpath.replace(r"\\", "\\")
-                    self.run_process([*ssh_cmd, f'del {remote_outpath}'])
-                    self.run_process([*ssh_cmd, f'del {remote_inpath}'])
+                    self.run_process([*ssh_cmd, f'del "{remote_outpath}"'])
+                    self.run_process([*ssh_cmd, f'del "{remote_inpath}"'])
                 else:
                     self.run_process([*ssh_cmd, f'"rm {remote_outpath}"'])
                     self.run_process([*ssh_cmd, f'"rm {remote_inpath}"'])
@@ -631,22 +613,10 @@ class MountedManagedHost(ManagedHost):
                 job: EncodeJob = self.queue.get()
                 inpath = job.inpath
 
-
-                #
-                # Got to do the rule matching again.
-                # This time we narrow down the available profiles based on host definition
-                #
-                if pytranscoder.verbose:
-                    self.log('matching ' + inpath)
-
-                _profile: Profile = self.match_profile(job, self.name)
-                if _profile is None:
-                    continue
-
                 #
                 # calculate paths
                 #
-                outpath = inpath[0:inpath.rfind('.')] + _profile.extension + '.tmp'
+                outpath = inpath[0:inpath.rfind('.')] + job.directive.extension() + '.tmp'
                 remote_inpath = inpath
                 remote_outpath = outpath
                 if self.props.has_path_subst:
@@ -658,17 +628,16 @@ class MountedManagedHost(ManagedHost):
                 #
                 # build command line
                 #
-
-                oinput = _profile.input_options.as_shell_params()
-                ooutput = self._manager.config.output_from_profile(_profile, job.mixins)
-#                ooutput = _profile.output_options.as_shell_params()
-
                 remote_inpath = self.converted_path(remote_inpath)
                 remote_outpath = self.converted_path(remote_outpath)
 
-                if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
-                    ooutput = ooutput + job.media_info.ffmpeg_streams(_profile)
-                cmd = ['-y', *oinput, '-i', f'"{remote_inpath}"', *ooutput, f'"{remote_outpath}"']
+                stream_map = []
+                if job.media_info.is_multistream() and self._manager.config.automap:
+                    stream_map = job.directive.stream_map(job.media_info.stream, job.media_info.audio,
+                                                          job.media_info.subtitle)
+                cmd = ['-y', *job.directive.input_options_list(), '-i', f'"{remote_inpath}"',
+                       *job.directive.output_options_list(self._manager.config, job.mixins), *stream_map,
+                       f'"{remote_outpath}"']
 
                 #
                 # display useful information
@@ -678,7 +647,8 @@ class MountedManagedHost(ManagedHost):
                     print('-' * 40)
                     print(f'Host     : {self.hostname} (mounted)')
                     print('Filename : ' + crayons.green(os.path.basename(remote_inpath)))
-                    print(f'Profile  : {_profile.name}')
+
+                    print(f'Directive: {job.directive.name()}')
                     print('ssh      : ' + ' '.join(cmd) + '\n')
                 finally:
                     self.lock.release()
@@ -690,19 +660,16 @@ class MountedManagedHost(ManagedHost):
 
                 def log_callback(stats):
                     pct_done, pct_comp = calculate_progress(job.media_info, stats)
-                    pytranscoder.status_queue.put({ 'host': self.hostname,
-                                                    'file': basename,
-                                                    'speed': stats['speed'],
-                                                    'comp': pct_comp,
-                                                    'done': pct_done})
+                    pytranscoder.status_queue.put({'host': self.hostname,
+                                                   'file': basename,
+                                                   'speed': stats['speed'],
+                                                   'comp': pct_comp,
+                                                   'done': pct_done})
 
-#                    self.log(f'{basename}: speed: {stats["speed"]}x, comp: {pct_comp}%, done: {pct_done:3}%')
-                    if _profile.threshold_check < 100:
-                        if pct_done >= _profile.threshold_check and pct_comp < _profile.threshold:
-                            # compression goal (threshold) not met, kill the job and waste no more time...
-                            self.log(f'Encoding of {basename} cancelled and skipped due to threshold not met')
-                            return True
-                    # continue
+                    if job.should_abort(pct_done):
+                        # compression goal (threshold) not met, kill the job and waste no more time...
+                        self.log(f'Encoding of {basename} cancelled and skipped due to threshold not met')
+                        return True
                     return False
 
                 #
@@ -722,7 +689,7 @@ class MountedManagedHost(ManagedHost):
                     continue
 
                 if code == 0:
-                    if not filter_threshold(_profile, inpath, outpath):
+                    if not filter_threshold(job.directive, inpath, outpath):
                         self.log(
                             f'Transcoded file {inpath} did not meet minimum savings threshold, skipped')
                         self.complete(inpath, (job_stop - job_start).seconds)
@@ -779,33 +746,23 @@ class LocalHost(ManagedHost):
                 inpath = job.inpath
 
                 #
-                # Got to do the rule matching again.
-                # This time we narrow down the available profiles based on host definition
-                #
-                if pytranscoder.verbose:
-                    self.log('matching ' + inpath)
-
-                _profile: Profile = self.match_profile(job, self.name)
-                if _profile is None:
-                    continue
-                #
                 # calculate paths
                 #
-                outpath = inpath[0:inpath.rfind('.')] + _profile.extension + '.tmp'
+                outpath = inpath[0:inpath.rfind('.')] + job.directive.extension() + '.tmp'
 
                 #
                 # build command line
                 #
-                oinput = _profile.input_options.as_shell_params()
-                ooutput = self._manager.config.output_from_profile(_profile, job.mixins)
-#                ooutput = _profile.output_options.as_shell_params()
-
                 remote_inpath = self.converted_path(inpath)
                 remote_outpath = self.converted_path(outpath)
 
-                if job.media_info.is_multistream() and self.configfile.automap and _profile.automap:
-                    ooutput = ooutput + job.media_info.ffmpeg_streams(_profile)
-                cli = ['-y', *oinput, '-i', remote_inpath, *ooutput, remote_outpath]
+                stream_map = []
+                if job.media_info.is_multistream() and self._manager.config.automap:
+                    stream_map = job.directive.stream_map(job.media_info.stream, job.media_info.audio,
+                                                          job.media_info.subtitle)
+                cli = ['-y', *job.directive.input_options_list(), '-i', remote_inpath,
+                       *job.directive.output_options_list(self._manager.config, job.mixins), *stream_map,
+                       remote_outpath]
 
                 #
                 # display useful information
@@ -815,7 +772,7 @@ class LocalHost(ManagedHost):
                     print('-' * 40)
                     print(f'Host     : {self.hostname} (local)')
                     print('Filename : ' + crayons.green(os.path.basename(remote_inpath)))
-                    print(f'Profile  : {_profile.name}')
+                    print(f'Directive: {job.directive.name()}')
                     print('ffmpeg   : ' + ' '.join(cli) + '\n')
                 finally:
                     self.lock.release()
@@ -827,18 +784,16 @@ class LocalHost(ManagedHost):
 
                 def log_callback(stats):
                     pct_done, pct_comp = calculate_progress(job.media_info, stats)
-                    pytranscoder.status_queue.put({ 'host': 'local',
-                                                    'file': basename,
-                                                    'speed': stats['speed'],
-                                                    'comp': pct_comp,
-                                                    'done': pct_done})
+                    pytranscoder.status_queue.put({'host': 'local',
+                                                   'file': basename,
+                                                   'speed': stats['speed'],
+                                                   'comp': pct_comp,
+                                                   'done': pct_done})
 
-#                    self.log(f'{basename}: speed: {stats["speed"]}x, comp: {pct_comp}%, done: {pct_done:3}%')
-                    if _profile.threshold_check < 100:
-                        if pct_done >= _profile.threshold_check and pct_comp < _profile.threshold:
-                            # compression goal (threshold) not met, kill the job and waste no more time...
-                            self.log(f'Encoding of {basename} cancelled and skipped due to threshold not met')
-                            return True
+                    if job.should_abort(pct_done):
+                        # compression goal (threshold) not met, kill the job and waste no more time...
+                        self.log(f'Encoding of {basename} cancelled and skipped due to threshold not met')
+                        return True
                     return False
 
                 #
@@ -858,7 +813,7 @@ class LocalHost(ManagedHost):
                     continue
 
                 if code == 0:
-                    if not filter_threshold(_profile, inpath, outpath):
+                    if not filter_threshold(job.directive, inpath, outpath):
                         self.log(
                             f'Transcoded file {inpath} did not meet minimum savings threshold, skipped')
                         self.complete(inpath, (job_stop - job_start).seconds)
@@ -891,7 +846,7 @@ class LocalHost(ManagedHost):
 class Cluster(Thread):
     """Thread to create host threads and wait for their completion."""
 
-    terminal_lock:  Lock = Lock()       # class-level
+    terminal_lock: Lock = Lock()  # class-level
 
     def __init__(self, name, configs: Dict, config: ConfigFile, ssh: str):
         """
@@ -974,7 +929,7 @@ class Cluster(Thread):
             else:
                 print(crayons.red(f'Unknown cluster host type "{hosttype}" - skipping'))
 
-    def enqueue(self, file, forced_profile: Optional[str]) -> (str, Optional[EncodeJob]):
+    def enqueue(self, file, forced_directive: Optional[str]) -> (str, Optional[EncodeJob]):
         """Add a media file to this cluster queue.
            This is different than in local mode in that we only care about handling skips here.
            The profile will be selected once a host is assigned to the work
@@ -990,16 +945,16 @@ class Cluster(Thread):
             print(crayons.red(f'File not found: {path}'))
             return None, None
         if media_info.valid:
+            directive = None
 
             if pytranscoder.verbose:
                 print(str(media_info))
 
-            if forced_profile is None:
+            if forced_directive is None:
                 #
                 # just interested in SKIP rule matches and queue designations here
                 #
 
-                profile = None
                 rule = self.config.match_rule(media_info)
                 if rule is None:
                     print(crayons.yellow(f'No matching profile found - skipped'))
@@ -1008,20 +963,24 @@ class Cluster(Thread):
                     basename = os.path.basename(path)
                     print(f'{basename}: Skipping due to profile rule - {rule.name}')
                     return None, None
-                profile = self.profiles[rule.profile]
+                directive = self.directives[rule.profile]
             else:
-                profile = self.profiles[forced_profile]
+                if forced_directive in self.directives:
+                    directive = self.directives[forced_directive]
+                else:
+                    print(f"{forced_directive} not found")
+                    return None, None
 
             if pytranscoder.verbose:
-                print(f"Matched to profile {profile.name}")
+                print(f"Matched to profile {directive.name()}")
 
             # not short circuited by a skip rule, add to appropriate queue
-            queue_name = profile.queue_name if profile.queue_name is not None else '_default'
+            queue_name = directive.queue_name() if directive.queue_name() is not None else '_default'
             if queue_name not in self.queues:
                 print(crayons.red('Error: ') +
-                      f'Queue "{queue_name}" referenced in profile "{profile.name}" not defined in any host')
+                      f'Queue "{queue_name}" referenced in "{directive.name()}" not defined in any host')
                 exit(1)
-            job = EncodeJob(file, media_info, profile.name, None)
+            job = EncodeJob(file, media_info, directive, None)
             self.queues[queue_name].put(job)
             return queue_name, job
         return None, None
@@ -1050,8 +1009,8 @@ class Cluster(Thread):
             host.terminate()
 
     @property
-    def profiles(self):
-        return self.config.profiles
+    def directives(self):
+        return self.config.directives
 
 
 def manage_clusters(files, config: ConfigFile, testing=False) -> List:
@@ -1116,7 +1075,7 @@ def manage_clusters(files, config: ConfigFile, testing=False) -> List:
         #
         # wait for each cluster thread to complete
         #
-#        for _, cluster in clusters.items():
-#            cluster.join()
-#            completed.extend(cluster.completed)
+    #        for _, cluster in clusters.items():
+    #            cluster.join()
+    #            completed.extend(cluster.completed)
     return completed

@@ -1,72 +1,39 @@
 config:
-    default_queue_file: '/tmp/queue.txt'
     ffmpeg:             '/usr/bin/ffmpeg'
     colorize:           yes
 
-profiles:
-    x264:               # h264 encoding
-        input_options:
-        output_options:
-        - "-crf 20"
-        - "-c:a copy"
-        - "-c:s copy"
-        - "-f matroska"
-        - "-c:v x264"
-        threshold: 20
-        threshold_check: 60
-        extension: '.mkv'
+templates:
+  qsv:
+    cli:
+      video-codec: "-c:v hevc_qsv -preset medium -qp 21 -b:v 7000K -f matroska -max_muxing_queue_size 1024"
+      audio-codec: "-c:a copy"
+      subtitles: "-c:s copy"
+    audio-lang: eng
+    subtitle-lang: eng
+    threshold: 15
+    threshold_check: 30
+    extension: '.mkv'
 
-    hevc_cuda:                  # nVidia CUDA HEVC encoding
-        input_options:
-            - "-hwaccel cuvid"        # REQUIRED for CUDA
-            - "-c:v h264_cuvid"       # hardware decoding too
-        output_options:
-            - "-crf 20"
-            - "-c:a copy"
-            - "-c:s copy"
-            - "-f matroska"
-            - "-c:v hevc_nvenc"
-            - "-profile:v main"
-            - "-preset medium"
-        extension: '.mkv'
-        threshold: 20
-        threshold_check: 60
+  qsv_medium:
+    cli:
+      video-codec: "-c:v hevc_qsv -preset medium -qp 21 -b:v 4000K -f matroska -max_muxing_queue_size 1024"
+      audio-codec: "-c:a ac3 -b:a 768k"
+      subtitles: "-c:s copy"
+    audio-lang: eng
+    subtitle-lang: eng
+    threshold: 15
+    threshold_check: 30
+    extension: '.mkv'
 
-    h264_cuda_anime:
-        input_options:
-        output_options:
-            - "-crf 20"
-            - "-c:a copy"
-            - "-c:s copy"
-            - "-f matroska"
-            - "-c:v h264_nvenc"
-            - "-tune animation"
-        extension: '.mkv'
-        threshold: 20
-        threshold_check: 60
+  qsv_anime:
+    cli:
+      video-codec: "-c:v hevc_qsv -preset medium -qp 21 -b:v 3000K -f matroska"
+      audio-codec: "-c:a ac3 -b:a 768k"
+      subtitles: "-c:s copy"
+    audio-lang: "eng jpn"
+    subtitle-lang: eng
+    threshold: 15
+    threshold_check: 30
+    extension: '.mkv'
 
-rules:
-    'anime to h264 using tuning':
-        profile: h264_cuda_anime
-        criteria:
-            filesize_mb: '>2500'   # larger than 2.5g
-            vcodec: '!hevc'            # not encoded with hevc
-            path: '/media/anime/.*'  # in a anime folder (regex)
-
-    'half-hour videos':
-        profile: 'x264'             # use profile called "x264"
-        criteria:
-            filesize_mb: '>500'     # 400mb file size or greater
-            runtime: '<31'          # 30 minutes or less runtime
-            vcodec: '!hevc'         # NOT hevc encoded video
-
-    'small enough already':       # skip if <2.5g size, between 720p and 1080p, and between 30 and 64 minutes long.
-        profile: SKIP             # transcoding these will probably cause a noticeable quality loss so skip.
-        criteria:
-            filesize_mb: '<2500'    # less than 2.5 gigabytes
-            res_height: '720-1081'  # 1080p, allowing for random oddball resolutions still in the HD range
-            runtime:  '35-65'       # between 35 and 65 minutes long
-
-    'default':                       # this will be the DEFAULT (no criteria implies a match)
-        profile: hevc_cuda
 

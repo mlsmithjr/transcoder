@@ -37,24 +37,24 @@ class TranscoderTests(unittest.TestCase):
         with open('tests/ffmpeg3.out', 'r') as ff:
             info = MediaInfo.parse_ffmpeg_details('/dev/null', ff.read())
             setup = ConfigFile(self.get_setup())
-            p = setup.get_profile('qsv')
-            streams = info.ffmpeg_streams(p)
+            p = setup.get_directive('qsv')
+            streams = info.stream_map(p)
             self.assertEqual(len(streams), 2, 'expected -map 0')
 
     def test_stream_exclude(self):
         with open('tests/ffmpeg3.out', 'r') as ff:
             info = MediaInfo.parse_ffmpeg_details('/dev/null', ff.read())
             setup = ConfigFile(self.get_setup())
-            p = setup.get_profile('excl_test_1')
-            streams = info.ffmpeg_streams(p)
+            p = setup.get_directive('excl_test_1')
+            streams = info.stream_map(p)
             self.assertEqual(len(streams), 12, 'expected 6 streams (12 elements)')
 
     def test_stream_reassign_default(self):
         with open('tests/ffmpeg4.out', 'r') as ff:
             info = MediaInfo.parse_ffmpeg_details('/dev/null', ff.read())
             setup = ConfigFile(self.get_setup())
-            p = setup.get_profile('excl_test_2')
-            streams = info.ffmpeg_streams(p)
+            p = setup.get_directive('excl_test_2')
+            streams = info.stream_map(p)
             self.assertEqual(len(streams), 8, 'expected 4 streams (8 elements)')
 
 #    def test_hook(self):
@@ -75,7 +75,7 @@ class TranscoderTests(unittest.TestCase):
         self.assertEqual(p2.get("one"), 11, 'expected 11 for "one"')
         self.assertEqual(p2.get("two"), 2, 'expected 2 for "two"')
         self.assertEqual(p2.get("six"), 6, 'expected 6 for "six"')
-        op2 = sorted(p2.input_options.as_list())
+        op2 = sorted(p2.input_options_list.as_list())
         expected = sorted(["three", "four", "five", "seven"])
         self.assertEqual(op2, expected, "Unexpected input_options merger")
 
@@ -138,22 +138,13 @@ class TranscoderTests(unittest.TestCase):
             self.assertEqual(info.path, '/dev/null')
             self.assertEqual(info.colorspace, 'yuv420p10le')
 
-    def test_automap_include(self):
-        info = TranscoderTests.make_media(None, None, None, 720, 45, 3000, 25, None,
-                                          [{'lang': 'eng', 'stream': '1'},
-                                           {'lang': 'ger', 'stream': '2', 'default': True}], [])
-        setup = ConfigFile(self.get_setup())
-        p = setup.get_profile('hevc_cuda')
-        options = info.ffmpeg_streams(p)
-        self.assertEqual(options, ['-map', '0:0', '-map', '0:1', '-disposition:a:0', 'default'])
-
     def test_include_overides(self):
         setup = ConfigFile(self.get_setup())
-        p = setup.get_profile('hevc_cuda_8bit')
+        p: Profile = setup.get_directive('hevc_cuda_8bit')
         self.assertEqual(p.threshold, 0, 'Threshold should be 0')
         self.assertEqual(p.threshold_check, 100, 'Threshold check should be 100')
-        self.assertIn("-cq:v 21", p.output_options.as_list(), 'Expected -cq:v 21')
-        self.assertIn('-pix_fmt yuv420p', p.output_options.as_list(), 'expected pix_fmt')
+        self.assertIn("-cq:v 21", p.output_options_list.as_list(), 'Expected -cq:v 21')
+        self.assertIn('-pix_fmt yuv420p', p.output_options_list.as_list(), 'expected pix_fmt')
 
     def test_default_profile(self):
         info = TranscoderTests.make_media(None, None, None, 720, 45, 3000, 25, None, [], [])

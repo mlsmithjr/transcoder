@@ -45,13 +45,13 @@ These options apply globally to pytranscoder.
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | automap               | optional, defaults to "yes". If "yes" then auto calculate and insert *ffmpeg* **-map** options to preserve all audio and subtitle tracks                                                                                                  |
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| fls_path              | optional. If given, this path is used when transcoding to build the output file. This reduces drive thrashing if the source is on a network share. When finished, the output is only then moved to the source.     |
+| fls_path              | optional. If given, this path is used when transcoding to build the output file. This reduces drive thrashing if the source is on a network share. When finished, the output is only then moved to the source.                            |
 +-----------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 
---------
-Profiles
---------
+-------------------
+Profiles (optional)
+-------------------
 
 Profiles are used to provide the encoder with various options for encoding. One profile definition is required, but mostly likely
 you will define multiples for different encoding scenarios.  The name of the profile can be provided on the command line
@@ -142,10 +142,10 @@ one or more other profiles to create a new, combined one. Use this to isolate co
 
 +-------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | Setting                 | Purpose                                                                                                                                                                       |
-+====================--===+===============================================================================================================================================================================+
-| input_options           | Encoder options related to the input (see ffmpeg docs)                                                                                                        |
++=========================+===============================================================================================================================================================================+
+| input_options           | Encoder options related to the input (see ffmpeg docs)                                                                                                                        |
 +-------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| output_options          | General encoder options related to the output (see ffmpeg docs).                                                                                              |
+| output_options          | General encoder options related to the output (see ffmpeg docs).                                                                                                              |
 +-------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | output_options_video    | Video-specific encoder options. Works like output_options except this is mixin-enabled.                                                                                       |
 +-------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -177,9 +177,9 @@ one or more other profiles to create a new, combined one. Use this to isolate co
 .. note::
     When transcoding from h264 on an Intel I5/I7 6th+ gen chip, *ffmpeg* will use detected extensions to basically perform hardware decoding for you. So if you configured hardware encoding you'll see low CPU use. On AMD there is no chip assistance on decoding.  So even if hardware encoding, the decoding process will load down your CPU. To fix this simply enable hardware decoding as an **input option**.
 
------
+----------------
 Rules (optional)
------
+----------------
 
 Simple expressions to match video files with the appropriate profile. They are evaluated top-down so
 make sure your default is the last one. You don't need to use the rules system. You can either

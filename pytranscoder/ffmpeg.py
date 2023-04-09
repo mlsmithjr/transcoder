@@ -85,7 +85,10 @@ class FFmpeg(Processor):
 
         if proc.returncode == 0:
             # if we got here then everything went fine, so remove the transaction log
-            os.remove(str(self.log_path))
+            try:
+                os.remove(str(self.log_path))
+            except Exception:
+                pass
             self.log_path = None
 
     def monitor_agent(self, sock):
@@ -96,6 +99,12 @@ class FFmpeg(Processor):
             if c.startswith("DONE|") or c.startswith("ERR|"):
                 print("Transcode complete, receiving results..")
                 # found end of processing marker
+                try:
+                    os.remove(str(self.log_path))
+                    self.log_path = None
+                except Exception:
+                    pass
+
                 yield c
 
             sock.send(bytes("ACK!".encode()))
