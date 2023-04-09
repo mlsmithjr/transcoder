@@ -1,6 +1,9 @@
 
 ### Version History
 
+Version 2.2.6:
+    * Added new templates which can be used instead of the more complicated profiles
+
 Version 2.2.5:
     * Much overdue doc updates
     * Addition of agent mode as alternative to using ssh.

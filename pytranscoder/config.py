@@ -34,15 +34,16 @@ class ConfigFile:
             #
             # load profiles
             #
-            for name, profile in yml['profiles'].items():
-                p = Profile(name, profile)
-                self.directives[name] = p
-                parent_names = p.include_profiles
-                for parent_name in parent_names:
-                    if parent_name not in self.directives:
-                        print(f'Profile error ({name}: included "{parent_name}" not defined')
-                        exit(1)
-                    p.include(self.directives[parent_name])
+            if 'profiles' in yml:
+                for name, profile in yml['profiles'].items():
+                    p = Profile(name, profile)
+                    self.directives[name] = p
+                    parent_names = p.include_profiles
+                    for parent_name in parent_names:
+                        if parent_name not in self.directives:
+                            print(f'Profile error ({name}: included "{parent_name}" not defined')
+                            exit(1)
+                        p.include(self.directives[parent_name])
             #
             # load templates
             #
@@ -50,8 +51,9 @@ class ConfigFile:
                 for name, template in yml['templates'].items():
                     self.directives[name] = Template(name, template)
 
-            for name, rule in yml['rules'].items():
-                self.rules[name] = Rule(name, rule)
+            if 'rules' in yml:
+                for name, rule in yml['rules'].items():
+                    self.rules[name] = Rule(name, rule)
 
             if 'queues' in self.settings:
                 self.queues = self.settings['queues']
