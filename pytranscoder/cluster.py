@@ -577,8 +577,8 @@ class StreamingManagedHost(ManagedHost):
                     if get_local_os_type() == "linux":
                         remote_outpath = remote_outpath.replace(r"\\", "\\")
                         remote_inpath = remote_inpath.replace(r"\\", "\\")
-                    self.run_process([*ssh_cmd, f'del {remote_outpath}'])
-                    self.run_process([*ssh_cmd, f'del {remote_inpath}'])
+                    self.run_process([*ssh_cmd, f'del "{remote_outpath}"'])
+                    self.run_process([*ssh_cmd, f'del "{remote_inpath}"'])
                 else:
                     self.run_process([*ssh_cmd, f'"rm {remote_outpath}"'])
                     self.run_process([*ssh_cmd, f'"rm {remote_inpath}"'])
@@ -647,6 +647,7 @@ class MountedManagedHost(ManagedHost):
                     print('-' * 40)
                     print(f'Host     : {self.hostname} (mounted)')
                     print('Filename : ' + crayons.green(os.path.basename(remote_inpath)))
+
                     print(f'Directive: {job.directive.name()}')
                     print('ssh      : ' + ' '.join(cmd) + '\n')
                 finally:

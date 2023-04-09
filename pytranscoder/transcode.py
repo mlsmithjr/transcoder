@@ -278,7 +278,7 @@ class LocalHost:
                 the_directive = self.configfile.get_directive(directive_name)
                 qname = the_directive.queue_name()
                 if pytranscoder.verbose:
-                    print(f'Matched with {the_directive}')
+                    print('Matched with {the_directive}')
                 if qname is not None:
                     if not self.configfile.has_queue(the_directive.queue_name()):
                         print(crayons.red(
@@ -288,7 +288,7 @@ class LocalHost:
                     else:
                         self.queues[qname].put(LocalJob(path, the_directive, mixins, media_info))
                         if pytranscoder.verbose:
-                            print(f'Added to queue {qname}')
+                            print('Added to queue {qname}')
                 else:
                     self.queues['_default_'].put(LocalJob(path, the_directive, mixins, media_info))
 
