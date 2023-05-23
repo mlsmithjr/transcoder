@@ -38,7 +38,11 @@ class Template(Directives):
         return self.template.get(key, None)
 
     def extension(self) -> str:
-        return self.template['extension']
+        ext = self.template.get('extension', None)
+        if not ext:
+            print(f"Required value for 'extension' missing in template {self.name}")
+            exit(1)
+        return ext
 
     def name(self) -> str:
         return self._name

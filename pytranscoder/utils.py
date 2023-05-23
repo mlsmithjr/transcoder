@@ -27,7 +27,7 @@ def is_exceeded_threshold(pct_threshold: int, orig_size: int, new_size: int) -> 
 
 def files_from_file(queuepath) -> list:
     if not os.path.exists(queuepath):
-        print(f'Queue file {queuepath} not found')
+        print(f'Nothing to do.')
         return []
     with open(queuepath, 'r') as qf:
         _files = [fn.rstrip() for fn in qf.readlines()]
