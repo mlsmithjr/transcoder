@@ -1,6 +1,9 @@
 
 ### Version History
 
+Version 2.2.7:
+    * Fixed streaming host class where spaces in filenames weren't being recognized by Windows
+
 Version 2.2.6:
     * Added new templates which can be used instead of the more complicated profiles
 
