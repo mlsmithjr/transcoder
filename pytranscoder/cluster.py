@@ -47,7 +47,7 @@ class RemoteHostProperties:
         return self.props['os']
 
     @property
-    def profiles(self) -> [str]:
+    def profiles(self) -> List[str]:
         return self.props.get('profiles', None)
 
     @property
@@ -74,7 +74,7 @@ class RemoteHostProperties:
     def queues(self) -> Dict:
         return self.props.get('queues', {'_default': 1})
 
-    def substitute_paths(self, in_path, out_path) -> (str, str):
+    def substitute_paths(self, in_path, out_path):
         lst = self.props['path-substitutions']
         for item in lst:
             src, dest = item.split(' ')
@@ -199,6 +199,7 @@ class ManagedHost(Thread):
 
     def converted_path(self, path):
         if self.props.is_windows():
+            path = '"' + path + '"'
             return str(PureWindowsPath(path))
         else:
             return str(PosixPath(path))
@@ -578,10 +579,8 @@ class StreamingManagedHost(ManagedHost):
                         remote_outpath = remote_outpath.replace(r"\\", "\\")
                         remote_inpath = remote_inpath.replace(r"\\", "\\")
                     self.run_process([*ssh_cmd, f'del "{remote_outpath}"'])
-                    self.run_process([*ssh_cmd, f'del "{remote_inpath}"'])
                 else:
                     self.run_process([*ssh_cmd, f'"rm {remote_outpath}"'])
-                    self.run_process([*ssh_cmd, f'"rm {remote_inpath}"'])
 
             finally:
                 self.queue.task_done()
@@ -929,7 +928,7 @@ class Cluster(Thread):
             else:
                 print(crayons.red(f'Unknown cluster host type "{hosttype}" - skipping'))
 
-    def enqueue(self, file, forced_directive: Optional[str]) -> (str, Optional[EncodeJob]):
+    def enqueue(self, file, forced_directive: Optional[str]):
         """Add a media file to this cluster queue.
            This is different than in local mode in that we only care about handling skips here.
            The profile will be selected once a host is assigned to the work

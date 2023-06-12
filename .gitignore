@@ -1,8 +1,7 @@
-.idea
-dist
-build
-.AppleDouble
-*egg-info
+.DS_Store
 __pycache__
-_build
-*.sh
+.vscode
+build
+dist
+docs/_build
+pytranscoder_ffmpeg.egg-info
