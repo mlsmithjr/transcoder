@@ -7,11 +7,10 @@ for automation.
 
 #### News
 
-**Coming soon**
-
-Version 3 will include an alternate means of configuring your setup.  Let's face it, all that YAML is confusing.
-The new version will use templating and be far simpler and very much smaller -- all my converted profiles fit on one screen now.
-Existing profile support will remain indefinitely for users with more complicated setups, but templates will appeal more to most users.
+**End of Life**
+Sadly this project has reached end of life. It will remain here but no further development will happen unless there is some compelling need.
+Instead, a new project called [wandarr](https://github.com/mlsmithjr/wandarr) has been created from the foundation of pytranscoder. It is far simpler and doesn't try to be "all things to all people".
+Gone are the rules, profiles, and mixins.  Instead there are simple templates.  Clustering is still supported, but simplified and now supporting multiple type of hardware acceleration on the same machine (something pytranscoder could not do)
 
 
 #### What it is
@@ -45,8 +44,6 @@ nVidia CUDA-enabled graphics card or Intel accelerated video (QSV)
 
 #### Support
 Please log issues or questions via the github home page for now.
-
-Video Tutorials: [Part 1 - Linux Setup](https://www.youtube.com/watch?v=LHhC_w34Kd0&t=5s), [Part 2 - Usage](https://www.youtube.com/watch?v=Os6UACDAOKA)
 
 #### Installation
 
