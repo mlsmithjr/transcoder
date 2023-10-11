@@ -7,7 +7,6 @@ for automation.
 
 #### News
 
-**End of Life**
 Sadly this project has reached end of life. It will remain here but no further development will happen unless there is some compelling need.
 Instead, a new project called [wandarr](https://github.com/mlsmithjr/wandarr) has been created from the foundation of pytranscoder. It is far simpler and doesn't try to be "all things to all people".
 Gone are the rules, profiles, and mixins.  Instead there are simple templates.  Clustering is still supported, but simplified and now supporting multiple type of hardware acceleration on the same machine (something pytranscoder could not do)
